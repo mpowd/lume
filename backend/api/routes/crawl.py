@@ -6,6 +6,7 @@ from pydantic import BaseModel, HttpUrl
 import logging
 import os
 import httpx
+import json
 
 
 logging.basicConfig(level=logging.INFO)
@@ -15,12 +16,14 @@ router = APIRouter()
 
 class URLCrawlRequest(BaseModel):
     base_url: HttpUrl
-    depth: int = 2
-    max_pages: int = 50
-    include_external_domains: bool = False
+    depth: int
+    max_pages: int
+    include_external_domains: bool
 
 @router.get("/")
-async def crawl_url(base_url: HttpUrl, depth: int = 2, max_pages: int = 50, include_external_domains: bool = False):
+async def crawl_url(base_url: HttpUrl, depth: int = 2, max_pages: int = 200, include_external_domains: bool = False):
+
+    logger.info(f"Prepare crawl request with params: base_url={str(base_url)}, depth={depth}, max_pages={max_pages}, include_external_domains={include_external_domains}")
     # Create the request object
     url_crawl_request = URLCrawlRequest(
         base_url=base_url,
@@ -32,7 +35,7 @@ async def crawl_url(base_url: HttpUrl, depth: int = 2, max_pages: int = 50, incl
     try:
         with httpx.Client(timeout=500.0) as client:
             response = client.get(
-                f"http://crawl4ai-service:11235/crawl",
+                f"http://crawler:11235/crawl",
                 params={
                     "base_url": str(url_crawl_request.base_url),
                     "depth": url_crawl_request.depth,
@@ -40,9 +43,15 @@ async def crawl_url(base_url: HttpUrl, depth: int = 2, max_pages: int = 50, incl
                     "include_external_domains": url_crawl_request.include_external_domains
                 }
             )
+
+        urls = json.loads(response.text)['response']['urls']
+
         return {
             "status": "success",
-            "response": response.json()
+            "response": {
+                "status": "success",
+                "urls": urls
+            }
         }
     except Exception as e:
         logger.error(f"Error crawling URL {url_crawl_request.base_url}: {str(e)}")

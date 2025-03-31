@@ -166,24 +166,34 @@ for i in range(len(collection_tabs)):
                 with col2:
                     crawl_depth = st.number_input('Depth', min_value=0, max_value=5, value=2, step=1, key=f"{collection_name}_crawl_depth")
                 
-                if st.button("Preview URLs", key=f"{collection_name}_preview", type="primary"):
+                if st.button("Fetch URLs", key=f"{collection_name}_preview", type="primary"):
                     if base_url:
-                        with httpx.Client(timeout=500.0) as client:
-                            try:
-                                response = client.get(
-                                    "http://api:8000/crawl",
-                                    params={"base_url": base_url, "depth": crawl_depth, "max_pages": 50},
-                                    follow_redirects=True
-                                )
-                                st.write(f"Status code: {response.status_code}")
-                                st.write(f"Response headers: {response.headers}")
-                                st.write(f"Response content: {response.text}")
-                            
+                        with st.spinner("Searching for internal urls. This can take a few minutes..."):
+                            with httpx.Client(timeout=500.0, follow_redirects=True) as client:
+                                try:
+                                    response = client.get(
+                                        f"http://api:8000/crawl",
+                                        params={
+                                            "base_url": base_url,
+                                            "depth": int(crawl_depth),  # Ensure it's an integer
+                                            "max_pages": 50,
+                                            "include_external_domains": False
+                                        }
+                                    )
+                                    # st.write(f"Status code: {response.status_code}")
+                                    # st.write(f"Response headers: {response.headers}")
+                                    # st.write(f"Response content: {response.text}")
 
-                                # st.success("Succesfully send a crawl request with url = {response.json}")
-                                # st.rerun()
-                            except Exception as e:
-                                st.error(f"There was an error while crawling the URL {base_url}.")
+                                    response_json = json.loads(response.text)
+                                    crawled_urls = response_json['response']['urls']
+
+                                    st.write(crawled_urls)
+                                
+
+                                    # st.success("Succesfully send a crawl request with url = {response.json}")
+                                    # st.rerun()
+                                except Exception as e:
+                                    st.error(f"There was an error while crawling the URL {base_url}.")
                     else:
                         st.warning("Please enter a URL to crawl")
 
