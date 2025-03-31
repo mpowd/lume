@@ -66,14 +66,15 @@ services:
     networks:
       - app_network
 
-  crawl4ai-service:
+  crawler:
     build:
       context: .
-      dockerfile: docker/crawl4ai.Dockerfile
+      dockerfile: docker/crawler.Dockerfile
     ports:
       - "11235:11235"
     volumes:
-      - ./backend/crawl4ai:/app
+      - ./backend/crawler:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - app_network
 
