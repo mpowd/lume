@@ -38,7 +38,7 @@ The platform consists of several components:
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker and Docker Compose installed
 - API keys for external services (if using):
   - OpenAI API key
   - Cohere API key
@@ -104,7 +104,70 @@ The backend exposes several API routes:
 - `/evaluation`: For creating datasets and evaluating chatbot performance
 - `/chatbot`: For managing chatbot configurations
 
-## 🛠️ Advanced Configuration
+## Installing Required Ollama Models
+
+After starting your containers with Docker Compose, you'll need to install the required language models inside the Ollama container:
+
+### Step 1: Find your Ollama container name
+
+```bash
+docker ps | grep ollama
+```
+
+You should see output similar to:
+
+```
+1a2b3c4d5e6f  ollama/ollama:latest  "/bin/ollama serve"  2 hours ago  Up 2 hours  0.0.0.0:11435->11434/tcp  offline-web-chatbot_ollama_1
+```
+
+Note the container name (last column) for the next step.
+
+### Step 2: Access the Ollama container
+
+```bash
+docker exec -it rag-chatbot-platform_ollama_1 /bin/bash
+```
+
+Replace `rag-chatbot-platform_ollama_1` with your actual container name.
+
+### Step 3: Install the required LLM models
+
+```bash
+# Install the LLM models
+ollama pull mistral
+ollama pull qwen
+ollama pull llama3
+```
+
+This may take some time depending on your internet connection and hardware.
+
+### Step 4: Install the required embedding model
+
+```bash
+# Install the embedding model
+ollama pull jina/jina-embeddings-v2-base-de
+```
+
+### Step 5: Verify the installation
+
+```bash
+ollama list
+```
+
+You should see all four models listed:
+- mistral
+- qwen
+- llama3
+- jina/jina-embeddings-v2-base-de
+
+### Troubleshooting
+
+- **Download stuck or very slow**: Try restarting the Ollama container with `docker restart rag-chatbot-platform_ollama_1`
+- **GPU not detected**: Make sure your NVIDIA drivers are up-to-date and that Docker is configured to use your GPU
+- **Out of disk space**: Check available space with `df -h` and clear some space if needed
+
+Now your RAG Chatbot Platform is ready to use with all required models installed!
+
 
 
 ### RAG Prompt Templates
