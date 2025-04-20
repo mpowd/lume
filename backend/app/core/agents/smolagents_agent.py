@@ -25,7 +25,6 @@ class SearchAgent:
             logger.error(f"Failed to initialize SearchAgent: {str(e)}", exc_info=True)
             raise
 
-    # Remove async since agent.run is not async
     def respond(self, query: str) -> str:
         try:
             response = self.agent.run(query)
