@@ -2,10 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY backend/crawl4ai/requirements.txt .
+COPY backend/crawler/requirements.txt .
+RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install system dependencies for Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
@@ -47,10 +47,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright browsers
 RUN playwright install chromium
 
-COPY backend/crawl4ai/ .
+COPY backend/crawler/ .
 
 EXPOSE 11235
 
