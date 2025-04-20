@@ -1,50 +1,92 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from backend.app.core.agents.smolagents_agent import SearchAgent
-from backend.app.core.tools.retriever import RetrieverTool
 import logging
-from smolagents import ToolCallingAgent, LiteLLMModel, DuckDuckGoSearchTool, CodeAgent
-import os
-from langchain_ollama import ChatOllama
+from typing import Optional, List, Dict, Any
+from backend.app.core.services.chatbot_service import get_chatbot_service
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-search_agent = None
-retriever_tool = None
 
-class SearchQuery(BaseModel):
+class ChatRequest(BaseModel):
     query: str
+    chatbot_id: Optional[str] = None
 
-@router.post("/search")
-async def search_query(query: SearchQuery):
+class ChatResponse(BaseModel):
+    response: str
+    contexts: List[str] = []
+    source_urls: List[str] = []
+
+@router.post("/", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """
+    Process a chat request with either the default or a specific chatbot
+    """
     try:
-        logger.info(f"Received query: {query.query}")
-        # global retriever_tool
-        # if retriever_tool is None:
-        #     retriever_tool = RetrieverTool()
-        # response = search_agent.respond(query.query) 
-        # response = CodeAgent(tools=[retriever_tool], model=LiteLLMModel(model_id="gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"]), max_steps=4, add_base_tools=True, verbosity_level=2).run(query.query)
-        # response = CodeAgent(tools=[retriever_tool], model=ChatOllama(model="qwen", base_url="http://ollama:11434"), max_steps=4, verbosity_level=2).run(query.query)
-        llm = "ollama_chat/qwen2.5-coder:7b"
-        model = LiteLLMModel(
-            model_id=llm, # This model is a bit weak for agentic behaviours though
-            api_base="http://ollama:11434", # replace with 127.0.0.1:11434 or remote open-ai compatible server if necessary
-            num_ctx=8192*2, # ollama default is 2048 which will fail horribly. 8192 works for easy tasks, more is better. Check https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator to calculate how much VRAM this will need for the selected model.
+        logger.info(f"Received chat query: {request.query}")
+        
+        chatbot_service = get_chatbot_service()
+        
+        chatbot_id = request.chatbot_id
+        if not chatbot_id:
+
+            raise HTTPException(
+                status_code=400, 
+                detail="No chatbot specified. Please provide a chatbot_id"
+            )
+        
+        result = await chatbot_service.process_query(chatbot_id, request.query)
+        logger.info(f"Generated response for query: {request.query}")
+        
+        if not isinstance(result, dict):
+            return ChatResponse(
+                response=str(result),
+                contexts=[],
+                source_urls=[]
+            )
+        
+        response = result.get("response", "No response generated")
+        if isinstance(response, list):
+            response = "\n".join(response) if all(isinstance(item, str) for item in response) else str(response)
+        
+        return ChatResponse(
+            response=response,
+            contexts=result.get("contexts", []),
+            source_urls=result.get("source_urls", [])
         )
-        # response = CodeAgent(
-        #     # tools=[retriever_tool], 
-        #     # model=LiteLLMModel(model_id="ollama/qwen", api_base="http://ollama:11434"), 
-        #     model=model,
-        #     max_steps=4, 
-        #     verbosity_level=2,
-        #     add_base_tools=True,
-        # ).run(query.query)
-        response = CodeAgent(tools=[], model=LiteLLMModel(model_id="gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"]), max_steps=4, add_base_tools=True, verbosity_level=2).run(query.query)
-        # return {"response": response}
-        return {"response": response}
+        
     except Exception as e:
-        logger.error(f"Error processing query: {str(e)}", exc_info=True)
+        logger.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error processing chat: {str(e)}"
+        )
+
+@router.get("/chatbots")
+async def list_available_chatbots():
+    """
+    List all available chatbots for the user to choose from
+    """
+    try:
+        from backend.db.mongodb import MongoDBClient
+        
+        mongodb_client = MongoDBClient.get_instance()
+        
+        chatbots = mongodb_client.get_all_documents(collection_name="chatbots")
+        
+        chatbot_list = [
+            {
+                "id": str(chatbot.get("_id")),
+                "name": chatbot.get("chatbot_name", "Unnamed Chatbot"),
+                "workflow": chatbot.get("workflow", "linear"),
+                "llm": chatbot.get("llm", "Unknown")
+            }
+            for chatbot in chatbots
+        ]
+        
+        return {"chatbots": chatbot_list}
+        
+    except Exception as e:
+        logger.error(f"Error listing chatbots: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
