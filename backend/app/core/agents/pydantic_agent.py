@@ -7,7 +7,6 @@ from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai import RunContext, ModelRetry
 import os
 
-from backend.app.core.tools.retriever import RetrieverTool
 from backend.db.mongodb import MongoDBClient
 from langchain_qdrant import QdrantVectorStore, RetrievalMode
 from langchain_core.documents import Document

@@ -14,7 +14,6 @@ from langchain.retrievers import ContextualCompressionRetriever
 from qdrant_client import QdrantClient
 import os
 from smolagents import ToolCallingAgent, LiteLLMModel, DuckDuckGoSearchTool, CodeAgent
-from backend.app.core.tools.retriever import RetrieverTool
 from backend.db.mongodb import MongoDBClient
 
 from backend.app.core.agents.pydantic_agent import PydanticAgentFactory, process_with_pydantic_agent
