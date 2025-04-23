@@ -154,7 +154,7 @@ with tab2:
             
             workflow = st.selectbox(
                 "Workflow Type", 
-                ["linear"], 
+                ["linear", "agentic"], 
                 index=0 if not chatbot_data or chatbot_data.get('workflow') == 'linear' else 1,
                 help="Linear flow simply queries and responds. Agentic can use tools and follow complex instructions."
             )
@@ -257,13 +257,13 @@ with tab2:
                 
                 agent_implementation = st.selectbox(
                     "Agent Implementation", 
-                    ["smolagents", "pydantic_ai"],
+                    ["pydantic_ai"],
                     index=0 if not chatbot_data or chatbot_data.get('workflow_implementation') != 'pydantic_ai' else 1,
                     help="Select the agent implementation to use. SmolaAgents is the original implementation, PydanticAI is a new structured agent implementation."
                 )
                 
                 default_tools = ["Document Retrieval"]
-                tools_list = ["Web Search", "Calculator", "Document Retrieval", "Code Execution"]
+                tools_list = ["Web Search", "Document Retrieval"]
                 
                 tools = st.multiselect(
                     "Available Tools", 

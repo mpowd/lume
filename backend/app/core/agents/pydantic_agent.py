@@ -52,7 +52,7 @@ class PydanticAgentFactory:
             mongodb_client=MongoDBClient.get_instance(),
             collections=collections,
             search_enabled="Web Search" in tools_config,
-            calculator_enabled="Calculator" in tools_config
+            # calculator_enabled="Calculator" in tools_config
         )
         
         system_prompt = config.get("pydantic_prompt", 

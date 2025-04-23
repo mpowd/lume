@@ -276,7 +276,7 @@ class ChatbotService:
         """
         Create an agentic chatbot that can use tools
         """
-        workflow_implementation = config.get("workflow_implementation", "smolagents")
+        workflow_implementation = config.get("workflow_implementation", "pydantic_ai")
         
         collections = config.get("collections", [])
         if collections:
@@ -288,29 +288,30 @@ class ChatbotService:
             logger.info(f"Creating PydanticAI agent with config: {config}")
             return PydanticAgentFactory.create_agent(config, self)
         else:
-            model = self.get_litellm_model(config.get("llm", "gpt-4o-mini"))
+            logger.error("smolagent chat request not implemented.")
+            # model = self.get_litellm_model(config.get("llm", "gpt-4o-mini"))
             
-            tools = []
+            # tools = []
             
-            if collections:
-                logger.info(f"Adding RetrieverTool with collections: {collections}")
-                retriever_tool = RetrieverTool(collections=collections)
-                tools.append(retriever_tool)
+            # if collections:
+            #     logger.info(f"Adding RetrieverTool with collections: {collections}")
+            #     retriever_tool = RetrieverTool(collections=collections)
+            #     tools.append(retriever_tool)
             
-            tool_options = config.get("tools", [])
-            if "Web Search" in tool_options:
-                tools.append(DuckDuckGoSearchTool())
+            # tool_options = config.get("tools", [])
+            # if "Web Search" in tool_options:
+            #     tools.append(DuckDuckGoSearchTool())
                 
-            max_steps = config.get("max_steps", 4)
-            agent = CodeAgent(
-                tools=tools,
-                model=model,
-                max_steps=max_steps,
-                add_base_tools="Calculator" in tool_options,
-                verbosity_level=1
-            )
+            # max_steps = config.get("max_steps", 4)
+            # agent = CodeAgent(
+            #     tools=tools,
+            #     model=model,
+            #     max_steps=max_steps,
+            #     add_base_tools="Calculator" in tool_options,
+            #     verbosity_level=1
+            # )
             
-            return agent
+            # return agent
         
     def get_agent(self, chatbot_id: str):
         """
@@ -392,7 +393,7 @@ class ChatbotService:
                 result = agent.invoke(query)
                 return result
             elif workflow == "agentic":
-                if config.get("workflow_implementation", "smolagents") == "pydantic_ai":
+                if config.get("workflow_implementation", "pydantic_ai") == "pydantic_ai":
                     result = await process_with_pydantic_agent(agent, config, query)
                     return result
                 else:
