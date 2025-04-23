@@ -1,6 +1,6 @@
 # RAG Chatbot Platform
 
-A flexible and powerful Retrieval-Augmented Generation (RAG) platform that allows you to create, manage, and evaluate chatbots with customizable knowledge sources.
+A Retrieval-Augmented Generation platform that allows you to create, manage, and evaluate chatbots with customizable knowledge sources.
 
 
 ## 🌟 Features
@@ -11,13 +11,13 @@ A flexible and powerful Retrieval-Augmented Generation (RAG) platform that allow
   - Hybrid search combining vector and keyword search
 
 - **Chatbot Creation & Management**
-  - Linear conversation workflows
+  - Linear and agentic conversation workflows
   - Customizable RAG prompt templates
   - Hypothetical Document Embedding (HyDE) for improved retrieval
   - Reranking support with Cohere
 
 - **Evaluation Framework**
-  - Create test datasets manually or automatically
+  - Create test datasets manually or automatically with RAGAS
   - Evaluate chatbots against test datasets
   - Comprehensive RAGAS metrics (faithfulness, context recall, answer relevancy, context precision)
   - Comparative evaluation of multiple chatbots
@@ -29,10 +29,10 @@ A flexible and powerful Retrieval-Augmented Generation (RAG) platform that allow
 The platform consists of several components:
 
 - **Frontend**: Streamlit application with pages for chatting, managing collections and chatbots, and evaluating performance
-- **Backend**: FastAPI service managing chat, knowledge base, crawl4ai crawler and evaluation
+- **Backend**: FastAPI server, knowledge base, crawl4ai as crawler and RAGAS evaluation module
 - **Vector Database**: Qdrant for efficient vector search
 - **Document Store**: MongoDB for storing documents, configurations, and evaluation results
-- **Language Models**: Local (via Ollama) and API-based LLMs
+- **Large Language Models**: Local (via Ollama) and API-based LLMs
 
 ## 🚀 Getting Started
 
@@ -47,8 +47,8 @@ The platform consists of several components:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/rag-chatbot-platform.git
-   cd rag-chatbot-platform
+   git clone https://github.com/mpowd/offline-web-chatbot.git
+   cd offline-web-chatbot
    ```
 
 2. Create a `.env` file with your API keys:
@@ -104,7 +104,7 @@ The backend exposes several API routes:
 - `/evaluation`: For creating datasets and evaluating chatbot performance
 - `/chatbot`: For managing chatbot configurations
 
-## Installing Required Ollama Models
+## Installing Required Ollama Models (Optional)
 
 After starting your containers with Docker Compose, you'll need to install the required language models inside the Ollama container:
 
@@ -160,11 +160,6 @@ You should see all four models listed:
 - llama3
 - jina/jina-embeddings-v2-base-de
 
-### Troubleshooting
-
-- **Download stuck or very slow**: Try restarting the Ollama container with `docker restart rag-chatbot-platform_ollama_1`
-- **GPU not detected**: Make sure your NVIDIA drivers are up-to-date and that Docker is configured to use your GPU
-- **Out of disk space**: Check available space with `df -h` and clear some space if needed
 
 Now your RAG Chatbot Platform is ready to use with all required models installed!
 
@@ -173,17 +168,3 @@ Now your RAG Chatbot Platform is ready to use with all required models installed
 ### RAG Prompt Templates
 
 Customize the RAG prompt template in the chatbot configuration to adjust how the model uses retrieved context.
-
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgements
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/), [Streamlit](https://streamlit.io/), [LangChain](https://python.langchain.com/), [Crawl4ai](https://github.com/unclecode/crawl4ai), [Qdrant](https://qdrant.tech/), and [MongoDB](https://www.mongodb.com/)
-- Evaluation metrics powered by [RAGAS](https://docs.ragas.io/)
