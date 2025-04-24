@@ -3,6 +3,13 @@
 A Retrieval-Augmented Generation platform that allows you to create, manage, and evaluate chatbots with customizable knowledge sources.
 
 
+
+
+https://github.com/user-attachments/assets/872e101c-7266-4d1e-a32f-96a1fdfb691a
+
+
+
+
 ## 🌟 Features
 
 - **Knowledge Base Management**
