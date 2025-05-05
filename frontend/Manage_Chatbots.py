@@ -158,145 +158,147 @@ with tab2:
                 index=0 if not chatbot_data or chatbot_data.get('workflow') == 'linear' else 1,
                 help="Linear flow simply queries and responds. Agentic can use tools and follow complex instructions."
             )
-            
-            selected_collections = st.multiselect(
-                "Knowledge Sources", 
-                st.session_state.collection_names,
-                default=chatbot_data.get('collections', []) if chatbot_data else [],
-                help="Choose collections your chatbot will access"
-            )
+            if workflow != "agentic":
+                selected_collections = st.multiselect(
+                    "Knowledge Sources", 
+                    st.session_state.collection_names,
+                    default=chatbot_data.get('collections', []) if chatbot_data else [],
+                    help="Choose collections your chatbot will access"
+                )
         
-        tab1, tab2, tab3 = st.tabs(["Retrieval Settings", "Generation Settings", "Advanced Options"])
+        if workflow != "agentic":
+            
+            tab1, tab2, tab3 = st.tabs(["Retrieval Settings", "Generation Settings", "Advanced Options"])
         
-        with tab1:
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                hybrid_search = st.checkbox(
-                    "Use Hybrid Search", 
-                    value=chatbot_data.get('hybrid_search', True) if chatbot_data else True,
-                    help="Combines keyword and semantic search"
-                )
-                
-                top_k = st.number_input(
-                    'Number of chunks to retrieve', 
-                    min_value=1, 
-                    max_value=100, 
-                    value=chatbot_data.get('top_k', 10) if chatbot_data else 10,
-                    step=1
-                )
-            
-            with col2:
-                hyde = st.checkbox(
-                    "Use HyDE (Hypothetical Document Embedding)", 
-                    value=chatbot_data.get('hyde', False) if chatbot_data else True,
-                    help="Improves retrieval by generating a hypothetical answer first"
-                )
-                
-                if hyde:
-                    default_hyde_prompt = "Given a question, generate a paragraph of text that answers the question.\n\nQuestion: {question}\n\nParagraph: "
-                    hyde_prompt = st.text_area(
-                        "HyDE Prompt",
-                        value=chatbot_data.get('hyde_prompt', default_hyde_prompt) if chatbot_data else default_hyde_prompt,
-                        height=150
+            with tab1:
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    hybrid_search = st.checkbox(
+                        "Use Hybrid Search", 
+                        value=chatbot_data.get('hybrid_search', True) if chatbot_data else True,
+                        help="Combines keyword and semantic search"
                     )
-            
-            st.divider()
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                reranking = st.checkbox(
-                    "Enable Reranking", 
-                    value=chatbot_data.get('reranking', False) if chatbot_data else False,
-                    help="Further refines search results after initial retrieval"
-                )
-            
-            if reranking:
+                    
+                    top_k = st.number_input(
+                        'Number of chunks to retrieve', 
+                        min_value=1, 
+                        max_value=100, 
+                        value=chatbot_data.get('top_k', 10) if chatbot_data else 10,
+                        step=1
+                    )
+                
                 with col2:
-                    reranker = st.selectbox(
-                        "Reranker Model", 
-                        rerankers,
-                        index=rerankers.index(chatbot_data.get('reranker', 'Cohere')) if chatbot_data and chatbot_data.get('reranker') in rerankers else 0,
-                        help="Select the reranking model to use"
+                    hyde = st.checkbox(
+                        "Use HyDE (Hypothetical Document Embedding)", 
+                        value=chatbot_data.get('hyde', False) if chatbot_data else True,
+                        help="Improves retrieval by generating a hypothetical answer first"
                     )
                     
-                    if reranker == "Cohere":
-                        st.info("Cohere reranker uses state-of-the-art neural models to improve search results by prioritizing the most relevant documents.")
-                    
-                    top_n = st.number_input(
-                        'Final number of chunks after reranking', 
-                        min_value=1, 
-                        max_value=int(top_k) if top_k > 1 else 1, 
-                        value=chatbot_data.get('top_n', int(top_k/2)) if chatbot_data and 'top_n' in chatbot_data else int(top_k/2) if top_k > 1 else 1,
-                        step=1,
-                        help="How many documents to keep after reranking"
+                    if hyde:
+                        default_hyde_prompt = "Given a question, generate a paragraph of text that answers the question.\n\nQuestion: {question}\n\nParagraph: "
+                        hyde_prompt = st.text_area(
+                            "HyDE Prompt",
+                            value=chatbot_data.get('hyde_prompt', default_hyde_prompt) if chatbot_data else default_hyde_prompt,
+                            height=150
+                        )
+                
+                st.divider()
+                col1, col2 = st.columns([1, 1])
+                
+                with col1:
+                    reranking = st.checkbox(
+                        "Enable Reranking", 
+                        value=chatbot_data.get('reranking', False) if chatbot_data else False,
+                        help="Further refines search results after initial retrieval"
                     )
+                
+                if reranking:
+                    with col2:
+                        reranker = st.selectbox(
+                            "Reranker Model", 
+                            rerankers,
+                            index=rerankers.index(chatbot_data.get('reranker', 'Cohere')) if chatbot_data and chatbot_data.get('reranker') in rerankers else 0,
+                            help="Select the reranking model to use"
+                        )
+                        
+                        if reranker == "Cohere":
+                            st.info("Cohere reranker uses state-of-the-art neural models to improve search results by prioritizing the most relevant documents.")
+                        
+                        top_n = st.number_input(
+                            'Final number of chunks after reranking', 
+                            min_value=1, 
+                            max_value=int(top_k) if top_k > 1 else 1, 
+                            value=chatbot_data.get('top_n', int(top_k/2)) if chatbot_data and 'top_n' in chatbot_data else int(top_k/2) if top_k > 1 else 1,
+                            step=1,
+                            help="How many documents to keep after reranking"
+                        )
         
-        with tab2:
-            col1, col2 = st.columns([1, 1])
+            with tab2:
+                col1, col2 = st.columns([1, 1])
+                
+                with col1:
+                    selected_llm = st.selectbox(
+                        "Choose a Language Model", 
+                        llms,
+                        index=llms.index(chatbot_data.get('llm')) if chatbot_data and chatbot_data.get('llm') in llms else 0,
+                        help="The AI model that will generate responses"
+                    )
+                
+                with col2:
+                    default_rag_prompt = "Answer the question using only the context\n\nRetrieved Context: {context}\n\nUser Question: {question}\nAnswer the user conversationally. User is not aware of context."
+                    rag_prompt = st.text_area(
+                        "Response Generation Prompt",
+                        value=chatbot_data.get('rag_prompt', default_rag_prompt) if chatbot_data else default_rag_prompt,
+                        height=200
+                    )
             
-            with col1:
-                selected_llm = st.selectbox(
-                    "Choose a Language Model", 
-                    llms,
-                    index=llms.index(chatbot_data.get('llm')) if chatbot_data and chatbot_data.get('llm') in llms else 0,
-                    help="The AI model that will generate responses"
-                )
-            
-            with col2:
-                default_rag_prompt = "Answer the question using only the context\n\nRetrieved Context: {context}\n\nUser Question: {question}\nAnswer the user conversationally. User is not aware of context."
-                rag_prompt = st.text_area(
-                    "Response Generation Prompt",
-                    value=chatbot_data.get('rag_prompt', default_rag_prompt) if chatbot_data else default_rag_prompt,
-                    height=200
-                )
-        
-        with tab3:
-            if workflow == "agentic":
-                st.info("Agentic workflow allows your chatbot to use tools and perform actions.")
-                
-                agent_implementation = st.selectbox(
-                    "Agent Implementation", 
-                    ["pydantic_ai"],
-                    index=0 if not chatbot_data or chatbot_data.get('workflow_implementation') != 'pydantic_ai' else 1,
-                    help="Select the agent implementation to use. SmolaAgents is the original implementation, PydanticAI is a new structured agent implementation."
-                )
-                
-                default_tools = ["Document Retrieval"]
-                tools_list = ["Web Search", "Document Retrieval"]
-                
-                tools = st.multiselect(
-                    "Available Tools", 
-                    tools_list,
-                    default=chatbot_data.get('tools', default_tools) if chatbot_data else default_tools
-                )
-                
-                max_steps = st.slider(
-                    "Maximum Reasoning Steps", 
-                    min_value=1, 
-                    max_value=10, 
-                    value=chatbot_data.get('max_steps', 4) if chatbot_data else 4
-                )
-                
-                if agent_implementation == "pydantic_ai":
-                    st.subheader("PydanticAI Agent Settings")
+            with tab3:
+                if workflow == "agentic":
+                    st.info("Agentic workflow allows your chatbot to use tools and perform actions.")
                     
-                    max_retries = st.slider(
-                        "Maximum Retries for Tool Calls", 
+                    agent_implementation = st.selectbox(
+                        "Agent Implementation", 
+                        # ["smolagents","pydantic_ai"],
+                        ["smolagents"],
+                        index=0 if not chatbot_data or chatbot_data.get('workflow_implementation') != 'pydantic_ai' else 1,
+                        help="Select the agent implementation to use. SmolaAgents is the original implementation, PydanticAI is a new structured agent implementation."
+                    )
+                    
+                    default_tools = ["Document Retrieval"]
+                    tools_list = ["Web Search", "Document Retrieval"]
+                    
+                    tools = st.multiselect(
+                        "Available Tools", 
+                        tools_list,
+                        default=chatbot_data.get('tools', default_tools) if chatbot_data else default_tools
+                    )
+                    
+                    max_steps = st.slider(
+                        "Maximum Reasoning Steps", 
                         min_value=1, 
-                        max_value=5, 
-                        value=chatbot_data.get('max_retries', 2) if chatbot_data else 2,
-                        help="Maximum number of times the agent will retry a tool call if it fails"
+                        max_value=10, 
+                        value=chatbot_data.get('max_steps', 4) if chatbot_data else 4
                     )
                     
-                    pydantic_prompt = st.text_area(
-                        "Agent System Prompt",
-                        value=chatbot_data.get('pydantic_prompt', "You are a helpful AI assistant. Answer the user's question concisely and accurately.") if chatbot_data else "You are a helpful AI assistant. Answer the user's question concisely and accurately.",
-                        height=150,
-                        help="System prompt for the PydanticAI agent"
-                    )
-            else:
-                st.info("No additional settings needed for linear workflow.")
+                    if agent_implementation == "pydantic_ai":
+                        st.subheader("PydanticAI Agent Settings")
+                        
+                        max_retries = st.slider(
+                            "Maximum Retries for Tool Calls", 
+                            min_value=1, 
+                            max_value=5, 
+                            value=chatbot_data.get('max_retries', 2) if chatbot_data else 2,
+                            help="Maximum number of times the agent will retry a tool call if it fails"
+                        )
+                        
+                        pydantic_prompt = st.text_area(
+                            "Agent System Prompt",
+                            value=chatbot_data.get('pydantic_prompt', "You are a helpful AI assistant. Answer the user's question concisely and accurately.") if chatbot_data else "You are a helpful AI assistant. Answer the user's question concisely and accurately.",
+                            height=150,
+                            help="System prompt for the PydanticAI agent"
+                        )
+                else:
+                    st.info("No additional settings needed for linear workflow.")
 
         button_text = "Update Chatbot" if st.session_state.editing_chatbot else "Create Chatbot"
         

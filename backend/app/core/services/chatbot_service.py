@@ -276,7 +276,7 @@ class ChatbotService:
         """
         Create an agentic chatbot that can use tools
         """
-        workflow_implementation = config.get("workflow_implementation", "pydantic_ai")
+        workflow_implementation = config.get("workflow_implementation", "smolagents")
         
         collections = config.get("collections", [])
         if collections:
@@ -288,10 +288,10 @@ class ChatbotService:
             logger.info(f"Creating PydanticAI agent with config: {config}")
             return PydanticAgentFactory.create_agent(config, self)
         else:
-            logger.error("smolagent chat request not implemented.")
-            # model = self.get_litellm_model(config.get("llm", "gpt-4o-mini"))
+            # logger.error("smolagent chat request not implemented.")
+            model = self.get_litellm_model(config.get("llm", "gpt-4o-mini"))
             
-            # tools = []
+            tools = []
             
             # if collections:
             #     logger.info(f"Adding RetrieverTool with collections: {collections}")
@@ -302,16 +302,17 @@ class ChatbotService:
             # if "Web Search" in tool_options:
             #     tools.append(DuckDuckGoSearchTool())
                 
-            # max_steps = config.get("max_steps", 4)
-            # agent = CodeAgent(
-            #     tools=tools,
-            #     model=model,
-            #     max_steps=max_steps,
-            #     add_base_tools="Calculator" in tool_options,
-            #     verbosity_level=1
-            # )
+            max_steps = config.get("max_steps", 4)
+            agent = CodeAgent(
+                # tools=tools,
+                tools=[DuckDuckGoSearchTool()],
+                model=model,
+                max_steps=max_steps,
+                # add_base_tools="Calculator" in tool_options,
+                verbosity_level=1
+            )
             
-            # return agent
+            return agent
         
     def get_agent(self, chatbot_id: str):
         """
@@ -378,7 +379,7 @@ class ChatbotService:
                 }
                 
             config = configs[0]
-            workflow = config.get("workflow", "linear")
+            workflow = config.get("workflow")
             
             agent = self.get_agent(chatbot_id)
             
@@ -393,10 +394,12 @@ class ChatbotService:
                 result = agent.invoke(query)
                 return result
             elif workflow == "agentic":
-                if config.get("workflow_implementation", "pydantic_ai") == "pydantic_ai":
-                    result = await process_with_pydantic_agent(agent, config, query)
-                    return result
+                if config.get("workflow_implementation", "smolagents") == "pydantic_ai":
+                    logger.error("pydantic ai response generation not implemented")
+                    # result = await process_with_pydantic_agent(agent, config, query)
+                    # return result
                 else:
+                    logger.info(f"smolagents query: {query}")
                     response = agent.run(query)
                     return {
                         "response": response,
