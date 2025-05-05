@@ -54,8 +54,8 @@ The platform consists of several components:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/mpowd/offline-web-chatbot.git
-   cd offline-web-chatbot
+   git clone https://github.com/mpowd/lume.git
+   cd lume
    ```
 
 2. Create a `.env` file with your API keys:
@@ -124,7 +124,7 @@ docker ps | grep ollama
 You should see output similar to:
 
 ```
-1a2b3c4d5e6f  ollama/ollama:latest  "/bin/ollama serve"  2 hours ago  Up 2 hours  0.0.0.0:11435->11434/tcp  offline-web-chatbot_ollama_1
+1a2b3c4d5e6f  ollama/ollama:latest  "/bin/ollama serve"  2 hours ago  Up 2 hours  0.0.0.0:11435->11434/tcp  lume_ollama_1
 ```
 
 Note the container name (last column) for the next step.
