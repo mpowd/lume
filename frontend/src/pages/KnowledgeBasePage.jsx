@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Loader2, Globe, Database, ExternalLink, Check, X, ChevronRight, Sparkles, FileText, Mail, FolderOpen, StickyNote, ArrowRight, Settings } from 'lucide-react'
+import { Plus, Trash2, Loader2, Globe, Database, ExternalLink, Check, X, ChevronRight, Sparkles, FileText, Mail, FolderOpen, StickyNote, ArrowRight, Settings, Eye, Upload, ChevronLeft } from 'lucide-react'
 import { knowledgeBaseAPI } from '../services/api'
 
 const SOURCE_TYPES = [
@@ -42,8 +42,9 @@ export default function KnowledgeBasePage() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeCollection, setActiveCollection] = useState(null)
+  const [view, setView] = useState('menu') // 'menu', 'add', 'view', 'crawl'
+  const [selectedSourceType, setSelectedSourceType] = useState(null)
   const [step, setStep] = useState(1)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   
   const [newCollection, setNewCollection] = useState({
     collection_name: '',
@@ -61,7 +62,6 @@ export default function KnowledgeBasePage() {
   const [selectedUrls, setSelectedUrls] = useState({})
   const [crawlSessionId, setCrawlSessionId] = useState(null)
 
-  // Initialize crawl data for active collection
   useEffect(() => {
     if (activeCollection && !crawlData[activeCollection]) {
       setCrawlData(prev => ({
@@ -104,6 +104,7 @@ export default function KnowledgeBasePage() {
       await loadCollections()
       setShowCreateModal(false)
       setActiveCollection(newCollection.collection_name)
+      setView('menu')
       setNewCollection({
         collection_name: '',
         source_type: 'website',
@@ -125,22 +126,18 @@ export default function KnowledgeBasePage() {
       return
     }
 
-    // Ensure all values are properly set
     const depth = crawlSettings.depth ?? 2
     const max_pages = crawlSettings.max_pages ?? 50
 
-    // Reset state
     setDiscoveredUrls(prev => ({ ...prev, [collectionName]: [] }))
     setSelectedUrls(prev => ({ ...prev, [collectionName]: {} }))
     setCrawling(prev => ({ ...prev, [collectionName]: true }))
     setStep(2)
 
-    // Close any existing EventSource
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
 
-    // Build query parameters
     const params = new URLSearchParams({
       base_url: crawlSettings.base_url,
       depth: depth.toString(),
@@ -148,7 +145,6 @@ export default function KnowledgeBasePage() {
       include_external_domains: 'false'
     })
 
-    // Create EventSource for SSE - note: /crawl NOT /api/crawl
     const eventSource = new EventSource(`http://localhost:8000/crawl?${params}`)
     eventSourceRef.current = eventSource
 
@@ -169,7 +165,6 @@ export default function KnowledgeBasePage() {
         }
         
         else if (data.type === 'url') {
-          // Add newly discovered URL
           setDiscoveredUrls(prev => {
             const current = prev[collectionName] || []
             return {
@@ -178,7 +173,6 @@ export default function KnowledgeBasePage() {
             }
           })
           
-          // Auto-select by default
           setSelectedUrls(prev => ({
             ...prev,
             [collectionName]: {
@@ -187,7 +181,6 @@ export default function KnowledgeBasePage() {
             }
           }))
           
-          // Update progress
           setCrawlProgress(prev => ({
             ...prev,
             [collectionName]: {
@@ -241,7 +234,6 @@ export default function KnowledgeBasePage() {
     }
 
     try {
-      // Update this URL to match your actual backend route
       const response = await fetch('http://localhost:8000/crawl/upload-documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -257,10 +249,10 @@ export default function KnowledgeBasePage() {
       const result = await response.json()
       alert(`Successfully uploaded ${result.uploaded_count} documents`)
       
-      // Reset state
       setDiscoveredUrls(prev => ({ ...prev, [collectionName]: [] }))
       setSelectedUrls(prev => ({ ...prev, [collectionName]: {} }))
       setStep(1)
+      setView('menu')
     } catch (error) {
       console.error('Error uploading documents:', error)
       alert('Error uploading documents')
@@ -275,6 +267,7 @@ export default function KnowledgeBasePage() {
     try {
       await knowledgeBaseAPI.delete(collectionName)
       setActiveCollection(null)
+      setView('menu')
       await loadCollections()
     } catch (error) {
       console.error('Error deleting collection:', error)
@@ -301,11 +294,24 @@ export default function KnowledgeBasePage() {
 
   const resetWizard = () => {
     setStep(1)
+    setView('add')
     setDiscoveredUrls(prev => ({ ...prev, [activeCollection]: [] }))
     setSelectedUrls(prev => ({ ...prev, [activeCollection]: {} }))
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
+  }
+
+  const handleCollectionClick = (collection) => {
+    setActiveCollection(collection)
+    setView('menu')
+    setStep(1)
+  }
+
+  const handleBackToMenu = () => {
+    setView('menu')
+    setStep(1)
+    setSelectedSourceType(null)
   }
 
   if (loading) {
@@ -316,10 +322,8 @@ export default function KnowledgeBasePage() {
     )
   }
 
-  // Ensure crawlData always has default values
   const currentCrawlData = crawlData[activeCollection] || { base_url: '', depth: 2, max_pages: 50 }
   
-  // Initialize if missing
   if (activeCollection && !crawlData[activeCollection]) {
     setCrawlData(prev => ({
       ...prev,
@@ -401,7 +405,7 @@ export default function KnowledgeBasePage() {
             collections.map(collection => (
               <button
                 key={collection}
-                onClick={() => { setActiveCollection(collection); setStep(1); }}
+                onClick={() => handleCollectionClick(collection)}
                 className={`w-full text-left p-4 rounded-xl transition-all group cursor-pointer ${
                   activeCollection === collection
                     ? 'bg-blue-500/10 border border-blue-500/30'
@@ -439,11 +443,251 @@ export default function KnowledgeBasePage() {
             <h3 className="text-2xl font-semibold text-white mb-3">Knowledge Base</h3>
             <p className="text-slate-400">Select or create a collection to start</p>
           </div>
-        ) : (
-          <div className="w-full max-w-2xl">
+        ) : view === 'menu' ? (
+          /* Main Menu View */
+          <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full mb-4">
+                <Database className="w-5 h-5 text-blue-400" />
+                <h1 className="text-xl font-semibold text-white">{activeCollection}</h1>
+              </div>
+              <p className="text-slate-400">What would you like to do?</p>
+            </div>
+
+            <div className="grid gap-4 mb-8">
+              {/* Add Knowledge Card */}
+              <button
+                onClick={() => setView('add')}
+                className="group relative overflow-hidden bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-blue-500/30 rounded-2xl p-8 transition-all cursor-pointer text-left"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-start gap-6">
+                  <div className="p-4 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl transition-all">
+                    <Upload className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                      Add Knowledge
+                    </h3>
+                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
+                      Import content from websites, files, or other sources
+                    </p>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-blue-400 transition-colors self-center" />
+                </div>
+              </button>
+
+              {/* View Knowledge Card */}
+              <button
+                onClick={() => setView('view')}
+                className="group relative overflow-hidden bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-purple-500/30 rounded-2xl p-8 transition-all cursor-pointer text-left"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-start gap-6">
+                  <div className="p-4 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl transition-all">
+                    <Eye className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                      View Knowledge
+                    </h3>
+                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
+                      Browse and manage your stored documents and vectors
+                    </p>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-purple-400 transition-colors self-center" />
+                </div>
+              </button>
+            </div>
+
+            {/* Delete Collection Button */}
+            <button
+              onClick={() => handleDeleteCollection(activeCollection)}
+              className="w-full px-4 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Collection
+            </button>
+          </div>
+        ) : view === 'add' ? (
+          /* Add Knowledge - Source Type Selection */
+          <div className="w-full max-w-3xl animate-in fade-in slide-in-from-right-4 duration-500">
+            <button
+              onClick={handleBackToMenu}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors cursor-pointer group"
+            >
+              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to menu</span>
+            </button>
+
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-white mb-3">Choose Source Type</h2>
+              <p className="text-slate-400">Select where to import your knowledge from</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {SOURCE_TYPES.map(type => {
+                const Icon = type.icon
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      if (type.implemented) {
+                        setSelectedSourceType(type.id)
+                        setView('crawl')
+                      }
+                    }}
+                    disabled={!type.implemented}
+                    className={`group relative overflow-hidden p-8 rounded-2xl border transition-all text-left ${
+                      type.implemented
+                        ? 'bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border-white/10 hover:border-blue-500/30 cursor-pointer'
+                        : 'bg-slate-900/20 border-white/5 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity ${
+                      type.color === 'blue' ? 'from-blue-500/5 to-purple-500/5' :
+                      type.color === 'purple' ? 'from-purple-500/5 to-pink-500/5' :
+                      type.color === 'green' ? 'from-green-500/5 to-emerald-500/5' :
+                      'from-slate-500/5 to-slate-600/5'
+                    }`} />
+                    
+                    <div className="relative">
+                      <div className={`p-4 rounded-2xl mb-4 inline-flex ${
+                        type.implemented 
+                          ? `bg-${type.color}-500/10 group-hover:bg-${type.color}-500/20`
+                          : 'bg-slate-800/30'
+                      } transition-all`}>
+                        <Icon className={`w-8 h-8 ${
+                          type.implemented ? `text-${type.color}-400` : 'text-slate-600'
+                        }`} />
+                      </div>
+                      
+                      <h3 className={`text-xl font-semibold mb-2 ${
+                        type.implemented ? 'text-white group-hover:text-blue-400' : 'text-slate-600'
+                      } transition-colors`}>
+                        {type.label}
+                      </h3>
+                      
+                      <p className={`text-sm mb-4 ${
+                        type.implemented ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-600'
+                      } transition-colors`}>
+                        {type.description}
+                      </p>
+                      
+                      {!type.implemented && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg">
+                          <Sparkles className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-xs font-medium text-slate-500">Coming Soon</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : view === 'view' ? (
+          /* View Knowledge - Database Links */
+          <div className="w-full max-w-2xl animate-in fade-in slide-in-from-right-4 duration-500">
+            <button
+              onClick={handleBackToMenu}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors cursor-pointer group"
+            >
+              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to menu</span>
+            </button>
+
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-white mb-3">View Knowledge</h2>
+              <p className="text-slate-400">Access your stored data through these interfaces</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Vector Database Card */}
+              <a
+                href={`http://localhost:6333/dashboard#/collections/${activeCollection}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block relative overflow-hidden bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-purple-500/30 rounded-2xl p-8 transition-all cursor-pointer"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-center gap-6">
+                  <div className="p-5 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl transition-all">
+                    <Database className="w-10 h-10 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                      Qdrant Vector Database
+                    </h3>
+                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors mb-3">
+                      Browse and search through vector embeddings
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-slate-500 group-hover:text-purple-400 transition-colors">
+                      <span className="font-mono">localhost:6333</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </a>
+
+              {/* Document Database Card */}
+              <a
+                href={`http://localhost:8081/db/rag_chatbot/${activeCollection}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block relative overflow-hidden bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-blue-500/30 rounded-2xl p-8 transition-all cursor-pointer"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-center gap-6">
+                  <div className="p-5 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl transition-all">
+                    <FileText className="w-10 h-10 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                      MongoDB Document Store
+                    </h3>
+                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors mb-3">
+                      View original documents and metadata
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-slate-500 group-hover:text-blue-400 transition-colors">
+                      <span className="font-mono">localhost:8081</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-blue-400 transition-colors" />
+                </div>
+              </a>
+            </div>
+
+            <div className="mt-8 p-6 bg-slate-900/30 border border-white/5 rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-white mb-1">Pro Tip</h4>
+                  <p className="text-sm text-slate-400">
+                    Use the Vector DB to explore embeddings and similarity scores, or the Document Store to view the original content and metadata.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : view === 'crawl' && step === 1 ? (
+          /* Crawl Step 1: URL Input */
+          <div className="w-full max-w-2xl animate-in fade-in slide-in-from-right-4 duration-500">
+            <button
+              onClick={() => setView('add')}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors cursor-pointer group"
+            >
+              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to sources</span>
+            </button>
+
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-white mb-2">{activeCollection}</h1>
-              <p className="text-slate-400">Add knowledge sources</p>
+              <h1 className="text-3xl font-bold text-white mb-2">Website Crawler</h1>
+              <p className="text-slate-400">Configure your web scraping settings</p>
             </div>
 
             <div className="flex items-center justify-center gap-2 mb-8">
@@ -454,279 +698,268 @@ export default function KnowledgeBasePage() {
               ))}
             </div>
 
-            {/* Step 1: URL Input */}
-            {step === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-3 bg-blue-500/10 rounded-xl">
-                      <Globe className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">Enter Website URL</h3>
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-3 bg-blue-500/10 rounded-xl">
+                    <Globe className="w-6 h-6 text-blue-400" />
                   </div>
-
-                  <div className="space-y-6">
-                    <div className="relative group">
-                      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity blur" />
-                      <input
-                        type="url"
-                        value={currentCrawlData.base_url}
-                        onChange={(e) => setCrawlData(prev => ({
-                          ...prev,
-                          [activeCollection]: { ...prev[activeCollection], base_url: e.target.value }
-                        }))}
-                        className="relative w-full px-6 py-5 bg-slate-950/80 border border-white/10 rounded-2xl text-white text-lg placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                        placeholder="https://example.com"
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-slate-300">Crawl Depth</label>
-                        <span className="text-2xl font-bold text-blue-400">{currentCrawlData.depth}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="4"
-                        value={currentCrawlData.depth}
-                        onChange={(e) => setCrawlData(prev => ({
-                          ...prev,
-                          [activeCollection]: { ...prev[activeCollection], depth: parseInt(e.target.value) }
-                        }))}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-slate-500">
-                        <span>Surface</span>
-                        <span>Deep</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-slate-300">Page Limit</label>
-                        <span className="text-2xl font-bold text-purple-400">{currentCrawlData.max_pages}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="500"
-                        step="10"
-                        value={currentCrawlData.max_pages}
-                        onChange={(e) => setCrawlData(prev => ({
-                          ...prev,
-                          [activeCollection]: { ...prev[activeCollection], max_pages: parseInt(e.target.value) }
-                        }))}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-slate-500">
-                        <span>10 pages</span>
-                        <span>500 pages</span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleCrawl(activeCollection)}
-                      disabled={!currentCrawlData.base_url}
-                      className="w-full px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-3 font-semibold text-lg shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      Start Crawling
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <h3 className="text-xl font-semibold text-white">Enter Website URL</h3>
                 </div>
 
-                <button
-                  onClick={() => handleDeleteCollection(activeCollection)}
-                  className="w-full px-4 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Collection
-                </button>
-              </div>
-            )}
+                <div className="space-y-6">
+                  <div className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity blur" />
+                    <input
+                      type="url"
+                      value={currentCrawlData.base_url}
+                      onChange={(e) => setCrawlData(prev => ({
+                        ...prev,
+                        [activeCollection]: { ...prev[activeCollection], base_url: e.target.value }
+                      }))}
+                      className="relative w-full px-6 py-5 bg-slate-950/80 border border-white/10 rounded-2xl text-white text-lg placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      placeholder="https://example.com"
+                    />
+                  </div>
 
-            {/* Step 2: Real-time Progress with URL List */}
-            {step === 2 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-slate-300">Crawl Depth</label>
+                      <span className="text-2xl font-bold text-blue-400">{currentCrawlData.depth}</span>
                     </div>
-                    
-                    <h3 className="text-xl font-semibold text-white mb-2">{currentProgress.status}</h3>
-                    <p className="text-slate-400">
-                      {currentProgress.current} / {currentProgress.total} pages
+                    <input
+                      type="range"
+                      min="0"
+                      max="4"
+                      value={currentCrawlData.depth}
+                      onChange={(e) => setCrawlData(prev => ({
+                        ...prev,
+                        [activeCollection]: { ...prev[activeCollection], depth: parseInt(e.target.value) }
+                      }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Surface</span>
+                      <span>Deep</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-slate-300">Page Limit</label>
+                      <span className="text-2xl font-bold text-purple-400">{currentCrawlData.max_pages}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="500"
+                      step="10"
+                      value={currentCrawlData.max_pages}
+                      onChange={(e) => setCrawlData(prev => ({
+                        ...prev,
+                        [activeCollection]: { ...prev[activeCollection], max_pages: parseInt(e.target.value) }
+                      }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>10 pages</span>
+                      <span>500 pages</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleCrawl(activeCollection)}
+                    disabled={!currentCrawlData.base_url}
+                    className="w-full px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-3 font-semibold text-lg shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    Start Crawling
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : view === 'crawl' && step === 2 ? (
+          /* Step 2: Real-time Progress with URL List */
+          <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2">Crawling Website</h1>
+              <p className="text-slate-400">Discovering and indexing pages</p>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[1, 2, 3].map(s => (
+                <div key={s} className={`h-1.5 rounded-full transition-all ${
+                  s === step ? 'w-12 bg-blue-500' : s < step ? 'w-8 bg-blue-500/50' : 'w-8 bg-white/10'
+                }`} />
+              ))}
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  </div>
+                  
+                  <h3 className="text-xl font-semibold text-white mb-2">{currentProgress.status}</h3>
+                  <p className="text-slate-400">
+                    {currentProgress.current} / {currentProgress.total} pages
+                  </p>
+                </div>
+
+                <div className="space-y-2 mb-6">
+                  <div className="w-full bg-slate-950/50 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500 rounded-full"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-slate-500 text-center">{Math.round(progressPercent)}% complete</p>
+                </div>
+
+                {/* Live URL List */}
+                {discoveredUrls[activeCollection]?.length > 0 && (
+                  <div className="border-t border-white/10 pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-semibold text-slate-300">
+                        Discovered URLs ({discoveredUrls[activeCollection].length})
+                      </h4>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => selectAllUrls(activeCollection, true)}
+                          className="px-2 py-1 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded transition-all cursor-pointer"
+                        >
+                          All
+                        </button>
+                        <button
+                          onClick={() => selectAllUrls(activeCollection, false)}
+                          className="px-2 py-1 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded transition-all cursor-pointer"
+                        >
+                          None
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto bg-slate-950/50 rounded-xl border border-white/5">
+                      {discoveredUrls[activeCollection].map((item, idx) => (
+                        <label 
+                          key={idx} 
+                          className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 border-b border-white/5 last:border-0 cursor-pointer group transition-all"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUrls[activeCollection]?.[item.url] || false}
+                            onChange={() => toggleUrlSelection(activeCollection, item.url)}
+                            className="w-4 h-4 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                          />
+                          <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-300 group-hover:text-white truncate block transition-colors">
+                              {item.url}
+                            </span>
+                            {item.title && (
+                              <span className="text-xs text-slate-500 truncate block">
+                                {item.title}
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : view === 'crawl' && step === 3 ? (
+          /* Step 3: Review & Upload */
+          <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2">Review & Upload</h1>
+              <p className="text-slate-400">Select pages to add to your knowledge base</p>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[1, 2, 3].map(s => (
+                <div key={s} className={`h-1.5 rounded-full transition-all ${
+                  s === step ? 'w-12 bg-blue-500' : s < step ? 'w-8 bg-blue-500/50' : 'w-8 bg-white/10'
+                }`} />
+              ))}
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white">Found {discoveredUrls[activeCollection]?.length || 0} pages</h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                      {Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length} selected
                     </p>
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => selectAllUrls(activeCollection, true)}
+                      className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all cursor-pointer"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => selectAllUrls(activeCollection, false)}
+                      className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all cursor-pointer"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
 
-                  <div className="space-y-2 mb-6">
-                    <div className="w-full bg-slate-950/50 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500 rounded-full"
-                        style={{ width: `${progressPercent}%` }}
+                <div className="max-h-96 overflow-y-auto bg-slate-950/50 rounded-xl border border-white/5 mb-6">
+                  {(discoveredUrls[activeCollection] || []).map((item, idx) => (
+                    <label 
+                      key={idx} 
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 cursor-pointer group transition-all"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUrls[activeCollection]?.[item.url] || false}
+                        onChange={() => toggleUrlSelection(activeCollection, item.url)}
+                        className="w-4 h-4 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
                       />
-                    </div>
-                    <p className="text-sm text-slate-500 text-center">{Math.round(progressPercent)}% complete</p>
-                  </div>
-
-                  {/* Live URL List */}
-                  {discoveredUrls[activeCollection]?.length > 0 && (
-                    <div className="border-t border-white/10 pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-semibold text-slate-300">
-                          Discovered URLs ({discoveredUrls[activeCollection].length})
-                        </h4>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => selectAllUrls(activeCollection, true)}
-                            className="px-2 py-1 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded transition-all cursor-pointer"
-                          >
-                            All
-                          </button>
-                          <button
-                            onClick={() => selectAllUrls(activeCollection, false)}
-                            className="px-2 py-1 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded transition-all cursor-pointer"
-                          >
-                            None
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="max-h-64 overflow-y-auto bg-slate-950/50 rounded-xl border border-white/5">
-                        {discoveredUrls[activeCollection].map((item, idx) => (
-                          <label 
-                            key={idx} 
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 border-b border-white/5 last:border-0 cursor-pointer group transition-all"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedUrls[activeCollection]?.[item.url] || false}
-                              onChange={() => toggleUrlSelection(activeCollection, item.url)}
-                              className="w-4 h-4 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
-                            />
-                            <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm text-slate-300 group-hover:text-white truncate block transition-colors">
-                                {item.url}
-                              </span>
-                              {item.title && (
-                                <span className="text-xs text-slate-500 truncate block">
-                                  {item.title}
-                                </span>
-                              )}
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Review & Upload */}
-            {step === 3 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8 backdrop-blur-xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-xl font-semibold text-white">Found {discoveredUrls[activeCollection]?.length || 0} pages</h3>
-                      <p className="text-sm text-slate-400 mt-1">
-                        {Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length} selected
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => selectAllUrls(activeCollection, true)}
-                        className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all cursor-pointer"
-                      >
-                        All
-                      </button>
-                      <button
-                        onClick={() => selectAllUrls(activeCollection, false)}
-                        className="px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-lg transition-all cursor-pointer"
-                      >
-                        None
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto bg-slate-950/50 rounded-xl border border-white/5 mb-6">
-                    {(discoveredUrls[activeCollection] || []).map((item, idx) => (
-                      <label 
-                        key={idx} 
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 cursor-pointer group transition-all"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedUrls[activeCollection]?.[item.url] || false}
-                          onChange={() => toggleUrlSelection(activeCollection, item.url)}
-                          className="w-4 h-4 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
-                        />
-                        <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-slate-300 group-hover:text-white truncate block transition-colors">
-                            {item.url}
+                      <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-slate-300 group-hover:text-white truncate block transition-colors">
+                          {item.url}
+                        </span>
+                        {item.title && (
+                          <span className="text-xs text-slate-500 truncate block mt-0.5">
+                            {item.title}
                           </span>
-                          {item.title && (
-                            <span className="text-xs text-slate-500 truncate block mt-0.5">
-                              {item.title}
-                            </span>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={resetWizard}
-                      className="flex-1 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer"
-                    >
-                      Start Over
-                    </button>
-                    <button
-                      onClick={() => handleUploadDocuments(activeCollection)}
-                      disabled={Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length === 0}
-                      className="flex-1 px-6 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:hover:scale-100"
-                    >
-                      <Database className="w-5 h-5" />
-                      Upload {Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length} Pages
-                    </button>
-                  </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
                 </div>
 
-                <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">Database Access</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <a
-                      href={`http://localhost:6333/dashboard#/collections/${activeCollection}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-3 bg-slate-800/50 hover:bg-slate-800 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-xl transition-all flex items-center gap-3 group cursor-pointer"
-                    >
-                      <Database className="w-4 h-4 text-purple-400" />
-                      <span className="text-sm font-medium">Vector DB</span>
-                      <ExternalLink className="w-3.5 h-3.5 ml-auto opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                    <a
-                      href={`http://localhost:8081/db/rag_chatbot/${activeCollection}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-3 bg-slate-800/50 hover:bg-slate-800 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-xl transition-all flex items-center gap-3 group cursor-pointer"
-                    >
-                      <FileText className="w-4 h-4 text-blue-400" />
-                      <span className="text-sm font-medium">Doc DB</span>
-                      <ExternalLink className="w-3.5 h-3.5 ml-auto opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={resetWizard}
+                    className="flex-1 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer"
+                  >
+                    Start Over
+                  </button>
+                  <button
+                    onClick={() => handleUploadDocuments(activeCollection)}
+                    disabled={Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length === 0}
+                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:hover:scale-100"
+                  >
+                    <Database className="w-5 h-5" />
+                    Upload {Object.values(selectedUrls[activeCollection] || {}).filter(Boolean).length} Pages
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Create Collection Modal */}
