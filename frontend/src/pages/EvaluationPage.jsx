@@ -1,31 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Plus, Loader2, BarChart3, FileText, PlayCircle, Trash2, Download, RefreshCw, Edit3, Check, X, Zap, TrendingUp, Award, Target, Sparkles, Eye, ChevronRight, Activity, Brain, Rocket, Beaker, GitCompare, Flame } from 'lucide-react'
+import { Plus, Loader2, BarChart3, FileText, PlayCircle, Trash2, RefreshCw, Edit3, Check, Zap, ChevronRight, Brain, Beaker, Database, ArrowLeft, Calendar, Hash } from 'lucide-react'
 import { evaluationAPI, knowledgeBaseAPI, chatbotsAPI, chatAPI } from '../services/api'
 
 export default function EvaluationPage() {
-  const [activeView, setActiveView] = useState('hub')
+  const [activeView, setActiveView] = useState('select-collection')
+  const [selectedCollection, setSelectedCollection] = useState(null)
   const [loading, setLoading] = useState(false)
   
   const [collections, setCollections] = useState([])
   const [chatbots, setChatbots] = useState([])
   const [datasets, setDatasets] = useState([])
-  const [evaluations, setEvaluations] = useState([])
   
   const [datasetName, setDatasetName] = useState('')
   const [qaPairs, setQaPairs] = useState([{ question: '', ground_truth: '', source_doc: '' }])
   
   const [autoGenConfig, setAutoGenConfig] = useState({
-    collection_name: '',
     dataset_name: '',
     testset_size: 10
   })
   
   const [selectedDataset, setSelectedDataset] = useState(null)
-  const [selectedChatbot, setSelectedChatbot] = useState(null)
+  const [selectedChatbots, setSelectedChatbots] = useState([])
   const [evaluating, setEvaluating] = useState(false)
   const [evalProgress, setEvalProgress] = useState(0)
-  const [compareMode, setCompareMode] = useState(false)
-  const [selectedEvals, setSelectedEvals] = useState([])
+  const [editingDataset, setEditingDataset] = useState(null)
 
   useEffect(() => {
     loadInitialData()
@@ -33,16 +31,14 @@ export default function EvaluationPage() {
 
   const loadInitialData = async () => {
     try {
-      const [collectionsData, chatbotsData, datasetsData, evalsData] = await Promise.all([
+      const [collectionsData, chatbotsData, datasetsData] = await Promise.all([
         knowledgeBaseAPI.getAll(),
         chatbotsAPI.getAll(),
-        evaluationAPI.getDatasets(),
-        evaluationAPI.getEvaluations()
+        evaluationAPI.getDatasets()
       ])
       setCollections(collectionsData.collection_names || [])
       setChatbots(chatbotsData)
-      setDatasets(datasetsData)
-      setEvaluations(evalsData)
+      setDatasets(datasetsData.datasets || [])
     } catch (error) {
       console.error('Error loading data:', error)
     }
@@ -61,12 +57,16 @@ export default function EvaluationPage() {
         return
       }
 
-      await evaluationAPI.createDataset(datasetName, validPairs)
+      await evaluationAPI.createDataset({
+        dataset_name: datasetName,
+        qa_pairs: validPairs,
+        source_collection: selectedCollection
+      })
       alert('Dataset created successfully!')
       setDatasetName('')
       setQaPairs([{ question: '', ground_truth: '', source_doc: '' }])
       await loadInitialData()
-      setActiveView('hub')
+      setActiveView('action-menu')
     } catch (error) {
       console.error('Error creating dataset:', error)
       alert('Error creating dataset')
@@ -80,18 +80,14 @@ export default function EvaluationPage() {
     setLoading(true)
     try {
       await evaluationAPI.generateDataset(
-        autoGenConfig.collection_name,
+        selectedCollection,
         autoGenConfig.dataset_name,
         autoGenConfig.testset_size
       )
       alert('Dataset generated successfully!')
-      setAutoGenConfig({
-        collection_name: '',
-        dataset_name: '',
-        testset_size: 10
-      })
+      setAutoGenConfig({ dataset_name: '', testset_size: 10 })
       await loadInitialData()
-      setActiveView('hub')
+      setActiveView('action-menu')
     } catch (error) {
       console.error('Error generating dataset:', error)
       alert('Error generating dataset')
@@ -100,9 +96,9 @@ export default function EvaluationPage() {
     }
   }
 
-  const handleEvaluateChatbot = async () => {
-    if (!selectedDataset || !selectedChatbot) {
-      alert('Please select both a dataset and a chatbot')
+  const handleEvaluateChatbots = async () => {
+    if (!selectedDataset || selectedChatbots.length === 0) {
+      alert('Please select at least one chatbot')
       return
     }
 
@@ -110,50 +106,53 @@ export default function EvaluationPage() {
     setEvalProgress(0)
 
     try {
-      const dataset = datasets.find(d => d._id === selectedDataset)
-      const qaPairs = dataset.qa_pairs
+      const qaPairs = selectedDataset.qa_pairs
+      const totalEvals = selectedChatbots.length
+      
+      for (let chatbotIdx = 0; chatbotIdx < selectedChatbots.length; chatbotIdx++) {
+        const chatbotId = selectedChatbots[chatbotIdx]
+        const questions = []
+        const groundTruths = []
+        const answers = []
+        const contexts = []
 
-      const questions = []
-      const groundTruths = []
-      const answers = []
-      const contexts = []
+        for (let i = 0; i < qaPairs.length; i++) {
+          const pair = qaPairs[i]
+          const progress = ((chatbotIdx / totalEvals) + ((i / qaPairs.length) / totalEvals)) * 100
+          setEvalProgress(Math.round(progress * 0.8))
 
-      for (let i = 0; i < qaPairs.length; i++) {
-        const pair = qaPairs[i]
-        setEvalProgress(Math.round((i / qaPairs.length) * 50))
-
-        try {
-          const response = await chatAPI.sendMessage(selectedChatbot, pair.question, [])
-          
-          questions.push(pair.question)
-          groundTruths.push(pair.ground_truth || pair.answer)
-          answers.push(response.response || '')
-          contexts.push(response.contexts || [])
-        } catch (error) {
-          console.error(`Error processing question ${i + 1}:`, error)
-          questions.push(pair.question)
-          groundTruths.push(pair.ground_truth || pair.answer)
-          answers.push('')
-          contexts.push([])
+          try {
+            const response = await chatAPI.sendMessage(chatbotId, pair.question, [])
+            questions.push(pair.question)
+            groundTruths.push(pair.ground_truth || pair.answer)
+            answers.push(response.response || '')
+            contexts.push(response.contexts || [])
+          } catch (error) {
+            console.error(`Error processing question ${i + 1}:`, error)
+            questions.push(pair.question)
+            groundTruths.push(pair.ground_truth || pair.answer)
+            answers.push('')
+            contexts.push([])
+          }
         }
+
+        setEvalProgress(Math.round(((chatbotIdx + 0.9) / totalEvals) * 80))
+
+        await evaluationAPI.evaluateChatbot(
+          selectedDataset.name,
+          chatbotId,
+          questions,
+          groundTruths,
+          answers,
+          contexts
+        )
       }
 
-      setEvalProgress(75)
-
-      await evaluationAPI.evaluateChatbot(
-        dataset.name,
-        selectedChatbot,
-        questions,
-        groundTruths,
-        answers,
-        contexts
-      )
-
       setEvalProgress(100)
-      alert('Evaluation completed successfully!')
-      
-      await loadInitialData()
-      setActiveView('leaderboard')
+      alert(`Successfully evaluated ${selectedChatbots.length} chatbot(s)!`)
+      setActiveView('view-datasets')
+      setSelectedDataset(null)
+      setSelectedChatbots([])
       
     } catch (error) {
       console.error('Error during evaluation:', error)
@@ -161,6 +160,42 @@ export default function EvaluationPage() {
     } finally {
       setEvaluating(false)
       setEvalProgress(0)
+    }
+  }
+
+  const handleDeleteDataset = async (datasetId) => {
+    if (!confirm('Delete this dataset? This cannot be undone.')) return
+    
+    try {
+      await evaluationAPI.deleteDataset(datasetId)
+      await loadInitialData()
+      setSelectedDataset(null)
+      alert('Dataset deleted successfully')
+      setActiveView('view-datasets')
+    } catch (error) {
+      console.error('Error deleting dataset:', error)
+      alert('Error deleting dataset')
+    }
+  }
+
+  const handleUpdateDataset = async (e) => {
+    e.preventDefault()
+    if (!editingDataset) return
+    
+    setLoading(true)
+    try {
+      await evaluationAPI.updateDataset(editingDataset._id, { qa_pairs: editingDataset.qa_pairs })
+      alert('Dataset updated successfully!')
+      await loadInitialData()
+      const updatedDataset = datasets.find(d => d._id === editingDataset._id)
+      setSelectedDataset(updatedDataset || editingDataset)
+      setEditingDataset(null)
+      setActiveView('dataset-detail')
+    } catch (error) {
+      console.error('Error updating dataset:', error)
+      alert('Error updating dataset')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -180,339 +215,549 @@ export default function EvaluationPage() {
     }
   }
 
-  const getMetricColor = (value) => {
-    if (value >= 0.8) return 'from-emerald-400 to-green-500'
-    if (value >= 0.6) return 'from-blue-400 to-cyan-500'
-    if (value >= 0.4) return 'from-amber-400 to-orange-500'
-    return 'from-rose-400 to-red-500'
+  const updateEditingQaPair = (index, field, value) => {
+    const updated = [...editingDataset.qa_pairs]
+    updated[index][field] = value
+    setEditingDataset({ ...editingDataset, qa_pairs: updated })
   }
 
-  const toggleEvalSelection = (evalId) => {
-    setSelectedEvals(prev => 
-      prev.includes(evalId) 
-        ? prev.filter(id => id !== evalId)
-        : [...prev, evalId]
-    )
-  }
-
-  const getTopPerformer = () => {
-    if (evaluations.length === 0) return null
-    return evaluations.reduce((best, current) => {
-      const currentMetrics = current.evaluation?.metrics_summary || {}
-      const bestMetrics = best.evaluation?.metrics_summary || {}
-      const currentAvg = Object.values(currentMetrics).reduce((a, b) => a + b, 0) / Object.values(currentMetrics).length
-      const bestAvg = Object.values(bestMetrics).reduce((a, b) => a + b, 0) / Object.values(bestMetrics).length
-      return currentAvg > bestAvg ? current : best
+  const addEditingQaPair = () => {
+    setEditingDataset({
+      ...editingDataset,
+      qa_pairs: [...editingDataset.qa_pairs, { question: '', ground_truth: '', source_doc: '' }]
     })
   }
 
+  const removeEditingQaPair = (index) => {
+    if (editingDataset.qa_pairs.length > 1) {
+      setEditingDataset({
+        ...editingDataset,
+        qa_pairs: editingDataset.qa_pairs.filter((_, i) => i !== index)
+      })
+    }
+  }
+
+  const toggleChatbotSelection = (chatbotId) => {
+    setSelectedChatbots(prev =>
+      prev.includes(chatbotId)
+        ? prev.filter(id => id !== chatbotId)
+        : [...prev, chatbotId]
+    )
+  }
+
+  const collectionDatasets = datasets.filter(d => d.source_collection === selectedCollection)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950">
+    <div className="h-full flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <style>{`
-        * { cursor: default; }
-        button, a, [role="button"], input[type="checkbox"], input[type="radio"], select { cursor: pointer !important; }
-        input[type="text"], input[type="url"], input[type="number"], textarea { cursor: text !important; }
-        input[type="range"] { cursor: grab !important; }
-        input[type="range"]:active { cursor: grabbing !important; }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
+        input[type="text"], input[type="url"], input[type="number"], textarea {
+          cursor: text !important;
         }
-        
-        @keyframes pulse-glow {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+          width: 100%;
+          cursor: grab !important;
         }
-        
-        .float-animation { animation: float 3s ease-in-out infinite; }
-        .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        input[type="range"]:active {
+          cursor: grabbing !important;
+        }
+        input[type="range"]::-webkit-slider-track {
+          background: rgba(255, 255, 255, 0.1);
+          height: 8px;
+          border-radius: 4px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          margin-top: -6px;
+          box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+          cursor: grab;
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+          cursor: grabbing;
+        }
+        input[type="range"]::-moz-range-track {
+          background: rgba(255, 255, 255, 0.1);
+          height: 8px;
+          border-radius: 4px;
+        }
+        input[type="range"]::-moz-range-thumb {
+          background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234));
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          border: none;
+          box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+          cursor: grab;
+        }
+        input[type="range"]::-moz-range-thumb:active {
+          cursor: grabbing;
+        }
       `}</style>
 
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl float-animation" />
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl float-animation" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl float-animation" style={{ animationDelay: '2s' }} />
+      {/* Sidebar */}
+      <div className="w-80 border-r border-white/5 flex flex-col">
+        <div className="p-6 border-b border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Collections</h2>
+            <button
+              onClick={loadInitialData}
+              className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/30 rounded-xl transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4 text-blue-400" />
+            </button>
+          </div>
+          <p className="text-sm text-slate-400">Select a collection to evaluate</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {collections.length === 0 ? (
+            <div className="text-center py-12 px-4">
+              <Database className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">No collections available</p>
+            </div>
+          ) : (
+            collections.map(collection => (
+              <button
+                key={collection}
+                onClick={() => {
+                  setSelectedCollection(collection)
+                  setActiveView('action-menu')
+                }}
+                className={`w-full text-left p-4 rounded-xl transition-all group cursor-pointer ${
+                  selectedCollection === collection
+                    ? 'bg-blue-500/10 border border-blue-500/30'
+                    : 'bg-slate-900/30 border border-white/5 hover:border-white/10 hover:bg-slate-900/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg transition-all ${
+                    selectedCollection === collection ? 'bg-blue-500/20' : 'bg-slate-800/50 group-hover:bg-slate-800'
+                  }`}>
+                    <Database className={`w-4 h-4 ${selectedCollection === collection ? 'text-blue-400' : 'text-slate-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium truncate ${selectedCollection === collection ? 'text-white' : 'text-slate-300'}`}>
+                      {collection}
+                    </p>
+                  </div>
+                  {selectedCollection === collection && (
+                    <ChevronRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
-      <div className="relative z-10 p-8">
-        {activeView === 'hub' && (
-          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-full mb-6 backdrop-blur-xl">
-                <Sparkles className="w-5 h-5 text-purple-400 pulse-glow" />
-                <span className="text-purple-300 font-medium">AI Performance Lab</span>
-              </div>
-              <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
-                Evaluation Hub
-              </h1>
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-                Build datasets, run experiments, and discover insights about your AI systems
-              </p>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto flex items-center justify-center p-8">
+        {!selectedCollection ? (
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <BarChart3 className="w-10 h-10 text-blue-400" />
             </div>
-
-            <div className="grid grid-cols-4 gap-6 mb-12">
-              <div className="group relative bg-gradient-to-br from-violet-500/10 via-purple-500/5 to-transparent border border-violet-500/20 rounded-3xl p-8 hover:border-violet-500/40 transition-all hover:scale-105">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative">
-                  <Beaker className="w-12 h-12 text-violet-400 mb-4 float-animation" />
-                  <div className="text-4xl font-bold text-white mb-2">{datasets.length}</div>
-                  <div className="text-violet-300 font-medium">Test Suites</div>
-                </div>
+            <h3 className="text-2xl font-semibold text-white mb-3">Evaluation Lab</h3>
+            <p className="text-slate-400">Select a collection to start evaluating your AI assistants</p>
+          </div>
+        ) : activeView === 'action-menu' ? (
+          <div className="w-full max-w-4xl">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full mb-4">
+                <Database className="w-5 h-5 text-blue-400" />
+                <h1 className="text-xl font-semibold text-white">{selectedCollection}</h1>
               </div>
-
-              <div className="group relative bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-transparent border border-blue-500/20 rounded-3xl p-8 hover:border-blue-500/40 transition-all hover:scale-105">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative">
-                  <Rocket className="w-12 h-12 text-blue-400 mb-4 float-animation" style={{ animationDelay: '0.5s' }} />
-                  <div className="text-4xl font-bold text-white mb-2">{evaluations.length}</div>
-                  <div className="text-blue-300 font-medium">Experiments</div>
-                </div>
-              </div>
-
-              <div className="group relative bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-transparent border border-emerald-500/20 rounded-3xl p-8 hover:border-emerald-500/40 transition-all hover:scale-105">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative">
-                  <Brain className="w-12 h-12 text-emerald-400 mb-4 float-animation" style={{ animationDelay: '1s' }} />
-                  <div className="text-4xl font-bold text-white mb-2">{chatbots.length}</div>
-                  <div className="text-emerald-300 font-medium">AI Agents</div>
-                </div>
-              </div>
-
-              <div className="group relative bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/20 rounded-3xl p-8 hover:border-amber-500/40 transition-all hover:scale-105">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative">
-                  <Flame className="w-12 h-12 text-amber-400 mb-4 float-animation" style={{ animationDelay: '1.5s' }} />
-                  <div className="text-4xl font-bold text-white mb-2">
-                    {evaluations.length > 0 
-                      ? (evaluations.reduce((acc, e) => {
-                          const metrics = e.evaluation?.metrics_summary || {}
-                          const avg = Object.values(metrics).reduce((a, b) => a + b, 0) / Object.values(metrics).length || 0
-                          return acc + avg
-                        }, 0) / evaluations.length * 100).toFixed(0)
-                      : 0}%
-                  </div>
-                  <div className="text-amber-300 font-medium">Peak Score</div>
-                </div>
-              </div>
+              <p className="text-slate-400">Choose an action to continue</p>
             </div>
 
             <div className="grid grid-cols-3 gap-6">
               <button
-                onClick={() => setActiveView('manual')}
-                className="group relative bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 hover:border-blue-500/50 rounded-3xl p-8 text-left overflow-hidden transition-all hover:scale-105"
+                onClick={() => setActiveView('create-manual')}
+                className="group relative bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-blue-500/30 rounded-2xl p-8 transition-all text-left cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
                 <div className="relative">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <div className="p-4 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl inline-flex mb-4 transition-all">
                     <Edit3 className="w-8 h-8 text-blue-400" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-blue-400 transition-colors">
+                  <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
                     Craft Dataset
                   </h3>
                   <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
-                    Hand-craft precise evaluation questions with expert ground truths
+                    Manually create test questions
                   </p>
-                  <div className="mt-6 flex items-center gap-2 text-blue-400 group-hover:gap-4 transition-all">
-                    <span className="text-sm font-medium">Start Building</span>
-                    <ChevronRight className="w-5 h-5" />
-                  </div>
                 </div>
+                <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-blue-400 absolute top-8 right-8 transition-colors" />
               </button>
 
               <button
-                onClick={() => setActiveView('generate')}
-                className="group relative bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 hover:border-purple-500/50 rounded-3xl p-8 text-left overflow-hidden transition-all hover:scale-105"
+                onClick={() => setActiveView('generate-auto')}
+                className="group relative bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-purple-500/30 rounded-2xl p-8 transition-all text-left cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
                 <div className="relative">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <div className="p-4 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl inline-flex mb-4 transition-all">
                     <Zap className="w-8 h-8 text-purple-400" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-purple-400 transition-colors">
-                    AI Generator
+                  <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                    AI Generate
                   </h3>
                   <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
-                    Automatically synthesize test cases from your knowledge base
+                    Auto-create from knowledge base
                   </p>
-                  <div className="mt-6 flex items-center gap-2 text-purple-400 group-hover:gap-4 transition-all">
-                    <span className="text-sm font-medium">Generate Now</span>
-                    <Sparkles className="w-5 h-5" />
-                  </div>
                 </div>
+                <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-purple-400 absolute top-8 right-8 transition-colors" />
               </button>
 
               <button
-                onClick={() => setActiveView('experiment')}
-                className="group relative bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 hover:border-emerald-500/50 rounded-3xl p-8 text-left overflow-hidden transition-all hover:scale-105"
+                onClick={() => setActiveView('view-datasets')}
+                className="group relative bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-green-500/30 rounded-2xl p-8 transition-all text-left cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
                 <div className="relative">
-                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <PlayCircle className="w-8 h-8 text-emerald-400" />
+                  <div className="p-4 bg-green-500/10 group-hover:bg-green-500/20 rounded-2xl inline-flex mb-4 transition-all">
+                    <FileText className="w-8 h-8 text-green-400" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-emerald-400 transition-colors">
-                    Run Experiment
+                  <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-green-400 transition-colors">
+                    View Datasets
                   </h3>
                   <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
-                    Execute comprehensive evaluations and measure performance
+                    Browse and manage datasets
                   </p>
-                  <div className="mt-6 flex items-center gap-2 text-emerald-400 group-hover:gap-4 transition-all">
-                    <span className="text-sm font-medium">Launch Test</span>
-                    <Rocket className="w-5 h-5" />
-                  </div>
+                  {collectionDatasets.length > 0 && (
+                    <div className="mt-4 px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-lg inline-block">
+                      <span className="text-sm font-medium text-green-400">{collectionDatasets.length} available</span>
+                    </div>
+                  )}
                 </div>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6 mt-6">
-              <button
-                onClick={() => setActiveView('datasets')}
-                className="group bg-gradient-to-r from-slate-900/50 to-slate-900/30 border border-white/10 hover:border-white/20 rounded-2xl p-6 flex items-center justify-between transition-all hover:scale-[1.02]"
-              >
-                <div className="flex items-center gap-4">
-                  <FileText className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors" />
-                  <div className="text-left">
-                    <div className="text-white font-semibold">Browse Datasets</div>
-                    <div className="text-sm text-slate-500">{datasets.length} available</div>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
-              </button>
-
-              <button
-                onClick={() => setActiveView('leaderboard')}
-                className="group bg-gradient-to-r from-slate-900/50 to-slate-900/30 border border-white/10 hover:border-white/20 rounded-2xl p-6 flex items-center justify-between transition-all hover:scale-[1.02]"
-              >
-                <div className="flex items-center gap-4">
-                  <TrendingUp className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors" />
-                  <div className="text-left">
-                    <div className="text-white font-semibold">View Leaderboard</div>
-                    <div className="text-sm text-slate-500">{evaluations.length} results</div>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
+                <ChevronRight className="w-6 h-6 text-slate-600 group-hover:text-green-400 absolute top-8 right-8 transition-colors" />
               </button>
             </div>
           </div>
-        )}
-
-        {activeView === 'manual' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-right-6 duration-500">
+        ) : activeView === 'view-datasets' ? (
+          <div className="w-full max-w-7xl">
             <button
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+              onClick={() => setActiveView('action-menu')}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group cursor-pointer"
             >
-              <ChevronRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Hub</span>
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to Menu</span>
             </button>
 
-            <div className="bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 rounded-3xl p-10 backdrop-blur-xl">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-                  <Edit3 className="w-8 h-8 text-blue-400" />
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">Datasets for {selectedCollection}</h2>
+              <p className="text-slate-400">{collectionDatasets.length} datasets available</p>
+            </div>
+
+            {collectionDatasets.length === 0 ? (
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-16 text-center">
+                <FileText className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">No Datasets Yet</h3>
+                <p className="text-slate-400 mb-6">Create your first evaluation dataset</p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setActiveView('create-manual')}
+                    className="px-5 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl transition-all cursor-pointer"
+                  >
+                    Craft Dataset
+                  </button>
+                  <button
+                    onClick={() => setActiveView('generate-auto')}
+                    className="px-5 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-xl transition-all cursor-pointer"
+                  >
+                    AI Generate
+                  </button>
                 </div>
-                <div>
-                  <h2 className="text-3xl font-bold text-white">Craft Your Dataset</h2>
-                  <p className="text-slate-400 mt-1">Build question-answer pairs with precision</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                {collectionDatasets.map(dataset => (
+                  <button
+                    key={dataset._id}
+                    onClick={() => {
+                      setSelectedDataset(dataset)
+                      setActiveView('dataset-detail')
+                    }}
+                    className="group bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-blue-500/30 rounded-2xl p-6 text-left transition-all cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-xl transition-all">
+                        <Beaker className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <span className="text-sm font-bold text-blue-400">{dataset.qa_pairs?.length || 0}</span>
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors line-clamp-2">
+                      {dataset.name}
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{new Date(dataset.generated_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Hash className="w-3.5 h-3.5" />
+                        <span>{dataset.qa_pairs?.length || 0} questions</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : activeView === 'dataset-detail' && selectedDataset ? (
+          <div className="w-full max-w-6xl">
+            <button
+              onClick={() => {
+                setSelectedDataset(null)
+                setActiveView('view-datasets')
+              }}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group cursor-pointer"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to Datasets</span>
+            </button>
+
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-3xl font-bold text-white mb-3">{selectedDataset.name}</h2>
+                    <div className="flex items-center gap-4 text-sm text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(selectedDataset.generated_at).toLocaleDateString()}</span>
+                      </div>
+                      <span>•</span>
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-4 h-4" />
+                        <span>{selectedDataset.qa_pairs?.length || 0} questions</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setEditingDataset(selectedDataset)
+                        setActiveView('edit-dataset')
+                      }}
+                      className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDataset(selectedDataset._id)}
+                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-white">Questions Preview</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                    {selectedDataset.qa_pairs?.slice(0, 5).map((pair, idx) => (
+                      <div key={idx} className="p-4 bg-slate-950/30 border border-white/5 rounded-lg">
+                        <p className="text-sm font-medium text-blue-400 mb-1">Q{idx + 1}: {pair.question}</p>
+                        <p className="text-sm text-slate-400">A: {pair.ground_truth || pair.answer}</p>
+                      </div>
+                    ))}
+                    {selectedDataset.qa_pairs?.length > 5 && (
+                      <p className="text-sm text-slate-500 text-center py-2">
+                        ... and {selectedDataset.qa_pairs.length - 5} more questions
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <form onSubmit={handleCreateManualDataset} className="space-y-8">
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8">
+                <h3 className="text-xl font-semibold text-white mb-6">Evaluate Assistants</h3>
+                
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-sm text-slate-400 mb-4">Select assistants to evaluate with this dataset</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {chatbots.map(bot => (
+                        <label
+                          key={bot.id}
+                          className="flex items-center gap-3 p-4 bg-slate-950/30 border border-white/5 hover:border-white/10 rounded-xl transition-all group cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedChatbots.includes(bot.id)}
+                            onChange={() => toggleChatbotSelection(bot.id)}
+                            className="w-5 h-5 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                          />
+                          <Brain className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                          <div className="flex-1">
+                            <div className="text-white font-medium group-hover:text-blue-400 transition-colors">{bot.name}</div>
+                            <div className="text-sm text-slate-500">{bot.llm}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {evaluating && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                          <span className="text-white font-semibold">Evaluating {selectedChatbots.length} assistant(s)...</span>
+                        </div>
+                        <span className="text-2xl font-bold text-blue-400">{evalProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-950/50 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300 rounded-full"
+                          style={{ width: `${evalProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleEvaluateChatbots}
+                    disabled={evaluating || selectedChatbots.length === 0}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 cursor-pointer"
+                  >
+                    {evaluating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Evaluating...
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-5 h-5" />
+                        Run Evaluation ({selectedChatbots.length} assistant{selectedChatbots.length !== 1 ? 's' : ''})
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : activeView === 'create-manual' ? (
+          <div className="w-full max-w-5xl">
+            <button
+              onClick={() => setActiveView('action-menu')}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group cursor-pointer"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to Menu</span>
+            </button>
+
+            <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-blue-500/10 rounded-xl">
+                  <Edit3 className="w-6 h-6 text-blue-400" />
+                </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-3">
+                  <h2 className="text-2xl font-bold text-white">Craft Dataset</h2>
+                  <p className="text-slate-400 mt-1">for {selectedCollection}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateManualDataset} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
                     Dataset Name
                   </label>
                   <input
                     type="text"
                     value={datasetName}
                     onChange={(e) => setDatasetName(e.target.value)}
-                    className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 focus:border-blue-500/50 rounded-2xl text-white text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                    placeholder="customer-support-qa-v1"
+                    className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="my-evaluation-dataset"
                     required
                   />
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-white">Question-Answer Pairs</h3>
+                    <h3 className="text-lg font-semibold text-white">Question-Answer Pairs</h3>
                     <button
                       type="button"
                       onClick={addQaPair}
-                      className="px-5 py-2.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 text-blue-400 rounded-xl font-medium transition-all flex items-center gap-2 hover:scale-105"
+                      className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-sm transition-all flex items-center gap-2 cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
                       Add Pair
                     </button>
                   </div>
 
-                  <div className="space-y-4">
-                    {qaPairs.map((pair, index) => (
-                      <div key={index} className="group bg-slate-950/30 border border-white/5 hover:border-white/10 rounded-2xl p-6 transition-all">
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-medium rounded-lg">
-                            Pair #{index + 1}
-                          </span>
-                          {qaPairs.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeQaPair(index)}
-                              className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all hover:scale-110"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                  {qaPairs.map((pair, index) => (
+                    <div key={index} className="p-6 bg-slate-950/30 border border-white/5 rounded-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-400">Pair #{index + 1}</span>
+                        {qaPairs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeQaPair(index)}
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-2">Question</label>
+                          <textarea
+                            value={pair.question}
+                            onChange={(e) => updateQaPair(index, 'question', e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            rows={3}
+                          />
                         </div>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-2">Question</label>
-                            <textarea
-                              value={pair.question}
-                              onChange={(e) => updateQaPair(index, 'question', e.target.value)}
-                              className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 focus:border-blue-500/50 rounded-xl text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                              rows={2}
-                              placeholder="What is the return policy?"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-2">Ground Truth Answer</label>
-                            <textarea
-                              value={pair.ground_truth}
-                              onChange={(e) => updateQaPair(index, 'ground_truth', e.target.value)}
-                              className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 focus:border-purple-500/50 rounded-xl text-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                              rows={2}
-                              placeholder="We offer 30-day returns..."
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-2">Source (Optional)</label>
-                            <input
-                              type="text"
-                              value={pair.source_doc}
-                              onChange={(e) => updateQaPair(index, 'source_doc', e.target.value)}
-                              className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 focus:border-slate-500/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 transition-all"
-                              placeholder="policy-docs.pdf"
-                            />
-                          </div>
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-2">Ground Truth</label>
+                          <textarea
+                            value={pair.ground_truth}
+                            onChange={(e) => updateQaPair(index, 'ground_truth', e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            rows={3}
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-2">Source (Optional)</label>
+                        <input
+                          type="text"
+                          value={pair.source_doc}
+                          onChange={(e) => updateQaPair(index, 'source_doc', e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full px-8 py-5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-blue-500/25"
+                  className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 cursor-pointer"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      Creating Dataset...
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Creating...
                     </>
                   ) : (
                     <>
-                      <Check className="w-6 h-6" />
+                      <Check className="w-5 h-5" />
                       Create Dataset
                     </>
                   )}
@@ -520,68 +765,47 @@ export default function EvaluationPage() {
               </form>
             </div>
           </div>
-        )}
-
-        {activeView === 'generate' && (
-          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-right-6 duration-500">
+        ) : activeView === 'generate-auto' ? (
+          <div className="w-full max-w-4xl">
             <button
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+              onClick={() => setActiveView('action-menu')}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group cursor-pointer"
             >
-              <ChevronRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Hub</span>
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to Menu</span>
             </button>
 
-            <div className="bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 rounded-3xl p-10 backdrop-blur-xl">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center">
-                  <Zap className="w-8 h-8 text-purple-400" />
+            <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-purple-500/10 rounded-xl">
+                  <Zap className="w-6 h-6 text-purple-400" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">AI-Powered Generation</h2>
-                  <p className="text-slate-400 mt-1">Synthesize test cases automatically</p>
+                  <h2 className="text-2xl font-bold text-white">AI Generate Dataset</h2>
+                  <p className="text-slate-400 mt-1">from {selectedCollection}</p>
                 </div>
               </div>
 
-              <form onSubmit={handleGenerateDataset} className="space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                      Source Collection
-                    </label>
-                    <select
-                      value={autoGenConfig.collection_name}
-                      onChange={(e) => setAutoGenConfig({...autoGenConfig, collection_name: e.target.value})}
-                      className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 focus:border-purple-500/50 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                      required
-                    >
-                      <option value="">Select collection...</option>
-                      {collections.map(col => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                      Dataset Name
-                    </label>
-                    <input
-                      type="text"
-                      value={autoGenConfig.dataset_name}
-                      onChange={(e) => setAutoGenConfig({...autoGenConfig, dataset_name: e.target.value})}
-                      className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 focus:border-purple-500/50 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                      placeholder="auto-generated-v1"
-                      required
-                    />
-                  </div>
+              <form onSubmit={handleGenerateDataset} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Dataset Name
+                  </label>
+                  <input
+                    type="text"
+                    value={autoGenConfig.dataset_name}
+                    onChange={(e) => setAutoGenConfig({...autoGenConfig, dataset_name: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                    placeholder="auto-generated-dataset"
+                    required
+                  />
                 </div>
 
-                <div className="bg-slate-950/30 border border-white/5 rounded-2xl p-8">
-                  <label className="block text-lg font-semibold text-white mb-6">
-                    Number of Test Cases
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Number of Questions
                   </label>
-                  <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-4">
                     <input
                       type="range"
                       min="5"
@@ -589,34 +813,31 @@ export default function EvaluationPage() {
                       step="5"
                       value={autoGenConfig.testset_size}
                       onChange={(e) => setAutoGenConfig({...autoGenConfig, testset_size: parseInt(e.target.value)})}
-                      className="flex-1 h-3 bg-slate-900/50 rounded-full"
+                      className="flex-1"
                     />
-                    <div className="text-right">
-                      <div className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                        {autoGenConfig.testset_size}
-                      </div>
-                      <div className="text-sm text-slate-500 mt-1">questions</div>
-                    </div>
+                    <span className="text-3xl font-bold text-purple-400 w-16 text-right">
+                      {autoGenConfig.testset_size}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-xs text-slate-500 mt-4">
-                    <span>Quick Test (5)</span>
-                    <span>Comprehensive (100)</span>
+                  <div className="flex justify-between text-xs text-slate-500 mt-2">
+                    <span>Quick</span>
+                    <span>Comprehensive</span>
                   </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full px-8 py-5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-purple-500/25"
+                  className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 cursor-pointer"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Generating...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-6 h-6" />
+                      <Zap className="w-5 h-5" />
                       Generate Dataset
                     </>
                   )}
@@ -624,372 +845,126 @@ export default function EvaluationPage() {
               </form>
             </div>
           </div>
-        )}
-
-        {activeView === 'datasets' && (
-          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-right-6 duration-500">
+        ) : activeView === 'edit-dataset' && editingDataset ? (
+          <div className="w-full max-w-5xl">
             <button
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+              onClick={() => {
+                setEditingDataset(null)
+                setActiveView('dataset-detail')
+              }}
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group cursor-pointer"
             >
-              <ChevronRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Hub</span>
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span>Cancel Editing</span>
             </button>
 
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-4xl font-bold text-white mb-2">Dataset Library</h2>
-                <p className="text-slate-400">{datasets.length} test suites ready</p>
-              </div>
-            </div>
-
-            {datasets.length === 0 ? (
-              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-3xl p-20 text-center">
-                <FileText className="w-20 h-20 text-slate-700 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-white mb-3">No Datasets Yet</h3>
-                <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                  Create your first evaluation dataset to start measuring AI performance
-                </p>
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={() => setActiveView('manual')}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 text-blue-400 rounded-xl font-medium transition-all hover:scale-105"
-                  >
-                    Manual Creation
-                  </button>
-                  <button
-                    onClick={() => setActiveView('generate')}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 text-purple-400 rounded-xl font-medium transition-all hover:scale-105"
-                  >
-                    AI Generate
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-6">
-                {datasets.map(dataset => (
-                  <div
-                    key={dataset._id}
-                    className="group bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 hover:border-white/20 rounded-2xl p-6 transition-all hover:scale-105"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="p-3 bg-blue-500/10 rounded-xl">
-                        <Beaker className="w-6 h-6 text-blue-400" />
-                      </div>
-                      <div className="px-3 py-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-lg">
-                        <span className="text-sm font-bold text-blue-400">
-                          {dataset.qa_pairs?.length || 0}
-                        </span>
-                      </div>
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors line-clamp-2">
-                      {dataset.name}
-                    </h3>
-                    <p className="text-sm text-slate-500 mb-4">
-                      {dataset.source_collection}
-                    </p>
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>{new Date(dataset.generated_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeView === 'experiment' && (
-          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-right-6 duration-500">
-            <button
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
-            >
-              <ChevronRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Hub</span>
-            </button>
-
-            <div className="bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border border-white/10 rounded-3xl p-10 backdrop-blur-xl">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl flex items-center justify-center">
-                  <Rocket className="w-8 h-8 text-emerald-400" />
+            <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-blue-500/10 rounded-xl">
+                  <Edit3 className="w-6 h-6 text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">Launch Experiment</h2>
-                  <p className="text-slate-400 mt-1">Evaluate your AI agent's capabilities</p>
+                  <h2 className="text-2xl font-bold text-white">Edit Dataset</h2>
+                  <p className="text-slate-400 mt-1">{editingDataset.name}</p>
                 </div>
               </div>
 
-              <div className="space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                      Test Suite
-                    </label>
-                    <select
-                      value={selectedDataset || ''}
-                      onChange={(e) => setSelectedDataset(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 focus:border-emerald-500/50 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              <form onSubmit={handleUpdateDataset} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">Question-Answer Pairs</h3>
+                    <button
+                      type="button"
+                      onClick={addEditingQaPair}
+                      className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-sm transition-all flex items-center gap-2 cursor-pointer"
                     >
-                      <option value="">Choose dataset...</option>
-                      {datasets.map(ds => (
-                        <option key={ds._id} value={ds._id}>
-                          {ds.name} ({ds.qa_pairs?.length || 0} tests)
-                        </option>
-                      ))}
-                    </select>
+                      <Plus className="w-4 h-4" />
+                      Add Pair
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                      AI Agent
-                    </label>
-                    <select
-                      value={selectedChatbot || ''}
-                      onChange={(e) => setSelectedChatbot(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 focus:border-emerald-500/50 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                    >
-                      <option value="">Choose agent...</option>
-                      {chatbots.map(bot => (
-                        <option key={bot.id} value={bot.id}>
-                          {bot.name} ({bot.llm})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {evaluating && (
-                  <div className="bg-slate-950/50 border border-emerald-500/30 rounded-2xl p-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-                          <div className="absolute inset-0 blur-xl bg-emerald-400/50" />
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    {editingDataset.qa_pairs.map((pair, index) => (
+                      <div key={index} className="p-6 bg-slate-950/30 border border-white/5 rounded-xl space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-400">Pair #{index + 1}</span>
+                          {editingDataset.qa_pairs.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeEditingQaPair(index)}
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-2">Question</label>
+                            <textarea
+                              value={pair.question}
+                              onChange={(e) => updateEditingQaPair(index, 'question', e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-2">Ground Truth</label>
+                            <textarea
+                              value={pair.ground_truth || pair.answer || ''}
+                              onChange={(e) => updateEditingQaPair(index, 'ground_truth', e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                              rows={3}
+                            />
+                          </div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-white">Running Experiment</div>
-                          <div className="text-sm text-slate-400">Processing test cases...</div>
+                          <label className="block text-xs text-slate-400 mb-2">Source (Optional)</label>
+                          <input
+                            type="text"
+                            value={pair.source_doc || ''}
+                            onChange={(e) => updateEditingQaPair(index, 'source_doc', e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                          />
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-4xl font-bold text-emerald-400">{evalProgress}%</div>
-                      </div>
-                    </div>
-                    <div className="relative w-full h-4 bg-slate-900/50 rounded-full overflow-hidden">
-                      <div
-                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-500"
-                        style={{ width: `${evalProgress}%` }}
-                      />
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
 
-                <button
-                  onClick={handleEvaluateChatbot}
-                  disabled={evaluating || !selectedDataset || !selectedChatbot}
-                  className="w-full px-8 py-5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/25"
-                >
-                  {evaluating ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Rocket className="w-6 h-6" />
-                      Launch Experiment
-                    </>
-                  )}
-                </button>
-              </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDataset(null)
+                      setActiveView('dataset-detail')
+                    }}
+                    className="flex-1 px-6 py-4 bg-slate-800/50 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 cursor-pointer"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        )}
-
-        {activeView === 'leaderboard' && (
-          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-right-6 duration-500">
-            <button
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
-            >
-              <ChevronRight className="w-5 h-5 rotate-180 group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Hub</span>
-            </button>
-
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-4xl font-bold text-white mb-2">Performance Leaderboard</h2>
-                <p className="text-slate-400">{evaluations.length} experiments completed</p>
-              </div>
-              <button
-                onClick={() => setCompareMode(!compareMode)}
-                className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                  compareMode
-                    ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-400'
-                    : 'bg-slate-900/50 border border-white/10 text-slate-400 hover:text-white hover:border-white/20'
-                }`}
-              >
-                <GitCompare className="w-5 h-5" />
-                {compareMode ? 'Exit Compare' : 'Compare Mode'}
-              </button>
-            </div>
-
-            {evaluations.length === 0 ? (
-              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 border border-white/10 rounded-3xl p-20 text-center">
-                <TrendingUp className="w-20 h-20 text-slate-700 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-white mb-3">No Results Yet</h3>
-                <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                  Run your first experiment to see performance metrics
-                </p>
-                <button
-                  onClick={() => setActiveView('experiment')}
-                  className="px-6 py-3 bg-gradient-to-r from-emerald-500/20 to-green-500/20 hover:from-emerald-500/30 hover:to-green-500/30 border border-emerald-500/30 text-emerald-400 rounded-xl font-medium transition-all hover:scale-105"
-                >
-                  Run Experiment
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {compareMode && selectedEvals.length > 0 && (
-                  <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-6 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <GitCompare className="w-6 h-6 text-purple-400" />
-                        <span className="text-white font-semibold">
-                          {selectedEvals.length} experiments selected
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setSelectedEvals([])}
-                        className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-all"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {evaluations.map((evaluation, idx) => {
-                  const metrics = evaluation.evaluation?.metrics_summary || {}
-                  const avgScore = Object.keys(metrics).length > 0 
-                    ? Object.values(metrics).reduce((a, b) => a + b, 0) / Object.values(metrics).length 
-                    : 0
-                  const topPerformer = getTopPerformer()
-                  const isTop = topPerformer?._id === evaluation._id
-                  const isSelected = selectedEvals.includes(evaluation._id)
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => compareMode && toggleEvalSelection(evaluation._id)}
-                      className={`group relative bg-gradient-to-br from-slate-900/80 via-slate-900/50 to-transparent border rounded-3xl overflow-hidden transition-all ${
-                        isSelected 
-                          ? 'border-purple-500/50 scale-[1.02]' 
-                          : 'border-white/10 hover:border-white/20'
-                      } ${compareMode ? '' : 'hover:scale-[1.01]'}`}
-                    >
-                      {isTop && (
-                        <div className="absolute top-0 right-0 px-4 py-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-l border-b border-amber-500/30 rounded-bl-2xl">
-                          <div className="flex items-center gap-2">
-                            <Award className="w-4 h-4 text-amber-400" />
-                            <span className="text-sm font-bold text-amber-400">Top Performer</span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="p-8">
-                        <div className="flex items-start justify-between mb-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-4 mb-3">
-                              {compareMode && (
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  className="w-5 h-5 rounded border-white/20 bg-slate-950 text-purple-500"
-                                />
-                              )}
-                              <h3 className="text-2xl font-bold text-white group-hover:text-blue-400 transition-colors">
-                                {evaluation.chatbot?.name || 'Unknown'}
-                              </h3>
-                              <span className="text-slate-600">×</span>
-                              <span className="text-slate-400">{evaluation.dataset?.name || 'Unknown'}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-500">
-                              <span>{new Date(evaluation.timestamp).toLocaleString()}</span>
-                              <span>•</span>
-                              <span>{evaluation.dataset?.num_questions || 0} questions</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-6xl font-black bg-gradient-to-r ${getMetricColor(avgScore)} bg-clip-text text-transparent`}>
-                              {(avgScore * 100).toFixed(0)}
-                            </div>
-                            <div className="text-sm text-slate-500 mt-1">Score</div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-4">
-                          {[
-                            { key: 'faithfulness', icon: Award, label: 'Faithfulness' },
-                            { key: 'answer_relevancy', icon: Target, label: 'Relevancy' },
-                            { key: 'context_recall', icon: Activity, label: 'Recall' },
-                            { key: 'context_precision', icon: Zap, label: 'Precision' }
-                          ].map(({ key, icon: Icon, label }) => {
-                            const value = metrics[key] || 0
-                            return (
-                              <div key={key} className="relative">
-                                <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <Icon className="w-4 h-4 text-slate-500" />
-                                    <span className="text-xs font-medium text-slate-400">{label}</span>
-                                  </div>
-                                  <div className={`text-3xl font-bold bg-gradient-to-r ${getMetricColor(value)} bg-clip-text text-transparent mb-3`}>
-                                    {(value * 100).toFixed(0)}
-                                  </div>
-                                  <div className="relative w-full h-2 bg-slate-900/50 rounded-full overflow-hidden">
-                                    <div
-                                      className={`absolute inset-y-0 left-0 bg-gradient-to-r ${getMetricColor(value)} rounded-full transition-all duration-1000`}
-                                      style={{ width: `${value * 100}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-6 flex-wrap">
-                          <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-lg">
-                            {evaluation.chatbot?.llm}
-                          </span>
-                          {evaluation.chatbot?.hyde && (
-                            <span className="px-3 py-1 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-medium rounded-lg">
-                              HyDE
-                            </span>
-                          )}
-                          {evaluation.chatbot?.reranking && (
-                            <span className="px-3 py-1 bg-pink-500/10 border border-pink-500/30 text-pink-400 text-xs font-medium rounded-lg">
-                              Reranked
-                            </span>
-                          )}
-                          {evaluation.chatbot?.hybrid_search && (
-                            <span className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-medium rounded-lg">
-                              Hybrid
-                            </span>
-                          )}
-                          <span className="px-3 py-1 bg-slate-700/30 border border-slate-600/30 text-slate-400 text-xs font-medium rounded-lg">
-                            Top-{evaluation.chatbot?.top_k || 5}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

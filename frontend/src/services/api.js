@@ -202,11 +202,12 @@ export const evaluationAPI = {
     }
   },
 
-  createDataset: async (name, qaPairs) => {
+  createDataset: async (data) => {
     try {
       const response = await api.post('/evaluation/datasets', {
-        name: name,
-        qa_pairs: qaPairs
+        dataset_name: data.dataset_name,
+        qa_pairs: data.qa_pairs,
+        source_collection: data.source_collection || 'manual'
       })
       return response.data
     } catch (error) {
@@ -215,9 +216,29 @@ export const evaluationAPI = {
     }
   },
 
+  updateDataset: async (datasetId, data) => {
+    try {
+      const response = await api.put(`/evaluation/datasets/${datasetId}`, data)
+      return response.data
+    } catch (error) {
+      console.error('Update Dataset Error:', error)
+      throw error
+    }
+  },
+
+  deleteDataset: async (datasetId) => {
+    try {
+      const response = await api.delete(`/evaluation/datasets/${datasetId}`)
+      return response.data
+    } catch (error) {
+      console.error('Delete Dataset Error:', error)
+      throw error
+    }
+  },
+
   generateDataset: async (collectionName, datasetName, testsetSize) => {
     try {
-      const response = await api.post('/evaluation/generate', {
+      const response = await api.post('/evaluation/ragas', {
         collection_name: collectionName,
         dataset_name: datasetName,
         testset_size: testsetSize
@@ -231,13 +252,13 @@ export const evaluationAPI = {
 
   evaluateChatbot: async (datasetName, chatbotId, questions, groundTruths, answers, contexts) => {
     try {
-      const response = await api.post('/evaluation/evaluate', {
+      const response = await api.post('/evaluation/evaluate-chatbot', {
         dataset_name: datasetName,
         chatbot_id: chatbotId,
         questions: questions,
         ground_truths: groundTruths,
         answers: answers,
-        contexts: contexts
+        retrieved_contexts: contexts  // Changed from 'contexts' to 'retrieved_contexts'
       })
       return response.data
     } catch (error) {
@@ -248,7 +269,7 @@ export const evaluationAPI = {
 
   getEvaluations: async () => {
     try {
-      const response = await api.get('/evaluation/results')
+      const response = await api.get('/evaluation/evaluations')
       return response.data
     } catch (error) {
       console.error('Get Evaluations Error:', error)

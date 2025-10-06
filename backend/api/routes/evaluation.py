@@ -71,7 +71,7 @@ class DatasetCreationRequest(BaseModel):
     qa_pairs: List[dict]
 
 
-@router.post("/")
+@router.post("/datasets")
 async def create_dataset(request: DatasetCreationRequest):
     """
     Create a dataset with manually provided question-answer pairs.
@@ -119,7 +119,7 @@ async def create_dataset(request: DatasetCreationRequest):
         raise HTTPException(status_code=500, detail=f"Error creating dataset: {str(e)}")
 
 
-@router.get("/")
+@router.get("/datasets")
 async def get_evaluation_datasets():
     """
     Retrieve all evaluation datasets.
@@ -141,7 +141,7 @@ async def get_evaluation_datasets():
         )
 
 
-@router.put("/{dataset_id}")
+@router.put("/datasets/{dataset_id}")
 async def update_evaluation_dataset(dataset_id: str, update_data: dict):
     """
     Update an evaluation dataset.
