@@ -633,7 +633,7 @@ export default function KnowledgeBasePage() {
 
               {/* Document Database Card */}
               <a
-                href={`http://localhost:8081/db/rag_chatbot/${activeCollection}`}
+                href={`http://localhost:8081/db/lume/${activeCollection}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group block relative overflow-hidden bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border border-white/10 hover:border-blue-500/30 rounded-2xl p-8 transition-all cursor-pointer"
@@ -945,7 +945,7 @@ export default function KnowledgeBasePage() {
                     onClick={resetWizard}
                     className="flex-1 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer"
                   >
-                    Start Over
+                    Cancel
                   </button>
                   <button
                     onClick={() => handleUploadDocuments(activeCollection)}
