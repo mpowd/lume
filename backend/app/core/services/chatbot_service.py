@@ -17,6 +17,8 @@ from smolagents import ToolCallingAgent, LiteLLMModel, DuckDuckGoSearchTool, Cod
 from backend.db.mongodb import MongoDBClient
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.documents import Document
+from FlagEmbedding import FlagReranker
 
 from backend.app.core.agents.pydantic_agent import (
     PydanticAgentFactory,
@@ -36,15 +38,85 @@ class CitedAnswer(BaseModel):
     )
 
 
+class HuggingFaceReranker:
+    """HuggingFace reranker using FlagEmbedding"""
+
+    def __init__(
+        self,
+        model_name: str = "BAAI/bge-reranker-v2-m3",
+        top_n: int = 5,
+        use_fp16: bool = True,
+    ):
+        self.model_name = model_name
+        self.top_n = top_n
+
+        logger.info(f"Loading FlagEmbedding reranker: {model_name}")
+        self.reranker = FlagReranker(model_name, use_fp16=use_fp16)
+        logger.info(f"Reranker loaded successfully")
+
+    def compress_documents(
+        self,
+        documents: List[Document],
+        query: str,
+    ) -> List[Document]:
+        """
+        Rerank documents based on their relevance to the query.
+        Compatible with LangChain's ContextualCompressionRetriever interface.
+        """
+        if not documents:
+            return []
+
+        logger.info(f"Reranking {len(documents)} documents with query: {query[:50]}...")
+
+        # Prepare pairs of [query, document]
+        pairs = [[query, doc.page_content] for doc in documents]
+
+        # Get normalized scores (0-1 range with sigmoid)
+        scores = self.reranker.compute_score(pairs, normalize=True)
+
+        # Handle single score (not a list)
+        if not isinstance(scores, list):
+            scores = [scores]
+
+        logger.info(f"Computed {len(scores)} scores. Sample scores: {scores[:3]}")
+
+        # Create list of (document, score) tuples
+        doc_score_pairs = list(zip(documents, scores))
+
+        # Sort by score (descending)
+        doc_score_pairs.sort(key=lambda x: x[1], reverse=True)
+
+        # Take top_n documents
+        top_docs = doc_score_pairs[: self.top_n]
+
+        logger.info(f"Selected top {len(top_docs)} documents after reranking")
+
+        # Add relevance scores to metadata and return documents
+        reranked_docs = []
+        for doc, score in top_docs:
+            new_doc = Document(
+                page_content=doc.page_content,
+                metadata={**doc.metadata, "relevance_score": float(score)},
+            )
+            reranked_docs.append(new_doc)
+            logger.info(
+                f"Reranked doc score: {score:.4f} for source: {doc.metadata.get('source_url', 'unknown')}"
+            )
+
+        return reranked_docs
+
+
 class ChatbotService:
     def __init__(self):
         self.sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
         self.embeddings = OllamaEmbeddings(
-            model="jina/jina-embeddings-v2-base-de", base_url="http://ollama:11434"
+            model="jina/jina-embeddings-v2-base-de",
+            base_url="http://host.docker.internal:11434",
         )
         self.active_agents = {}
         self.active_pydantic_agents = {}
         self._current_query = ""
+        self.hf_rerankers = {}  # Cache for HuggingFace rerankers
 
         self.mongodb_client = MongoDBClient.get_instance()
 
@@ -52,21 +124,17 @@ class ChatbotService:
         """
         Get the appropriate language model based on configuration
         """
-        if model_name == "gpt-4o-mini":
+        if model_name in ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"]:
             return ChatOpenAI(
-                model="gpt-4o-mini",
+                model=model_name,
                 api_key=os.environ.get("OPENAI_API_KEY"),
                 temperature=0,
-            )
-        elif model_name in ["mistral", "qwen", "llama3"]:
-            return ChatOllama(
-                model=model_name, temperature=0, base_url="http://ollama:11434"
             )
         else:
-            return ChatOpenAI(
-                model="gpt-4o-mini",
-                api_key=os.environ.get("OPENAI_API_KEY"),
+            return ChatOllama(
+                model=model_name,
                 temperature=0,
+                base_url="http://host.docker.internal:11434",
             )
 
     def get_litellm_model(self, model_name: str):
@@ -80,9 +148,23 @@ class ChatbotService:
         else:
             return LiteLLMModel(
                 model_id=f"ollama_chat/{model_name}",
-                api_base="http://ollama:11434",
+                api_base="http://host.docker.internal:11434",
                 num_ctx=4096,
             )
+
+    def get_hf_reranker(self, model_name: str, top_n: int):
+        """
+        Get or create a HuggingFace reranker
+        """
+        cache_key = f"{model_name}_{top_n}"
+
+        if cache_key not in self.hf_rerankers:
+            logger.info(f"Creating new HuggingFace reranker: {model_name}")
+            self.hf_rerankers[cache_key] = HuggingFaceReranker(
+                model_name=model_name, top_n=top_n
+            )
+
+        return self.hf_rerankers[cache_key]
 
     def generate_hypothetical_document(self, query: str, hyde_prompt: str, llm) -> str:
         """Generate a hypothetical document/answer to improve retrieval"""
@@ -157,12 +239,15 @@ class ChatbotService:
                 retriever = base_retriever
 
             if config.get("reranking", False):
-                reranker_type = config.get("reranker", "Cohere")
+                reranker_provider = config.get("reranker_provider", "cohere")
+                reranker_model = config.get("reranker_model", "rerank-v3.5")
                 top_n = config.get("top_n", max(1, int(top_k / 2)))
 
-                logger.info(f"Setting up {reranker_type} reranker with top_n={top_n}")
+                logger.info(
+                    f"Setting up {reranker_provider} reranker (model: {reranker_model}) with top_n={top_n}"
+                )
 
-                if reranker_type == "Cohere":
+                if reranker_provider == "cohere":
                     if not os.environ.get("COHERE_API_KEY"):
                         logger.warning(
                             "COHERE_API_KEY is not set. Reranking will not work properly."
@@ -171,7 +256,7 @@ class ChatbotService:
                     try:
                         cohere_reranker = CohereRerank(
                             cohere_api_key=os.environ.get("COHERE_API_KEY"),
-                            model="rerank-v3.5",
+                            model=reranker_model,
                             top_n=top_n,
                         )
 
@@ -192,12 +277,49 @@ class ChatbotService:
                             f"Error setting up Cohere reranker: {str(e)}", exc_info=True
                         )
 
-                elif reranker_type == "Jina":
-                    logger.warning(
-                        "Jina reranker not implemented yet, using default retrieval"
-                    )
+                elif reranker_provider == "huggingface":
+                    try:
+                        hf_reranker = self.get_hf_reranker(reranker_model, top_n)
 
-            return retriever | RunnableLambda(LongContextReorder().transform_documents)
+                        logger.info(
+                            f"Creating ContextualCompressionRetriever with HF reranker"
+                        )
+
+                        contextual_compression_retriever = (
+                            ContextualCompressionRetriever(
+                                base_compressor=hf_reranker,
+                                base_retriever=retriever,
+                            )
+                        )
+
+                        retriever = contextual_compression_retriever
+
+                        logger.info(
+                            f"Successfully created HuggingFace reranker ({reranker_model}) with ContextualCompressionRetriever"
+                        )
+
+                        # Test the reranker to make sure it's working
+                        logger.info(f"Retriever type: {type(retriever)}")
+                        logger.info(
+                            f"Retriever base_compressor: {type(retriever.base_compressor)}"
+                        )
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error setting up HuggingFace reranker: {str(e)}",
+                            exc_info=True,
+                        )
+
+            # CRITICAL FIX: Don't apply LongContextReorder BEFORE reranking!
+            # The reranker already does the reordering we need
+            if config.get("reranking", False):
+                logger.info("Reranking enabled, skipping LongContextReorder")
+                return retriever
+            else:
+                logger.info("No reranking, applying LongContextReorder")
+                return retriever | RunnableLambda(
+                    LongContextReorder().transform_documents
+                )
 
         except Exception as e:
             logger.error(
@@ -229,9 +351,14 @@ class ChatbotService:
         Create a linear RAG agent based on configuration
         """
 
-        # Define helper functions FIRST
-        def extract_sources_with_scores(docs):
-            """Extract sources and their relevance scores"""
+        # Define helper functions FIRST (at the correct indentation level)
+        def extract_sources_with_scores(docs, include_without_scores=False):
+            """Extract sources and their relevance scores
+
+            Args:
+                docs: List of documents
+                include_without_scores: If True, include sources even without scores (for non-reranked results)
+            """
             sources = []
             for doc in docs:
                 source = (
@@ -240,30 +367,37 @@ class ChatbotService:
                     or doc.metadata.get("source_url")
                 )
 
-                # Cohere reranker stores the relevance score in metadata
+                # Rerankers store the relevance score in metadata
                 score = None
 
-                # Check for Cohere relevance score (from ContextualCompressionRetriever)
+                # Check for relevance score (from ContextualCompressionRetriever)
                 if "relevance_score" in doc.metadata:
                     score = doc.metadata["relevance_score"]
-                    logger.info(f"Found Cohere relevance_score: {score} for {source}")
+                    logger.info(f"Found relevance_score: {score} for {source}")
 
                 # Fallback: check other common score locations
                 elif "_score" in doc.metadata:
                     score = doc.metadata["_score"]
                     logger.info(f"Found _score: {score} for {source}")
 
-                # Log if no score found
-                if score is None:
-                    logger.warning(f"No score found for {source}, using default 0.5")
-                    logger.info(f"Available metadata keys: {doc.metadata.keys()}")
-
-                sources.append(
-                    {
-                        "url": source if source else "Unknown source",
-                        "score": float(score) if score is not None else 0.5,
-                    }
-                )
+                # Add source based on whether we require scores
+                if score is not None:
+                    sources.append(
+                        {
+                            "url": source if source else "Unknown source",
+                            "score": float(score),
+                        }
+                    )
+                elif include_without_scores:
+                    # No score available, but we want to include the source anyway
+                    sources.append(
+                        {
+                            "url": source if source else "Unknown source",
+                            # Don't include score key at all if we don't have one
+                        }
+                    )
+                else:
+                    logger.info(f"No score found for {source}, excluding from sources")
 
             return sources
 
@@ -271,6 +405,7 @@ class ChatbotService:
             """Extract page contents from documents"""
             return [doc.page_content for doc in docs]
 
+        # Check if collections are specified
         if not config.get("collections"):
             logger.warning("No collections specified. Creating a simple non-RAG agent.")
 
@@ -304,22 +439,22 @@ class ChatbotService:
             parser = PydanticOutputParser(pydantic_object=CitedAnswer)
 
             rag_prompt_with_citation = """You are answering a question using provided context chunks.
-Each chunk is numbered starting from 0. You must track which chunks you use.
+    Each chunk is numbered starting from 0. You must track which chunks you use.
 
-Retrieved Context Chunks:
-{context_with_indices}
+    Retrieved Context Chunks:
+    {context_with_indices}
 
-User Question: {question}
+    User Question: {question}
 
-Instructions:
-1. Answer the question using ONLY the information from the chunks above
-2. Track which chunk numbers you actually used to generate your answer
-3. Only include chunk indices you directly referenced or paraphrased
-4. If you didn't use a chunk, don't include its index
+    Instructions:
+    1. Answer the question using ONLY the information from the chunks above
+    2. Track which chunk numbers you actually used to generate your answer
+    3. Only include chunk indices you directly referenced or paraphrased
+    4. If you didn't use a chunk, don't include its index
 
-{format_instructions}
+    {format_instructions}
 
-Be precise with chunk indices - only list chunks you actually used!"""
+    Be precise with chunk indices - only list chunks you actually used!"""
 
             context_prompt = ChatPromptTemplate.from_template(rag_prompt_with_citation)
 
@@ -361,7 +496,10 @@ Be precise with chunk indices - only list chunks you actually used!"""
                 return {
                     "response": cited_answer.answer,
                     "contexts": [doc.page_content for doc in used_docs],
-                    "source_urls": extract_sources_with_scores(used_docs),
+                    "source_urls": extract_sources_with_scores(
+                        used_docs,
+                        include_without_scores=not config.get("reranking", False),
+                    ),
                 }
 
             agent = RunnableParallel(
@@ -405,7 +543,10 @@ Be precise with chunk indices - only list chunks you actually used!"""
             ).assign(
                 response=answer_chain,
                 contexts=lambda x: extract_page_contents(x["retrieved_docs"]),
-                source_urls=lambda x: extract_sources_with_scores(x["retrieved_docs"]),
+                source_urls=lambda x: extract_sources_with_scores(
+                    x["retrieved_docs"],
+                    include_without_scores=not config.get("reranking", False),
+                ),
             )
 
         return agent
@@ -465,6 +606,11 @@ Be precise with chunk indices - only list chunks you actually used!"""
             logger.info(f"Selected LLM: {config.get('llm')}")
             logger.info(f"Collections: {config.get('collections', [])}")
             logger.info(f"Precise Citation: {config.get('precise_citation', False)}")
+            logger.info(
+                f"Reranker Provider: {config.get('reranker_provider', 'cohere')}"
+            )
+            logger.info(f"Reranker Model: {config.get('reranker_model', 'N/A')}")
+            logger.info(f"Local Only: {config.get('local_only', False)}")
 
             workflow = config.get("workflow", "linear")
 
