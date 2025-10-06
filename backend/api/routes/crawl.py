@@ -1,76 +1,145 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 import logging
-import os
 import httpx
 import json
-
 import uuid
-from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List
 from backend.db.mongodb import MongoDBClient
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-class URLCrawlRequest(BaseModel):
-    base_url: HttpUrl
-    depth: int
-    max_pages: int
-    include_external_domains: bool
 
 @router.get("/")
-async def crawl_url(base_url: HttpUrl, depth: int = 2, max_pages: int = 200, include_external_domains: bool = False, collection_name:str = "temp"):
+async def crawl_url(
+    base_url: str = Query(..., description="URL to crawl"),
+    depth: int = Query(2, description="Crawl depth"),
+    max_pages: int = Query(50, description="Maximum pages to crawl"),
+    include_external_domains: bool = Query(
+        False, description="Include external domains"
+    ),
+):
+    """Stream crawl progress via Server-Sent Events"""
+    logger.info(f"Crawl request: {base_url}, depth={depth}, max_pages={max_pages}")
 
-    logger.info(f"Prepare crawl request with params: base_url={str(base_url)}, depth={depth}, max_pages={max_pages}, include_external_domains={include_external_domains}")
-    
-    crawl_session_id = str(uuid.uuid4())
-    
-    url_crawl_request = URLCrawlRequest(
-        base_url=base_url,
-        depth=depth,
-        max_pages=max_pages,
-        include_external_domains=include_external_domains,
-    )
-    
-    try:
-        with httpx.Client(timeout=600000.0) as client:
-            response = client.get(
-                f"http://crawler:11235/crawl",
-                params={
-                    "base_url": str(url_crawl_request.base_url),
-                    "depth": url_crawl_request.depth,
-                    "max_pages": url_crawl_request.max_pages,
-                    "include_external_domains": url_crawl_request.include_external_domains,
-                    "crawl_session_id": crawl_session_id
+    async def generate():
+        crawl_session_id = str(uuid.uuid4())
+
+        # Send initial status
+        yield f"data: {json.dumps({'type': 'init', 'session_id': crawl_session_id, 'max_pages': max_pages})}\n\n"
+
+        try:
+            # Make the crawl request to crawler service
+            async with httpx.AsyncClient(timeout=600.0) as client:
+                response = await client.get(
+                    "http://crawler:11235/crawl",
+                    params={
+                        "base_url": base_url,
+                        "depth": depth,
+                        "max_pages": max_pages,
+                        "include_external_domains": include_external_domains,
+                        "crawl_session_id": crawl_session_id,
+                    },
+                )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code, detail="Crawler service error"
+                )
+
+            response_data = response.json()
+            results = response_data.get("results", [])
+
+            # Store all results in MongoDB temp collection
+            if results:
+                mongo_db_client = MongoDBClient.get_instance()
+                mongo_db_client.db["temp"].insert_many(results)
+                logger.info(f"Stored {len(results)} documents in temp collection")
+
+            # Stream each URL as it's processed
+            for i, result in enumerate(results):
+                url_data = {
+                    "type": "url",
+                    "url": result["url"],
+                    "title": result.get("title", ""),
+                    "index": i,
+                    "total": len(results),
+                    "session_id": crawl_session_id,
                 }
+                yield f"data: {json.dumps(url_data)}\n\n"
+
+            # Send completion status
+            yield f"data: {json.dumps({'type': 'complete', 'total': len(results), 'session_id': crawl_session_id})}\n\n"
+
+        except httpx.TimeoutException:
+            logger.error("Crawl timeout")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Crawl request timed out'})}\n\n"
+        except Exception as e:
+            logger.error(f"Crawl error: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+class UploadDocumentsRequest(BaseModel):
+    collection_name: str
+    urls: List[str]
+    crawl_session_id: str
+
+
+@router.post("/upload-documents")
+async def upload_documents(request: UploadDocumentsRequest):
+    """Upload selected URLs to the vector store"""
+    try:
+        mongo_db_client = MongoDBClient.get_instance()
+
+        # Retrieve documents from temp collection by crawl_session_id
+        all_docs = list(
+            mongo_db_client.db["temp"].find(
+                {"crawl_session_id": request.crawl_session_id}
+            )
+        )
+
+        if not all_docs:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No documents found for session {request.crawl_session_id}",
             )
 
-        response_data = json.loads(response.text)
+        # Filter to only include selected URLs
+        selected_docs = [doc for doc in all_docs if doc.get("url") in request.urls]
 
-        logger.info(f"Try to persist docs in mongodb")
-        mongo_db_client = MongoDBClient.get_instance()
-        
-        doc_ids = mongo_db_client.persist_docs(docs=response_data['results'], collection_name="temp")
-        logger.info(f"Stored {len(doc_ids)} documents in Mongo DB.")
+        if not selected_docs:
+            raise HTTPException(
+                status_code=404, detail="No matching documents found for selected URLs"
+            )
 
-        urls = [res["url"] for res in response_data['results']][:max_pages]
-        
+        logger.info(
+            f"Uploading {len(selected_docs)} documents to {request.collection_name}"
+        )
+
+        # TODO: Implement your vector store upload logic here
+        # Example:
+        # from backend.services.vector_store import vector_store
+        # vector_store.add_documents(request.collection_name, selected_docs)
+
+        # Clean up temp documents after successful upload
+        mongo_db_client.db["temp"].delete_many(
+            {"crawl_session_id": request.crawl_session_id}
+        )
+
         return {
-            "status": "success",
-            "response": {
-                "status": "success",
-                "urls": urls,
-                "crawl_session_id": crawl_session_id
-            }
+            "success": True,
+            "uploaded_count": len(selected_docs),
+            "urls": request.urls,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error crawling URL {url_crawl_request.base_url}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to crawl URL {url_crawl_request.base_url}: {str(e)}"
-        )
+        logger.error(f"Error uploading documents: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
