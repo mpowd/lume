@@ -16,8 +16,8 @@ export const chatAPI = {
     try {
       const response = await api.post('/chat/', {
         chatbot_id: chatbotId,
-        message: message,
-        conversation_history: conversationHistory
+        query: message  // Changed from "message" to "query"
+        // Remove conversation_history - backend doesn't use it yet
       })
       return response.data
     } catch (error) {
@@ -122,6 +122,15 @@ export const knowledgeBaseAPI = {
       console.error('Upload Documents Error:', error)
       throw error
     }
+  }
+}
+
+// Ollama API
+export const ollamaAPI = {
+  getModels: async () => {
+    const response = await fetch('http://localhost:8000/ollama/models');
+    if (!response.ok) throw new Error('Failed to fetch Ollama models');
+    return response.json();
   }
 }
 
