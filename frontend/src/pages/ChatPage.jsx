@@ -180,10 +180,22 @@ export default function ChatPage() {
   }
 
   const getSourceScore = (source) => {
-    return typeof source === 'string' ? 0.5 : (source.score || 0.5)
+    // Return null if source is a string or doesn't have a score
+    if (typeof source === 'string') return null
+    // Only return score if it actually exists
+    return source.score !== undefined ? source.score : null
   }
 
   const getSourceStyle = (score) => {
+    // If no score, use a neutral style without glow
+    if (score === null || score === undefined) {
+      return {
+        backgroundColor: 'rgb(30, 41, 59)',
+        borderColor: 'rgba(148, 163, 184, 0.3)',
+        border: '2px solid'
+      }
+    }
+    
     const glowIntensity = score * 20
     const borderOpacity = 0.3 + (score * 0.4)
     
@@ -196,6 +208,9 @@ export default function ChatPage() {
   }
 
   const getDotColor = (score) => {
+    // If no score, return neutral color
+    if (score === null || score === undefined) return 'bg-slate-400'
+    
     if (score >= 0.8) return 'bg-emerald-400'
     if (score >= 0.6) return 'bg-blue-400'
     if (score >= 0.4) return 'bg-yellow-400'
