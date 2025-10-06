@@ -12,7 +12,7 @@ router = APIRouter()
 
 class SourceUrl(BaseModel):
     url: str
-    score: float = 0.5
+    score: Optional[float] = None  # Make score optional
 
 
 class ChatRequest(BaseModel):
@@ -38,7 +38,6 @@ async def chat(request: ChatRequest):
 
         chatbot_id = request.chatbot_id
         if not chatbot_id:
-
             raise HTTPException(
                 status_code=400,
                 detail="No chatbot specified. Please provide a chatbot_id",
