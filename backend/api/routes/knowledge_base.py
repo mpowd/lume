@@ -32,6 +32,7 @@ qdrant_client = QdrantClient(url="http://qdrant:6333")
 
 @router.get("/collections")
 async def get_collections():
+    """Get all available collections"""
     try:
         collections_response = qdrant_client.get_collections()
         collection_names = [
@@ -49,6 +50,7 @@ async def get_collections():
 
 @router.get("/collection_info")
 async def get_collection_info(collection_name: str):
+    """Get detailed information about a specific collection"""
     try:
         mongodb_client = MongoDBClient.get_instance()
         collection_info = mongodb_client.get_docs(
@@ -80,6 +82,7 @@ async def get_collection_info(collection_name: str):
 
 
 def get_embedder(embedding_model: str):
+    """Get embeddings configuration for the specified model"""
     match embedding_model:
         case "jina/jina-embeddings-v2-base-de":
             return {
@@ -95,6 +98,7 @@ def get_embedder(embedding_model: str):
 
 
 def get_distance_metric(distance_metric: str):
+    """Convert string distance metric to Qdrant Distance enum"""
     match distance_metric:
         case "Cosine similarity":
             return Distance.COSINE
@@ -110,6 +114,7 @@ def get_distance_metric(distance_metric: str):
 
 class CollectionCreateRequest(BaseModel):
     collection_name: str
+    description: Optional[str] = ""
     embedding_model: str
     chunk_size: int
     chunk_overlap: int
@@ -118,14 +123,32 @@ class CollectionCreateRequest(BaseModel):
 
 @router.post("/collections")
 async def create_collection(request: CollectionCreateRequest):
+    """
+    Create a new knowledge base collection with specified configuration.
 
+    This creates:
+    1. A Qdrant collection with the specified vector configuration
+    2. A MongoDB configuration document with collection metadata and settings
+    """
+
+    # Validate embedding model
     embedder_info = get_embedder(request.embedding_model)
     if embedder_info == -1:
-        raise HTTPException(status_code=400, detail=f"Unsupported embedding model")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported embedding model: {request.embedding_model}",
+        )
 
     embedding_dim = embedder_info["embedding_dim"]
     distance_metric = get_distance_metric(request.distance_metric)
 
+    if not distance_metric:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid distance metric: {request.distance_metric}",
+        )
+
+    # Create Qdrant collection
     try:
         qdrant_client.create_collection(
             collection_name=request.collection_name,
@@ -138,6 +161,7 @@ async def create_collection(request: CollectionCreateRequest):
                 )
             },
         )
+        logger.info(f"Created Qdrant collection: {request.collection_name}")
     except Exception as e:
         logger.error(
             f"Error creating qdrant collection {request.collection_name}: {str(e)}"
@@ -146,19 +170,31 @@ async def create_collection(request: CollectionCreateRequest):
             status_code=500,
             detail=f"Failed to create qdrant collection {request.collection_name}: {str(e)}",
         )
+
+    # Save configuration to MongoDB
     try:
         config = {
             "collection_name": request.collection_name,
+            "description": request.description or "",
             "dense_embedding_model": request.embedding_model,
             "dense_embedding_dim": embedding_dim,
             "sparse_embedding_model": "bm25",
             "chunk_size": request.chunk_size,
             "chunk_overlap": request.chunk_overlap,
+            "distance_metric": request.distance_metric,
             "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
         }
         mongodb_client = MongoDBClient.get_instance()
         mongodb_client.persist_docs(docs=[config], collection_name="configurations")
+        logger.info(f"Saved configuration for collection: {request.collection_name}")
     except Exception as e:
+        # Rollback: delete the Qdrant collection if MongoDB save fails
+        try:
+            qdrant_client.delete_collection(collection_name=request.collection_name)
+        except:
+            pass
+
         logger.error(
             f"Error saving config document for qdrant collection '{request.collection_name}' in mongodb: {str(e)}"
         )
@@ -167,9 +203,16 @@ async def create_collection(request: CollectionCreateRequest):
             detail=f"Failed to save config document for qdrant collection '{request.collection_name}' in mongodb: {str(e)}",
         )
 
+    # Return config without MongoDB _id (which causes JSON serialization issues)
     return {
         "status": "success",
         "message": f"Collection '{request.collection_name}' created successfully",
+        "collection_name": request.collection_name,
+        "description": config["description"],
+        "embedding_model": config["dense_embedding_model"],
+        "chunk_size": config["chunk_size"],
+        "chunk_overlap": config["chunk_overlap"],
+        "distance_metric": config["distance_metric"],
     }
 
 
@@ -751,22 +794,102 @@ async def get_existing_content_hashes(collection_name: str) -> Set[str]:
 
 @router.delete("/collections/{collection_name}")
 async def delete_collection(collection_name: str):
+    """
+    Delete a collection and all its associated data.
+
+    This removes:
+    1. The Qdrant vector collection
+    2. The MongoDB document collection
+    3. The MongoDB configuration document
+    """
+    # Delete from Qdrant
     try:
         qdrant_client.delete_collection(collection_name=collection_name)
+        logger.info(f"Deleted Qdrant collection: {collection_name}")
     except Exception as e:
         logger.error(f"Error deleting qdrant collection {collection_name}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete qdrant collecion {collection_name}: {str(e)}",
+            detail=f"Failed to delete qdrant collection {collection_name}: {str(e)}",
         )
+
+    # Delete from MongoDB
     try:
         mongodb_client = MongoDBClient.get_instance()
+
+        # Delete the document collection
         mongodb_client.delete_collection(collection_name)
+
+        # Delete the configuration document
+        mongodb_client.delete_documents(
+            filter_query={"collection_name": collection_name},
+            collection_name="configurations",
+        )
+
+        logger.info(f"Deleted MongoDB collection and configuration: {collection_name}")
     except Exception as e:
         logger.error(f"Error deleting mongodb collection {collection_name}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete mongodb collecion {collection_name}: {str(e)}",
+            detail=f"Failed to delete mongodb collection {collection_name}: {str(e)}",
         )
 
-    return {"status": "success"}
+    return {
+        "status": "success",
+        "message": f"Collection '{collection_name}' deleted successfully",
+    }
+
+
+@router.patch("/collections/{collection_name}")
+async def update_collection(collection_name: str, description: Optional[str] = None):
+    """
+    Update collection metadata (e.g., description).
+
+    Args:
+        collection_name: Name of the collection to update
+        description: New description for the collection
+    """
+    try:
+        mongodb_client = MongoDBClient.get_instance()
+
+        # Check if collection exists
+        collection_info = mongodb_client.get_docs(
+            filter={"collection_name": collection_name},
+            collection_name="configurations",
+        )
+
+        if not collection_info:
+            raise HTTPException(
+                status_code=404, detail=f"Collection '{collection_name}' not found"
+            )
+
+        # Update fields
+        update_data = {"updated_at": datetime.now().isoformat()}
+
+        if description is not None:
+            update_data["description"] = description
+
+        # Update in MongoDB
+        from bson.objectid import ObjectId
+
+        doc_id = str(collection_info[0]["_id"])
+
+        success = mongodb_client.update_document(
+            doc_id=doc_id, update_data=update_data, collection_name="configurations"
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update collection")
+
+        return {
+            "status": "success",
+            "message": f"Collection '{collection_name}' updated successfully",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating collection {collection_name}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error updating collection: {str(e)}"
+        )

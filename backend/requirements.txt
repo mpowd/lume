@@ -23,7 +23,6 @@ openinference-instrumentation-smolagents==0.1.9
 
 lightrag-hku==1.3.6
 
-# torch==2.8.0
-# transformers==4.57.0
-# sentencepiece==0.2.1
 FlagEmbedding==1.3.5
+
+crawl4ai==0.7.4

@@ -16,8 +16,7 @@ export const chatAPI = {
     try {
       const response = await api.post('/chat/', {
         chatbot_id: chatbotId,
-        query: message  // Changed from "message" to "query"
-        // Remove conversation_history - backend doesn't use it yet
+        query: message
       })
       return response.data
     } catch (error) {
@@ -80,7 +79,7 @@ export const chatbotsAPI = {
   }
 }
 
-// Knowledge Base API (renamed from collectionsAPI)
+// Knowledge Base API
 export const knowledgeBaseAPI = {
   getAll: async () => {
     try {
@@ -91,13 +90,44 @@ export const knowledgeBaseAPI = {
       throw error
     }
   },
-  
-  create: async (data) => {
+
+  getInfo: async (collectionName) => {
     try {
-      const response = await api.post('/knowledge_base/collections', data)
+      const response = await api.get('/knowledge_base/collection_info', {
+        params: { collection_name: collectionName }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Get Collection Info Error:', error)
+      throw error
+    }
+  },
+  
+  create: async (config) => {
+    try {
+      const response = await api.post('/knowledge_base/collections', {
+        collection_name: config.collection_name,
+        description: config.description || '',
+        embedding_model: config.embedding_model,
+        chunk_size: config.chunk_size,
+        chunk_overlap: config.chunk_overlap,
+        distance_metric: config.distance_metric,
+      })
       return response.data
     } catch (error) {
       console.error('Create Knowledge Base Error:', error)
+      throw error
+    }
+  },
+
+  update: async (collectionName, updates) => {
+    try {
+      const response = await api.patch(`/knowledge_base/collections/${collectionName}`, null, {
+        params: updates
+      })
+      return response.data
+    } catch (error) {
+      console.error('Update Knowledge Base Error:', error)
       throw error
     }
   },
@@ -111,11 +141,42 @@ export const knowledgeBaseAPI = {
       throw error
     }
   },
+
+  checkUrlExists: async (collectionName, url) => {
+    try {
+      const response = await api.get('/knowledge_base/check_url_exists', {
+        params: {
+          collection_name: collectionName,
+          url: url
+        }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Check URL Error:', error)
+      throw error
+    }
+  },
+
+  deduplicate: async (collectionName) => {
+    try {
+      const response = await api.post('/knowledge_base/deduplicate_collection', null, {
+        params: { collection_name: collectionName }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Deduplicate Error:', error)
+      throw error
+    }
+  },
   
   uploadDocuments: async (collectionName, documents) => {
     try {
-      const response = await api.post(`/knowledge_base/collections/${collectionName}/documents`, {
-        documents: documents
+      const response = await api.post('/knowledge_base/upload_documents', {
+        collection_name: collectionName,
+        documents: documents.map(doc => ({
+          url: doc.url,
+          custom_payload: doc.custom_payload || null,
+        }))
       })
       return response.data
     } catch (error) {
@@ -125,16 +186,72 @@ export const knowledgeBaseAPI = {
   }
 }
 
+// Website/Crawling API
+export const websiteAPI = {
+  /**
+   * Discover links from a website
+   */
+  getLinks: async (baseUrl, includeExternal = false) => {
+    try {
+      const response = await api.get('/website/links', {
+        params: {
+          base_url: baseUrl,
+          include_external_domains: includeExternal
+        }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Get Links Error:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Upload documents with streaming progress (uses EventSource/SSE)
+   * Returns an EventSource for real-time progress updates
+   */
+  createUploadStream: (collectionName, urls) => {
+    const params = new URLSearchParams({
+      collection_name: collectionName,
+      urls: JSON.stringify(urls),
+    })
+
+    return new EventSource(
+      `${API_BASE_URL}/website/upload-documents-stream?${params}`
+    )
+  },
+
+  /**
+   * Upload documents (non-streaming version)
+   */
+  uploadDocuments: async (collectionName, urls) => {
+    try {
+      const response = await api.post('/website/upload-documents', {
+        collection_name: collectionName,
+        urls: urls,
+      })
+      return response.data
+    } catch (error) {
+      console.error('Upload Documents Error:', error)
+      throw error
+    }
+  },
+}
+
 // Ollama API
 export const ollamaAPI = {
   getModels: async () => {
-    const response = await fetch('http://localhost:8000/ollama/models');
-    if (!response.ok) throw new Error('Failed to fetch Ollama models');
-    return response.json();
+    try {
+      const response = await api.get('/ollama/models')
+      return response.data
+    } catch (error) {
+      console.error('Ollama Models Error:', error)
+      throw error
+    }
   }
 }
 
-// Crawl API
+// Crawl API (Legacy - consider migrating to websiteAPI)
 export const crawlAPI = {
   crawlWebsite: async (baseUrl, depth, maxPages, collectionName, onProgress) => {
     try {
@@ -165,7 +282,6 @@ export const crawlAPI = {
           if (line.startsWith('data: ')) {
             const data = JSON.parse(line.slice(6))
             
-            // Progress Callback aufrufen
             if (onProgress) onProgress(data)
             
             if (data.status === 'complete') {
@@ -258,7 +374,7 @@ export const evaluationAPI = {
         questions: questions,
         ground_truths: groundTruths,
         answers: answers,
-        retrieved_contexts: contexts  // Changed from 'contexts' to 'retrieved_contexts'
+        retrieved_contexts: contexts
       })
       return response.data
     } catch (error) {

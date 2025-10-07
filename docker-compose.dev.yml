@@ -29,17 +29,6 @@ services:
     networks:
       - app_network
 
-  crawler:
-    build:
-      context: .
-      dockerfile: docker/crawler.Dockerfile
-    ports:
-      - "11235:11235"
-    volumes:
-      - ./backend/crawler:/app
-    networks:
-      - app_network
-
   mongodb:
     image: mongo:latest
     ports:

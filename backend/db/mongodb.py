@@ -3,6 +3,7 @@ import pymongo
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,74 @@ class MongoDBClient:
         result = collection.insert_many(docs)
         return [str(id) for id in result.inserted_ids]
 
+    def save_crawled_documents(
+        self,
+        crawl_results: List[Dict[str, Any]],
+        collection_name: str,
+        also_save_to_temp: bool = True,
+    ) -> List[str]:
+        """
+        Save crawled documents with markdown content to MongoDB.
+
+        Args:
+            crawl_results: List of crawl result dictionaries with url, markdown, title, etc.
+            collection_name: Target collection name
+            also_save_to_temp: Whether to also save to 'temp' collection
+
+        Returns:
+            List of inserted document IDs
+        """
+        documents = []
+
+        for result in crawl_results:
+            doc = {
+                "url": result.get("url"),
+                "markdown": result.get("markdown"),
+                "title": result.get("title", "Untitled"),
+                "description": result.get("description", ""),
+                "timestamp": datetime.now().isoformat(),
+                "metadata": result.get("metadata", {}),
+            }
+            documents.append(doc)
+
+        # Save to target collection
+        doc_ids = self.persist_docs(documents, collection_name)
+
+        # Optionally save to temp collection for backup
+        if also_save_to_temp:
+            self.persist_docs(documents, "temp")
+
+        logger.info(
+            f"Saved {len(documents)} documents to MongoDB collection '{collection_name}'"
+        )
+        return doc_ids
+
+    def get_collection_config(self, collection_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get configuration for a collection.
+
+        Args:
+            collection_name: Name of the collection
+
+        Returns:
+            Configuration dict or None if not found
+        """
+        configs = self.get_docs(
+            filter={"collection_name": collection_name},
+            collection_name="configurations",
+        )
+
+        if not configs:
+            logger.error(f"No configuration found for collection '{collection_name}'")
+            return None
+
+        if len(configs) > 1:
+            logger.warning(
+                f"Multiple configs found for '{collection_name}', using first"
+            )
+
+        return configs[0]
+
     def get_docs_by_ids(
         self, doc_ids: List[str], collection_name: str = "temp"
     ) -> List[Dict[str, Any]]:
@@ -136,7 +205,7 @@ class MongoDBClient:
         Retrieve documents by a key-value pair.
 
         Args:
-            key_value: Key-value pair to filter by
+            filter: Filter dictionary
             collection_name: Name of the collection to query
 
         Returns:
