@@ -11,6 +11,7 @@ export default function Accordion({
   return (
     <div className={`border-t border-white/10 pt-5 ${className}`}>
       <button
+        type="button"
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 rounded-xl transition-all cursor-pointer"
       >
