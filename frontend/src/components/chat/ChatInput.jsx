@@ -46,7 +46,7 @@ export default function ChatInput({ onSend, disabled, loading }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={disabled ? "Select a chatbot to start..." : "Ask me anything..."}
+                placeholder={disabled ? "Select an assistant to start..." : "Ask me anything..."}
                 disabled={disabled || loading}
                 rows={1}
                 className="flex-1 bg-transparent text-white placeholder:text-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-slate-600 cursor-text"

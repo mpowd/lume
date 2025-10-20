@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Loader2, BarChart3, FileText, PlayCircle, Trash2, RefreshCw, Edit3, Check, Zap, ChevronRight, Brain, Beaker, Database, ArrowLeft, Calendar, Hash } from 'lucide-react'
-import { evaluationAPI, knowledgeBaseAPI, chatbotsAPI, chatAPI } from '../../services/api'
+import { evaluationAPI, knowledgeBaseAPI, assistantsAPI, chatAPI } from '../../services/api'
 
 export default function EvaluationPage() {
   const [activeView, setActiveView] = useState('select-collection')
@@ -8,7 +8,7 @@ export default function EvaluationPage() {
   const [loading, setLoading] = useState(false)
   
   const [collections, setCollections] = useState([])
-  const [chatbots, setChatbots] = useState([])
+  const [assistants, setAssistants] = useState([])
   const [datasets, setDatasets] = useState([])
   
   const [datasetName, setDatasetName] = useState('')
@@ -20,7 +20,7 @@ export default function EvaluationPage() {
   })
   
   const [selectedDataset, setSelectedDataset] = useState(null)
-  const [selectedChatbots, setSelectedChatbots] = useState([])
+  const [selectedAssistants, setSelectedAssistants] = useState([])
   const [evaluating, setEvaluating] = useState(false)
   const [evalProgress, setEvalProgress] = useState(0)
   const [editingDataset, setEditingDataset] = useState(null)
@@ -31,13 +31,13 @@ export default function EvaluationPage() {
 
   const loadInitialData = async () => {
     try {
-      const [collectionsData, chatbotsData, datasetsData] = await Promise.all([
+      const [collectionsData, assistantsData, datasetsData] = await Promise.all([
         knowledgeBaseAPI.getAll(),
-        chatbotsAPI.getAll(),
+        assistantsAPI.getAll(),
         evaluationAPI.getDatasets()
       ])
       setCollections(collectionsData.collection_names || [])
-      setChatbots(chatbotsData)
+      setAssistants(assistantsData)
       setDatasets(datasetsData.datasets || [])
     } catch (error) {
       console.error('Error loading data:', error)
@@ -96,9 +96,9 @@ export default function EvaluationPage() {
     }
   }
 
-  const handleEvaluateChatbots = async () => {
-    if (!selectedDataset || selectedChatbots.length === 0) {
-      alert('Please select at least one chatbot')
+  const handleEvaluateAssistants = async () => {
+    if (!selectedDataset || selectedAssistants.length === 0) {
+      alert('Please select at least one assistant')
       return
     }
 
@@ -107,10 +107,10 @@ export default function EvaluationPage() {
 
     try {
       const qaPairs = selectedDataset.qa_pairs
-      const totalEvals = selectedChatbots.length
+      const totalEvals = selectedAssistants.length
       
-      for (let chatbotIdx = 0; chatbotIdx < selectedChatbots.length; chatbotIdx++) {
-        const chatbotId = selectedChatbots[chatbotIdx]
+      for (let assistantIdx = 0; assistantIdx < selectedAssistants.length; assistantIdx++) {
+        const assistantId = selectedAssistants[assistantIdx]
         const questions = []
         const groundTruths = []
         const answers = []
@@ -118,11 +118,11 @@ export default function EvaluationPage() {
 
         for (let i = 0; i < qaPairs.length; i++) {
           const pair = qaPairs[i]
-          const progress = ((chatbotIdx / totalEvals) + ((i / qaPairs.length) / totalEvals)) * 100
+          const progress = ((assistantIdx / totalEvals) + ((i / qaPairs.length) / totalEvals)) * 100
           setEvalProgress(Math.round(progress * 0.8))
 
           try {
-            const response = await chatAPI.sendMessage(chatbotId, pair.question, [])
+            const response = await chatAPI.sendMessage(assistantId, pair.question, [])
             questions.push(pair.question)
             groundTruths.push(pair.ground_truth || pair.answer)
             answers.push(response.response || '')
@@ -136,11 +136,11 @@ export default function EvaluationPage() {
           }
         }
 
-        setEvalProgress(Math.round(((chatbotIdx + 0.9) / totalEvals) * 80))
+        setEvalProgress(Math.round(((assistantIdx + 0.9) / totalEvals) * 80))
 
-        await evaluationAPI.evaluateChatbot(
+        await evaluationAPI.evaluateAssistant(
           selectedDataset.name,
-          chatbotId,
+          assistantId,
           questions,
           groundTruths,
           answers,
@@ -149,10 +149,10 @@ export default function EvaluationPage() {
       }
 
       setEvalProgress(100)
-      alert(`Successfully evaluated ${selectedChatbots.length} chatbot(s)!`)
+      alert(`Successfully evaluated ${selectedAssistants.length} assistant(s)!`)
       setActiveView('view-datasets')
       setSelectedDataset(null)
-      setSelectedChatbots([])
+      setSelectedAssistants([])
       
     } catch (error) {
       console.error('Error during evaluation:', error)
@@ -237,11 +237,11 @@ export default function EvaluationPage() {
     }
   }
 
-  const toggleChatbotSelection = (chatbotId) => {
-    setSelectedChatbots(prev =>
-      prev.includes(chatbotId)
-        ? prev.filter(id => id !== chatbotId)
-        : [...prev, chatbotId]
+  const toggleAssistantSelection = (assistantId) => {
+    setSelectedAssistants(prev =>
+      prev.includes(assistantId)
+        ? prev.filter(id => id !== assistantId)
+        : [...prev, assistantId]
     )
   }
 
@@ -589,15 +589,15 @@ export default function EvaluationPage() {
                   <div>
                     <p className="text-sm text-slate-400 mb-4">Select assistants to evaluate with this dataset</p>
                     <div className="grid grid-cols-2 gap-3">
-                      {chatbots.map(bot => (
+                      {assistants.map(bot => (
                         <label
                           key={bot.id}
                           className="flex items-center gap-3 p-4 bg-slate-950/30 border border-white/5 hover:border-white/10 rounded-xl transition-all group cursor-pointer"
                         >
                           <input
                             type="checkbox"
-                            checked={selectedChatbots.includes(bot.id)}
-                            onChange={() => toggleChatbotSelection(bot.id)}
+                            checked={selectedAssistants.includes(bot.id)}
+                            onChange={() => toggleAssistantSelection(bot.id)}
                             className="w-5 h-5 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
                           />
                           <Brain className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
@@ -615,7 +615,7 @@ export default function EvaluationPage() {
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-                          <span className="text-white font-semibold">Evaluating {selectedChatbots.length} assistant(s)...</span>
+                          <span className="text-white font-semibold">Evaluating {selectedAssistants.length} assistant(s)...</span>
                         </div>
                         <span className="text-2xl font-bold text-blue-400">{evalProgress}%</span>
                       </div>
@@ -629,8 +629,8 @@ export default function EvaluationPage() {
                   )}
 
                   <button
-                    onClick={handleEvaluateChatbots}
-                    disabled={evaluating || selectedChatbots.length === 0}
+                    onClick={handleEvaluateAssistants}
+                    disabled={evaluating || selectedAssistants.length === 0}
                     className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl transition-all flex items-center justify-center gap-2 font-semibold disabled:cursor-not-allowed disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 cursor-pointer"
                   >
                     {evaluating ? (
@@ -641,7 +641,7 @@ export default function EvaluationPage() {
                     ) : (
                       <>
                         <PlayCircle className="w-5 h-5" />
-                        Run Evaluation ({selectedChatbots.length} assistant{selectedChatbots.length !== 1 ? 's' : ''})
+                        Run Evaluation ({selectedAssistants.length} assistant{selectedAssistants.length !== 1 ? 's' : ''})
                       </>
                     )}
                   </button>

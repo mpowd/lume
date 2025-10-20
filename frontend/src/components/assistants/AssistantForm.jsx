@@ -10,8 +10,8 @@ import ModelSelector from './ModelSelector'
 import AdvancedSettings from './AdvancedSettings'
 import { formatModelSize } from '../../utils/formatters'
 
-export default function ChatbotForm({ 
-  chatbot, 
+export default function AssistantForm({ 
+  assistant, 
   onSubmit, 
   onCancel, 
   loading 
@@ -22,7 +22,7 @@ export default function ChatbotForm({
   const [showAdvanced, setShowAdvanced] = useState(false)
   
   const [formData, setFormData] = useState({
-    chatbot_name: '',
+    assistant_name: '',
     workflow: 'linear',
     collections: [],
     local_only: false,
@@ -47,29 +47,29 @@ export default function ChatbotForm({
   }, [])
 
   useEffect(() => {
-    if (chatbot) {
+    if (assistant) {
       setFormData({
-        chatbot_name: chatbot.name || chatbot.chatbot_name,
-        workflow: chatbot.workflow || 'linear',
-        collections: chatbot.collections || [],
-        local_only: chatbot.local_only || false,
-        hybrid_search: chatbot.hybrid_search ?? true,
-        hyde: chatbot.hyde ?? false,
-        hyde_prompt: chatbot.hyde_prompt || formData.hyde_prompt,
-        top_k: chatbot.top_k || 10,
-        reranking: chatbot.reranking ?? false,
-        reranker_provider: chatbot.reranker_provider || 'cohere',
-        reranker_model: chatbot.reranker_model || 'rerank-v3.5',
-        top_n: chatbot.top_n || 5,
-        llm: chatbot.llm || 'gpt-4o-mini',
-        llm_provider: chatbot.llm_provider || 'openai',
-        rag_prompt: chatbot.rag_prompt || formData.rag_prompt,
-        tools: chatbot.tools || [],
-        max_steps: chatbot.max_steps || 4,
-        precise_citation: chatbot.precise_citation ?? false
+        assistant_name: assistant.name || assistant.assistant_name,
+        workflow: assistant.workflow || 'linear',
+        collections: assistant.collections || [],
+        local_only: assistant.local_only || false,
+        hybrid_search: assistant.hybrid_search ?? true,
+        hyde: assistant.hyde ?? false,
+        hyde_prompt: assistant.hyde_prompt || formData.hyde_prompt,
+        top_k: assistant.top_k || 10,
+        reranking: assistant.reranking ?? false,
+        reranker_provider: assistant.reranker_provider || 'cohere',
+        reranker_model: assistant.reranker_model || 'rerank-v3.5',
+        top_n: assistant.top_n || 5,
+        llm: assistant.llm || 'gpt-4o-mini',
+        llm_provider: assistant.llm_provider || 'openai',
+        rag_prompt: assistant.rag_prompt || formData.rag_prompt,
+        tools: assistant.tools || [],
+        max_steps: assistant.max_steps || 4,
+        precise_citation: assistant.precise_citation ?? false
       })
     }
-  }, [chatbot])
+  }, [assistant])
 
   const loadOllamaModels = async () => {
     setLoadingModels(true)
@@ -128,7 +128,7 @@ export default function ChatbotForm({
       <div className="flex items-center gap-3 mb-6">
         <Sparkles className="w-5 h-5 text-blue-400" />
         <h2 className="text-xl font-semibold text-white">
-          {chatbot ? 'Edit Assistant' : 'Create New Assistant'}
+          {assistant ? 'Edit Assistant' : 'Create New Assistant'}
         </h2>
       </div>
       
@@ -136,8 +136,8 @@ export default function ChatbotForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Name"
-            value={formData.chatbot_name}
-            onChange={(e) => setFormData({...formData, chatbot_name: e.target.value})}
+            value={formData.assistant_name}
+            onChange={(e) => setFormData({...formData, assistant_name: e.target.value})}
             placeholder="e.g., Customer Support Bot"
             required
           />
@@ -244,9 +244,9 @@ export default function ChatbotForm({
             variant="primary"
             fullWidth
             loading={loading}
-            disabled={!formData.chatbot_name || (formData.workflow === 'linear' && formData.collections.length === 0)}
+            disabled={!formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0)}
           >
-            {chatbot ? 'Update Assistant' : 'Create Assistant'}
+            {assistant ? 'Update Assistant' : 'Create Assistant'}
           </Button>
           <Button
             type="button"

@@ -1,11 +1,11 @@
 // src/components/Layout.jsx
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, Sparkles, MessageSquare, Bot, Database, BarChart3 } from 'lucide-react'
+import { Menu, X, Sparkles, MessageSquare, Database, BarChart3 } from 'lucide-react'
 
 const navigation = [
   { name: 'Chat', href: '/', icon: MessageSquare },
-  { name: 'Chatbots', href: '/chatbots', icon: Bot },
+  { name: 'Assistants', href: '/assistants', icon: Sparkles }, // Fixed: was lowercase 'sparkles'
   { name: 'Knowledge Base', href: '/knowledge_base', icon: Database },
   { name: 'Evaluation', href: '/evaluation', icon: BarChart3 },
 ]
@@ -79,24 +79,14 @@ export default function Layout({ children }) {
         {/* Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/5">
           <div className="text-[11px] text-white/30 space-y-0.5">
-            <div>Lume v1.0</div>
-            <div>React + FastAPI</div>
+            <div>Lume v2.0</div>
+            <div>Assistant Platform</div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
-        {/* <div className="h-16 px-6 flex items-center justify-between border-b border-white/5 bg-[#0A0A0A]/80 backdrop-blur-xl">
-          <button 
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-          >
-            <Menu className="w-5 h-5 text-white/60" />
-          </button>
-        </div> */}
-
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto">
           {children}

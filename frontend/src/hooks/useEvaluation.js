@@ -6,9 +6,9 @@ export const useEvaluation = () => {
   const [evalProgress, setEvalProgress] = useState(0)
   const [error, setError] = useState(null)
 
-  const evaluateChatbots = async (dataset, chatbotIds) => {
-    if (!dataset || chatbotIds.length === 0) {
-      return { success: false, error: 'Missing dataset or chatbots' }
+  const evaluateAssistants = async (dataset, assistantIds) => {
+    if (!dataset || assistantIds.length === 0) {
+      return { success: false, error: 'Missing dataset or assistants' }
     }
 
     setEvaluating(true)
@@ -17,10 +17,10 @@ export const useEvaluation = () => {
 
     try {
       const qaPairs = dataset.qa_pairs
-      const totalEvals = chatbotIds.length
+      const totalEvals = assistantIds.length
       
-      for (let chatbotIdx = 0; chatbotIdx < chatbotIds.length; chatbotIdx++) {
-        const chatbotId = chatbotIds[chatbotIdx]
+      for (let assistantIdx = 0; assistantIdx < assistantIds.length; assistantIdx++) {
+        const assistantId = assistantIds[assistantIdx]
         const questions = []
         const groundTruths = []
         const answers = []
@@ -28,11 +28,11 @@ export const useEvaluation = () => {
 
         for (let i = 0; i < qaPairs.length; i++) {
           const pair = qaPairs[i]
-          const progress = ((chatbotIdx / totalEvals) + ((i / qaPairs.length) / totalEvals)) * 100
+          const progress = ((assistantIdx / totalEvals) + ((i / qaPairs.length) / totalEvals)) * 100
           setEvalProgress(Math.round(progress * 0.8))
 
           try {
-            const response = await chatAPI.sendMessage(chatbotId, pair.question, [])
+            const response = await chatAPI.sendMessage(assistantId, pair.question, [])
             questions.push(pair.question)
             groundTruths.push(pair.ground_truth || pair.answer)
             answers.push(response.response || '')
@@ -46,11 +46,11 @@ export const useEvaluation = () => {
           }
         }
 
-        setEvalProgress(Math.round(((chatbotIdx + 0.9) / totalEvals) * 80))
+        setEvalProgress(Math.round(((assistantIdx + 0.9) / totalEvals) * 80))
 
-        await evaluationAPI.evaluateChatbot(
+        await evaluationAPI.evaluateAssistant(
           dataset.name,
-          chatbotId,
+          assistantId,
           questions,
           groundTruths,
           answers,
@@ -59,7 +59,7 @@ export const useEvaluation = () => {
       }
 
       setEvalProgress(100)
-      return { success: true, count: chatbotIds.length }
+      return { success: true, count: assistantIds.length }
     } catch (err) {
       console.error('Error during evaluation:', err)
       setError(err.message)
@@ -82,7 +82,7 @@ export const useEvaluation = () => {
     evaluating,
     evalProgress,
     error,
-    evaluateChatbots,
+    evaluateAssistants,
     reset
   }
 }

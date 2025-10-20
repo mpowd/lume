@@ -10,15 +10,241 @@ const api = axios.create({
   },
 })
 
-// Chat API
-export const chatAPI = {
-  sendMessage: async (chatbotId, message, conversationHistory) => {
+// ASSISTANT API 
+
+export const assistantsAPI = {
+  /**
+   * Get all assistants
+   * @param {string} type - Optional filter by type (e.g., 'qa')
+   * @param {boolean} is_active - Optional filter by active status
+   */
+  getAll: async (type = null, is_active = null) => {
     try {
-      const response = await api.post('/chat/', {
-        chatbot_id: chatbotId,
-        query: message
+      const params = {}
+      if (type) params.type = type
+      if (is_active !== null) params.is_active = is_active
+      
+      const response = await api.get('/assistants/', { params })
+      return response.data.assistants || []
+    } catch (error) {
+      console.error('Assistants API Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Get assistant by ID
+   */
+  getById: async (id) => {
+    try {
+      const response = await api.get(`/assistants/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Get Assistant Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Create a new assistant
+   * @param {Object} data - Assistant configuration
+   * @param {string} data.name - Assistant name
+   * @param {string} data.description - Assistant description
+   * @param {string} data.type - Assistant type (e.g., 'qa')
+   * @param {Object} data.config - Type-specific configuration
+   */
+  create: async (data) => {
+    try {
+      const response = await api.post('/assistants/', data)
+      return response.data
+    } catch (error) {
+      console.error('Create Assistant Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Update an assistant
+   */
+  update: async (id, data) => {
+    try {
+      const response = await api.put(`/assistants/${id}`, data)
+      return response.data
+    } catch (error) {
+      console.error('Update Assistant Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Delete an assistant
+   */
+  delete: async (id) => {
+    try {
+      const response = await api.delete(`/assistants/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Delete Assistant Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Get list of available assistant types
+   */
+  getTypes: async () => {
+    try {
+      const response = await api.get('/assistants/types/list')
+      return response.data.types || []
+    } catch (error) {
+      console.error('Get Assistant Types Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Get schema for a specific assistant type
+   * @param {string} type - Assistant type (e.g., 'qa')
+   */
+  getTypeSchema: async (type) => {
+    try {
+      const response = await api.get(`/assistants/types/${type}/schema`)
+      return response.data
+    } catch (error) {
+      console.error('Get Type Schema Error:', error)
+      throw error
+    }
+  }
+}
+
+// Execution API (NEW)
+export const executionAPI = {
+  /**
+   * Execute any assistant
+   * @param {string} assistantId - Assistant ID
+   * @param {Object} inputData - Input data for the assistant
+   */
+  execute: async (assistantId, inputData) => {
+    try {
+      const response = await api.post('/execute/', {
+        assistant_id: assistantId,
+        input_data: inputData
       })
       return response.data
+    } catch (error) {
+      console.error('Execute Assistant Error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * Execute QA assistant (convenience method)
+   * @param {string} assistantId - QA Assistant ID
+   * @param {string} question - Question to ask
+   */
+  executeQA: async (assistantId, question) => {
+    try {
+      const response = await api.post('/execute/qa', null, {
+        params: {
+          assistant_id: assistantId,
+          question: question
+        }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Execute QA Error:', error)
+      throw error
+    }
+  }
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Helper to create a QA assistant with common defaults
+ */
+export const createQAAssistant = async ({
+  name,
+  description = '',
+  knowledgeBaseIds,
+  llmModel = 'gpt-4o-mini',
+  llmProvider = 'openai',
+  hybridSearch = true,
+  topK = 10,
+  useHyde = false,
+  hydePrompt = null,
+  reranking = false,
+  rerankerProvider = 'cohere',
+  rerankerModel = 'rerank-v3.5',
+  topN = null,
+  ragPrompt = null,
+  preciseCitation = false
+}) => {
+  return assistantsAPI.create({
+    name,
+    description,
+    type: 'qa',
+    config: {
+      type: 'qa',
+      name,
+      description,
+      created_by: 'user',
+      knowledge_base_ids: knowledgeBaseIds,
+      llm_model: llmModel,
+      llm_provider: llmProvider,
+      hybrid_search: hybridSearch,
+      top_k: topK,
+      use_hyde: useHyde,
+      hyde_prompt: hydePrompt,
+      reranking: reranking,
+      reranker_provider: rerankerProvider,
+      reranker_model: rerankerModel,
+      top_n: topN,
+      rag_prompt: ragPrompt,
+      precise_citation: preciseCitation
+    },
+    created_by: 'user'
+  })
+}
+
+/**
+ * Helper to update a QA assistant
+ */
+export const updateQAAssistant = async (assistantId, updates) => {
+  // Get current assistant
+  const current = await assistantsAPI.getById(assistantId)
+  
+  // Merge updates with current config
+  const updatedConfig = {
+    ...current.config,
+    ...updates
+  }
+  
+  return assistantsAPI.update(assistantId, {
+    name: updates.name || current.name,
+    description: updates.description || current.description,
+    config: updatedConfig
+  })
+}
+
+// ==================== CHAT API (Using new execution API) ====================
+
+export const chatAPI = {
+  /**
+   * Send a message to an assistant (QA assistant)
+   * @param {string} assistantId - Assistant ID
+   * @param {string} message - User message
+   */
+  sendMessage: async (assistantId, message) => {
+    try {
+      const response = await executionAPI.executeQA(assistantId, message)
+      
+      // Transform to match old response format for backwards compatibility
+      return {
+        response: response.response,
+        contexts: response.contexts || [],
+        source_urls: response.source_urls || []
+      }
     } catch (error) {
       console.error('Chat API Error:', error)
       throw error
@@ -26,58 +252,8 @@ export const chatAPI = {
   }
 }
 
-// Chatbots API
-export const chatbotsAPI = {
-  getAll: async () => {
-    try {
-      const response = await api.get('/chatbot/list')
-      return response.data.chatbots || response.data
-    } catch (error) {
-      console.error('Chatbots API Error:', error)
-      throw error
-    }
-  },
-  
-  getById: async (id) => {
-    try {
-      const response = await api.get(`/chatbot/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Get Chatbot Error:', error)
-      throw error
-    }
-  },
-  
-  create: async (data) => {
-    try {
-      const response = await api.post('/chatbot/save', data)
-      return response.data
-    } catch (error) {
-      console.error('Create Chatbot Error:', error)
-      throw error
-    }
-  },
-  
-  update: async (id, data) => {
-    try {
-      const response = await api.put(`/chatbot/${id}`, data)
-      return response.data
-    } catch (error) {
-      console.error('Update Chatbot Error:', error)
-      throw error
-    }
-  },
-  
-  delete: async (id) => {
-    try {
-      const response = await api.delete(`/chatbot/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Delete Chatbot Error:', error)
-      throw error
-    }
-  }
-}
+
+// ==================== KEEP EXISTING APIs UNCHANGED ====================
 
 // Knowledge Base API
 export const knowledgeBaseAPI = {
@@ -188,9 +364,6 @@ export const knowledgeBaseAPI = {
 
 // Website/Crawling API
 export const websiteAPI = {
-  /**
-   * Discover links from a website
-   */
   getLinks: async (baseUrl, includeExternal = false) => {
     try {
       const response = await api.get('/website/links', {
@@ -206,10 +379,6 @@ export const websiteAPI = {
     }
   },
 
-  /**
-   * Upload documents with streaming progress (uses EventSource/SSE)
-   * Returns an EventSource for real-time progress updates
-   */
   createUploadStream: (collectionName, urls) => {
     const params = new URLSearchParams({
       collection_name: collectionName,
@@ -221,9 +390,6 @@ export const websiteAPI = {
     )
   },
 
-  /**
-   * Upload documents (non-streaming version)
-   */
   uploadDocuments: async (collectionName, urls) => {
     try {
       const response = await api.post('/website/upload-documents', {
@@ -246,61 +412,6 @@ export const ollamaAPI = {
       return response.data
     } catch (error) {
       console.error('Ollama Models Error:', error)
-      throw error
-    }
-  }
-}
-
-// Crawl API (Legacy - consider migrating to websiteAPI)
-export const crawlAPI = {
-  crawlWebsite: async (baseUrl, depth, maxPages, collectionName, onProgress) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/crawl/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base_url: baseUrl,
-          depth: depth,
-          max_pages: maxPages,
-          include_external_domains: false
-        })
-      })
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop()
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6))
-            
-            if (onProgress) onProgress(data)
-            
-            if (data.status === 'complete') {
-              return { 
-                response: { 
-                  urls: data.urls, 
-                  crawl_session_id: data.crawl_session_id 
-                } 
-              }
-            }
-            
-            if (data.status === 'error') {
-              throw new Error(data.message)
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Crawl API Error:', error)
       throw error
     }
   }
@@ -366,11 +477,11 @@ export const evaluationAPI = {
     }
   },
 
-  evaluateChatbot: async (datasetName, chatbotId, questions, groundTruths, answers, contexts) => {
+  evaluateAssistant: async (datasetName, assistantId, questions, groundTruths, answers, contexts) => {
     try {
-      const response = await api.post('/evaluation/evaluate-chatbot', {
+      const response = await api.post('/evaluation/evaluate-assistant', {
         dataset_name: datasetName,
-        chatbot_id: chatbotId,
+        assistant_id: assistantId,
         questions: questions,
         ground_truths: groundTruths,
         answers: answers,
@@ -378,7 +489,7 @@ export const evaluationAPI = {
       })
       return response.data
     } catch (error) {
-      console.error('Evaluate Chatbot Error:', error)
+      console.error('Evaluate Assistant Error:', error)
       throw error
     }
   },

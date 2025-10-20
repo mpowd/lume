@@ -116,9 +116,7 @@ async def upload_documents_stream(
 ):
     """
     Upload selected URLs to the knowledge base with real-time progress streaming.
-
-    This endpoint streams progress updates using Server-Sent Events (SSE).
-    Each event contains status information about the upload process.
+    Shows two-stage progress: crawling/chunking and embedding.
     """
 
     async def generate_progress():
@@ -185,21 +183,14 @@ async def upload_documents_stream(
                 return
 
             # Configure crawler
-
-            # Create a pruning filter
             prune_filter = PruningContentFilter(
-                # Lower → more content retained, higher → more content pruned
                 threshold=0.45,
-                # "fixed" or "dynamic"
                 threshold_type="dynamic",
-                # Ignore nodes with <5 words
                 min_word_threshold=30,
             )
 
-            # Insert it into a Markdown Generator
             md_generator = DefaultMarkdownGenerator(content_filter=prune_filter)
 
-            # Pass it to CrawlerRunConfig
             crawler_config = CrawlerRunConfig(
                 only_text=True, verbose=True, markdown_generator=md_generator
             )
@@ -208,7 +199,7 @@ async def upload_documents_stream(
             failed_urls = []
             processed_urls = []
 
-            # Step 1: Crawl all URLs and store in MongoDB
+            # STAGE 1: Crawl all URLs
             yield f"data: {json.dumps({'status': 'crawling', 'message': 'Crawling websites...', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
 
             async with AsyncWebCrawler() as crawler:
@@ -216,13 +207,11 @@ async def upload_documents_stream(
                     try:
                         logger.info(f"Crawling {idx + 1}/{len(url_list)}: {url}")
 
-                        # Send progress update
                         yield f"data: {json.dumps({'status': 'crawling', 'message': f'Crawling page {idx + 1} of {len(url_list)}', 'current': idx, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'current_url': url})}\n\n"
 
                         result = await crawler.arun(url, config=crawler_config)
 
                         if result.success and result.markdown:
-                            # Create document for MongoDB
                             doc = {
                                 "url": url,
                                 "markdown": result.markdown.fit_markdown,
@@ -238,7 +227,6 @@ async def upload_documents_stream(
                                 },
                             }
 
-                            # Store in MongoDB
                             mongodb_client.persist_docs(
                                 docs=[doc], collection_name="temp"
                             )
@@ -263,7 +251,6 @@ async def upload_documents_stream(
                             logger.error(f"✗ Failed to crawl {url}: {error_msg}")
                             failed_urls.append({"url": url, "error": error_msg})
 
-                        # Small delay to prevent overwhelming
                         await asyncio.sleep(0.1)
 
                     except Exception as e:
@@ -274,10 +261,10 @@ async def upload_documents_stream(
                 yield f"data: {json.dumps({'status': 'error', 'message': 'No documents were successfully crawled', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
                 return
 
-            # Step 2: Chunk the documents
+            # STAGE 2: Chunk the documents
             yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
 
-            logger.info(f"Step 2: Chunking {len(crawled_documents)} documents...")
+            logger.info(f"Chunking {len(crawled_documents)} documents...")
 
             headers_to_split_on = [
                 ("#", "Header 1"),
@@ -298,15 +285,11 @@ async def upload_documents_stream(
 
             for doc_data in crawled_documents:
                 try:
-                    # Split by markdown headers
                     md_header_splits = markdown_splitter.split_text(
                         doc_data["markdown"]
                     )
-
-                    # Further split into chunks
                     chunks = text_splitter.split_documents(md_header_splits)
 
-                    # Add metadata to each chunk
                     for chunk in chunks:
                         if not chunk.metadata:
                             chunk.metadata = {}
@@ -326,10 +309,13 @@ async def upload_documents_stream(
                 yield f"data: {json.dumps({'status': 'error', 'message': 'No chunks were created from the documents', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
                 return
 
-            # Step 3: Create embeddings and store in Qdrant
-            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {len(all_chunks)} chunks...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
+            # STAGE 3: Create embeddings with progress updates
+            total_chunks = len(all_chunks)
+            batch_size = 50  # Process in batches for progress updates
 
-            logger.info(f"Step 3: Creating embeddings for {len(all_chunks)} chunks...")
+            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {total_chunks} chunks...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': 0})}\n\n"
+
+            logger.info(f"Creating embeddings for {total_chunks} chunks...")
 
             qdrant = QdrantVectorStore(
                 client=qdrant_client,
@@ -341,12 +327,23 @@ async def upload_documents_stream(
                 sparse_vector_name="sparse",
             )
 
-            qdrant.add_documents(documents=all_chunks, ids=all_uuids)
+            # Process chunks in batches to show progress
+            for i in range(0, len(all_chunks), batch_size):
+                batch_chunks = all_chunks[i : i + batch_size]
+                batch_uuids = all_uuids[i : i + batch_size]
 
-            logger.info(f"✓ Successfully uploaded {len(all_chunks)} chunks to Qdrant")
+                qdrant.add_documents(documents=batch_chunks, ids=batch_uuids)
+
+                embedded_count = min(i + batch_size, total_chunks)
+
+                yield f"data: {json.dumps({'status': 'embedding', 'message': f'Embedding chunks ({embedded_count}/{total_chunks})...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': embedded_count})}\n\n"
+
+                await asyncio.sleep(0.1)
+
+            logger.info(f"✓ Successfully uploaded {total_chunks} chunks to Qdrant")
 
             # Send completion status
-            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully processed {len(crawled_documents)} documents!', 'current': len(processed_urls), 'total': len(url_list), 'total_processed': len(crawled_documents), 'processed_urls': processed_urls, 'failed_urls': failed_urls, 'total_chunks': len(all_chunks)})}\n\n"
+            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully processed {len(crawled_documents)} documents!', 'current': len(processed_urls), 'total': len(url_list), 'total_processed': len(crawled_documents), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': total_chunks})}\n\n"
 
         except Exception as e:
             logger.error(f"Error in streaming upload: {str(e)}")

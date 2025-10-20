@@ -1,9 +1,25 @@
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Loader2, FileText, Sparkles } from 'lucide-react'
 import ProgressBar from '../shared/ProgressBar'
 import StatDisplay from '../shared/StatDisplay'
 
 export default function UploadProgress({ isOpen, progress }) {
   if (!isOpen || !progress) return null
+
+  // Determine which stage we're in
+  const isCrawling = progress.status === 'crawling'
+  const isChunking = progress.status === 'chunking'
+  const isEmbedding = progress.status === 'embedding'
+  const isComplete = progress.status === 'complete'
+  const isError = progress.status === 'error'
+
+  // Calculate progress percentages
+  const crawlingProgress = progress.total > 0 
+    ? Math.round((progress.current / progress.total) * 100) 
+    : 0
+
+  const embeddingProgress = progress.total_chunks > 0 && progress.embedded_chunks
+    ? Math.round((progress.embedded_chunks / progress.total_chunks) * 100)
+    : 0
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-6 animate-in fade-in duration-200">
@@ -28,14 +44,15 @@ export default function UploadProgress({ isOpen, progress }) {
         }
       `}</style>
 
-      <div className="bg-gradient-to-br from-slate-900 to-slate-900/95 border border-white/10 rounded-2xl max-w-2xl w-full shadow-2xl">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-900/95 border border-white/10 rounded-2xl max-w-3xl w-full shadow-2xl">
         <div className="p-8">
+          {/* Header Status */}
           <div className="text-center mb-8">
-            {progress.status === 'complete' ? (
+            {isComplete ? (
               <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-10 h-10 text-green-400" />
               </div>
-            ) : progress.status === 'error' ? (
+            ) : isError ? (
               <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-10 h-10 text-red-400" />
               </div>
@@ -49,42 +66,119 @@ export default function UploadProgress({ isOpen, progress }) {
             )}
 
             <h2 className="text-2xl font-bold text-white mb-2">
-              {progress.status === 'complete' ? 'Upload Complete!' :
-               progress.status === 'error' ? 'Upload Failed' :
+              {isComplete ? 'Upload Complete!' :
+               isError ? 'Upload Failed' :
+               isCrawling ? 'Crawling Websites' :
+               isChunking ? 'Chunking Documents' :
+               isEmbedding ? 'Creating Embeddings' :
                'Processing Documents'}
             </h2>
             <p className="text-slate-400">{progress.message}</p>
           </div>
 
-          {progress.status !== 'error' && (
-            <div className="mb-6">
-              <ProgressBar
-                current={progress.current}
-                total={progress.total}
-                label="Progress"
-                showPercentage
-                className="progress-shimmer"
-              />
+          {/* Two-Stage Progress */}
+          {!isError && (
+            <div className="space-y-6 mb-6">
+              {/* Stage 1: Crawling & Markdown Generation */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className={`w-5 h-5 ${
+                      isCrawling || isChunking ? 'text-blue-400 animate-pulse' : 
+                      isEmbedding || isComplete ? 'text-green-400' : 
+                      'text-slate-500'
+                    }`} />
+                    <span className={`font-medium ${
+                      isCrawling || isChunking ? 'text-white' : 
+                      isEmbedding || isComplete ? 'text-green-400' : 
+                      'text-slate-500'
+                    }`}>
+                      Stage 1: Crawling & Chunking
+                    </span>
+                  </div>
+                  <span className="text-sm text-slate-400">
+                    {progress.current || 0} / {progress.total || 0} pages
+                  </span>
+                </div>
+                
+                <ProgressBar
+                  current={progress.current || 0}
+                  total={progress.total || 0}
+                  showPercentage
+                  className={isCrawling || isChunking ? 'progress-shimmer' : ''}
+                  color={isEmbedding || isComplete ? 'green' : 'blue'}
+                />
+
+                {progress.current_url && (isCrawling || isChunking) && (
+                  <div className="p-3 bg-slate-800/50 rounded-lg">
+                    <div className="text-xs text-slate-500 mb-1">Currently processing:</div>
+                    <div className="text-sm text-slate-300 font-mono truncate">{progress.current_url}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Stage 2: Embedding Generation */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className={`w-5 h-5 ${
+                      isEmbedding ? 'text-purple-400 animate-pulse' : 
+                      isComplete ? 'text-green-400' : 
+                      'text-slate-500'
+                    }`} />
+                    <span className={`font-medium ${
+                      isEmbedding ? 'text-white' : 
+                      isComplete ? 'text-green-400' : 
+                      'text-slate-500'
+                    }`}>
+                      Stage 2: Creating Embeddings
+                    </span>
+                  </div>
+                  {(isEmbedding || isComplete) && (
+                    <span className="text-sm text-slate-400">
+                      {progress.embedded_chunks || progress.total_chunks || 0} / {progress.total_chunks || 0} chunks
+                    </span>
+                  )}
+                </div>
+                
+                {(isEmbedding || isComplete) ? (
+                  <>
+                    <ProgressBar
+                      current={progress.embedded_chunks || progress.total_chunks || 0}
+                      total={progress.total_chunks || 1}
+                      showPercentage
+                      className={isEmbedding ? 'progress-shimmer' : ''}
+                      color={isComplete ? 'green' : 'purple'}
+                    />
+                    
+                    {isEmbedding && (
+                      <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        <div className="text-sm text-purple-300">
+                          Generating vector embeddings and storing in database...
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="h-2 bg-slate-800/50 rounded-full">
+                    <div className="h-full w-0 bg-slate-700 rounded-full" />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {progress.current_url && progress.status !== 'complete' && (
-            <div className="mb-6 p-4 bg-slate-800/50 rounded-xl">
-              <div className="text-xs text-slate-500 mb-1">Currently processing:</div>
-              <div className="text-sm text-slate-300 font-mono truncate">{progress.current_url}</div>
-            </div>
-          )}
-
-          {progress.status === 'complete' && (
+          {/* Completion Stats */}
+          {isComplete && (
             <div className="grid grid-cols-3 gap-4 mb-6">
               <StatDisplay 
-                value={progress.processed?.length || 0} 
-                label="Processed" 
+                value={progress.processed?.length || progress.total_processed || 0} 
+                label="Pages Crawled" 
                 variant="success" 
               />
               <StatDisplay 
                 value={progress.total_chunks || 0} 
-                label="Chunks" 
+                label="Chunks Created" 
                 variant="info" 
               />
               <StatDisplay 
@@ -95,6 +189,7 @@ export default function UploadProgress({ isOpen, progress }) {
             </div>
           )}
 
+          {/* Failed URLs */}
           {progress.failed && progress.failed.length > 0 && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
               <div className="flex items-center gap-2 mb-2">

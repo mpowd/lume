@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, Bot, AlertCircle, Loader2, ExternalLink, Sparkles, MessageSquare, RefreshCw, ChevronLeft, ChevronRight, Database, Cpu } from 'lucide-react'
-import { chatAPI, chatbotsAPI } from '../../services/api'
+import { chatAPI, assistantsAPI } from '../../services/api'
 import ReactMarkdown from 'react-markdown'
 import SmartTooltip from '../../components/SmartTooltip'
 
@@ -14,15 +14,15 @@ export default function ChatPage() {
   const carouselRef = useRef(null)
   
   // API State
-  const [chatbots, setChatbots] = useState([])
-  const [selectedChatbot, setSelectedChatbot] = useState(null)
+  const [assistants, setAssistants] = useState([])
+  const [selectedAssistant, setSelectedAssistant] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [loadingChatbots, setLoadingChatbots] = useState(true)
+  const [loadingAssistants, setLoadingAssistants] = useState(true)
   const [error, setError] = useState(null)
   const [carouselScroll, setCarouselScroll] = useState(0)
 
   useEffect(() => {
-    loadChatbots()
+    loadAssistants()
   }, [])
 
   useEffect(() => {
@@ -40,15 +40,15 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const loadChatbots = async () => {
-    setLoadingChatbots(true)
+  const loadAssistants = async () => {
+    setLoadingAssistants(true)
     setError(null)
     try {
-      const data = await chatbotsAPI.getAll()
+      const data = await assistantsAPI.getAll()
       
-      const mappedChatbots = data.map(bot => ({
+      const mappedAssistants = data.map(bot => ({
         id: bot.id || bot._id,
-        name: bot.chatbot_name || bot.name,
+        name: bot.assistant_name || bot.name,
         workflow: bot.workflow,
         llm: bot.llm,
         collections: bot.collections || [],
@@ -58,26 +58,26 @@ export default function ChatPage() {
         created_at: bot.created_at
       }))
       
-      setChatbots(mappedChatbots)
-      if (mappedChatbots.length > 0) {
-        setSelectedChatbot(mappedChatbots[0])
+      setAssistants(mappedAssistants)
+      if (mappedAssistants.length > 0) {
+        setSelectedAssistant(mappedAssistants[0])
         setMessages([{ 
           role: 'assistant', 
-          content: `Hi! I'm ${mappedChatbots[0].name}. How can I help you today?` 
+          content: `Hi! I'm ${mappedAssistants[0].name}. How can I help you today?` 
         }])
       } else {
-        setError('No chatbots found. Please create one first.')
+        setError('No assistants found. Please create one first.')
       }
     } catch (err) {
-      console.error('Error loading chatbots:', err)
+      console.error('Error loading assistants:', err)
       setError('Could not connect to backend. Is it running?')
     } finally {
-      setLoadingChatbots(false)
+      setLoadingAssistants(false)
     }
   }
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedChatbot) return
+    if (!input.trim() || !selectedAssistant) return
     
     const userMessage = { role: 'user', content: input }
     setMessages(prev => [...prev, userMessage])
@@ -86,7 +86,7 @@ export default function ChatPage() {
     
     try {
       const response = await chatAPI.sendMessage(
-        selectedChatbot.id,
+        selectedAssistant.id,
         input,
         messages
       )
@@ -138,10 +138,10 @@ export default function ChatPage() {
   }
 
   const handleNewChat = () => {
-    if (selectedChatbot) {
+    if (selectedAssistant) {
       setMessages([{ 
         role: 'assistant', 
-        content: `Hi! I'm ${selectedChatbot.name}. How can I help you today?` 
+        content: `Hi! I'm ${selectedAssistant.name}. How can I help you today?` 
       }])
     }
   }
@@ -158,8 +158,8 @@ export default function ChatPage() {
     }
   }
 
-  const selectChatbot = (bot) => {
-    setSelectedChatbot(bot)
+  const selectAssistant = (bot) => {
+    setSelectedAssistant(bot)
     setMessages([{ 
       role: 'assistant', 
       content: `Hi! I'm ${bot.name}. How can I help you today?` 
@@ -241,9 +241,9 @@ export default function ChatPage() {
         .gradient-border-inner { background: rgb(10, 10, 10); border-radius: 1.5rem; }
         .carousel-container { scrollbar-width: none; -ms-overflow-style: none; }
         .carousel-container::-webkit-scrollbar { display: none; }
-        .chatbot-card { transition: all 0.3s ease; }
-        .chatbot-card:hover { transform: translateY(-2px); }
-        .chatbot-card.selected { box-shadow: 0 0 0 2px rgb(59, 130, 246); }
+        .assistant-card { transition: all 0.3s ease; }
+        .assistant-card:hover { transform: translateY(-2px); }
+        .assistant-card.selected { box-shadow: 0 0 0 2px rgb(59, 130, 246); }
         .chunk-tooltip { pointer-events: auto; }
         .chunk-content {
           scrollbar-width: thin;
@@ -259,7 +259,7 @@ export default function ChatPage() {
         <div className="fixed top-0 left-0 right-0 z-10 border-b border-white/5 bg-slate-950/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
-              {!selectedChatbot ? (
+              {!selectedAssistant ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -268,18 +268,18 @@ export default function ChatPage() {
                       </div>
                       <div>
                         <h1 className="text-xl font-semibold text-white">Chat</h1>
-                        <p className="text-sm text-slate-400">Select a chatbot to start</p>
+                        <p className="text-sm text-slate-400">Select a assistant to start</p>
                       </div>
                     </div>
                   </div>
-                  {loadingChatbots ? (
+                  {loadingAssistants ? (
                     <div className="flex items-center justify-center py-12">
                       <div className="flex items-center gap-3 text-slate-400">
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="text-sm">Loading chatbots...</span>
+                        <span className="text-sm">Loading assistants...</span>
                       </div>
                     </div>
-                  ) : chatbots.length > 0 ? (
+                  ) : assistants.length > 0 ? (
                     <div className="relative">
                       {carouselScroll > 0 && (
                         <button onClick={() => scrollCarousel('left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-slate-900/90 hover:bg-slate-800 border border-white/10 rounded-2xl transition-all cursor-pointer shadow-lg">
@@ -287,8 +287,8 @@ export default function ChatPage() {
                         </button>
                       )}
                       <div ref={carouselRef} className="carousel-container flex gap-4 overflow-x-auto pb-2" onScroll={(e) => setCarouselScroll(e.target.scrollLeft)}>
-                        {chatbots.map((bot) => (
-                          <div key={bot.id} onClick={() => selectChatbot(bot)} className="chatbot-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-slate-900/30 border-white/10 hover:border-white/20 hover:bg-slate-900/50">
+                        {assistants.map((bot) => (
+                          <div key={bot.id} onClick={() => selectAssistant(bot)} className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-slate-900/30 border-white/10 hover:border-white/20 hover:bg-slate-900/50">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-xl bg-slate-800/50">
@@ -298,7 +298,7 @@ export default function ChatPage() {
                               </div>
                             </div>
                             <p className="text-sm text-slate-400 mb-4 line-clamp-2">
-                              {bot.workflow === 'agentic' ? 'Agentic workflow with tools' : `RAG chatbot with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`}
+                              {bot.workflow === 'agentic' ? 'Agentic workflow with tools' : `RAG assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`}
                             </p>
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-xs">
@@ -326,7 +326,7 @@ export default function ChatPage() {
                   ) : (
                     <div className="py-12 text-center">
                       <AlertCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400">No chatbots available</p>
+                      <p className="text-slate-400">No assistants available</p>
                     </div>
                   )}
                   {error && (
@@ -345,22 +345,22 @@ export default function ChatPage() {
                       <Bot className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <h1 className="text-lg font-semibold text-white">{selectedChatbot.name}</h1>
+                      <h1 className="text-lg font-semibold text-white">{selectedAssistant.name}</h1>
                       <div className="flex items-center gap-3 text-xs text-slate-400">
                         <span className="flex items-center gap-1">
                           <Database className="w-3 h-3" />
-                          {selectedChatbot.collections && selectedChatbot.collections.length > 0 ? selectedChatbot.collections.length === 1 ? selectedChatbot.collections[0] : `${selectedChatbot.collections.length} sources` : 'No sources'}
+                          {selectedAssistant.collections && selectedAssistant.collections.length > 0 ? selectedAssistant.collections.length === 1 ? selectedAssistant.collections[0] : `${selectedAssistant.collections.length} sources` : 'No sources'}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Cpu className="w-3 h-3" />
-                          {selectedChatbot.llm || 'Not set'}
+                          {selectedAssistant.llm || 'Not set'}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setSelectedChatbot(null)} className="px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 hover:border-white/20 rounded-2xl transition-all cursor-pointer text-sm text-slate-300 hover:text-white">
+                    <button onClick={() => setSelectedAssistant(null)} className="px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 hover:border-white/20 rounded-2xl transition-all cursor-pointer text-sm text-slate-300 hover:text-white">
                       Change Bot
                     </button>
                     <button onClick={handleNewChat} className="flex items-center gap-2 px-4 py-2 bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 hover:border-white/20 rounded-2xl transition-all cursor-pointer text-sm text-slate-300 hover:text-white">
@@ -374,7 +374,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-8" style={{ marginTop: selectedChatbot ? '90px' : '280px', marginBottom: '140px' }}>
+        <div className="flex-1 overflow-y-auto px-6 pb-8" style={{ marginTop: selectedAssistant ? '90px' : '280px', marginBottom: '140px' }}>
           <div className="max-w-4xl mx-auto space-y-6">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''} message-enter`}>
@@ -432,9 +432,9 @@ export default function ChatPage() {
             <div className="gradient-border">
               <div className="gradient-border-inner p-4">
                 <div className="flex items-end gap-3">
-                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); handleSend() }}} placeholder={selectedChatbot ? "Ask me anything..." : "Select a chatbot to start..."} disabled={!selectedChatbot || loading} rows={1} className="flex-1 bg-transparent text-white placeholder:text-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-slate-600 cursor-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }} />
-                  <button onClick={handleSend} disabled={!input.trim() || !selectedChatbot || loading} className="flex-shrink-0 w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 transition-all duration-200 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 disabled:shadow-none">
-                    {loading ? <Loader2 className="w-5 h-5 text-slate-500 animate-spin" /> : <Send className={`w-5 h-5 ${input.trim() && selectedChatbot ? 'text-white' : 'text-slate-600'}`} />}
+                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); handleSend() }}} placeholder={selectedAssistant ? "Ask me anything..." : "Select a assistant to start..."} disabled={!selectedAssistant || loading} rows={1} className="flex-1 bg-transparent text-white placeholder:text-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-slate-600 cursor-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }} />
+                  <button onClick={handleSend} disabled={!input.trim() || !selectedAssistant || loading} className="flex-shrink-0 w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 transition-all duration-200 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 disabled:shadow-none">
+                    {loading ? <Loader2 className="w-5 h-5 text-slate-500 animate-spin" /> : <Send className={`w-5 h-5 ${input.trim() && selectedAssistant ? 'text-white' : 'text-slate-600'}`} />}
                   </button>
                 </div>
               </div>

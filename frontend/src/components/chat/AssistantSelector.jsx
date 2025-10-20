@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Bot, Database, Cpu, ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function ChatbotSelector({ chatbots, onSelect }) {
+export default function AssistantSelector({ assistants, onSelect }) {
   const carouselRef = useRef(null)
   const [carouselScroll, setCarouselScroll] = useState(0)
 
@@ -22,8 +22,8 @@ export default function ChatbotSelector({ chatbots, onSelect }) {
       <style>{`
         .carousel-container { scrollbar-width: none; -ms-overflow-style: none; }
         .carousel-container::-webkit-scrollbar { display: none; }
-        .chatbot-card { transition: all 0.3s ease; }
-        .chatbot-card:hover { transform: translateY(-2px); }
+        .assistant-card { transition: all 0.3s ease; }
+        .assistant-card:hover { transform: translateY(-2px); }
       `}</style>
 
       {carouselScroll > 0 && (
@@ -40,11 +40,11 @@ export default function ChatbotSelector({ chatbots, onSelect }) {
         className="carousel-container flex gap-4 overflow-x-auto pb-2" 
         onScroll={(e) => setCarouselScroll(e.target.scrollLeft)}
       >
-        {chatbots.map((bot) => (
+        {assistants.map((bot) => (
           <div 
             key={bot.id} 
             onClick={() => onSelect(bot)} 
-            className="chatbot-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-slate-900/30 border-white/10 hover:border-white/20 hover:bg-slate-900/50"
+            className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-slate-900/30 border-white/10 hover:border-white/20 hover:bg-slate-900/50"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -58,7 +58,7 @@ export default function ChatbotSelector({ chatbots, onSelect }) {
             <p className="text-sm text-slate-400 mb-4 line-clamp-2">
               {bot.workflow === 'agentic' 
                 ? 'Agentic workflow with tools' 
-                : `RAG chatbot with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
+                : `RAG assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
               }
             </p>
 

@@ -1,11 +1,39 @@
+"""
+Main FastAPI application
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api.routes import chat, knowledge_base, evaluation, chatbot, ollama
+import logging
+
+# Import to register all assistants
+import backend.core.assistants
+
+# Import routes
+from backend.api.routes import (
+    assistants,
+    executions,
+    knowledge_base,
+    evaluation,
+    ollama,
+)
 from backend.api.routes.sources import website
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
 
+# Create FastAPI app
+app = FastAPI(
+    title="AI Assistant Platform",
+    description="Platform for creating and managing AI assistants",
+    version="2.0.0",
+)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -20,16 +48,37 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-app.include_router(chat.router, prefix="/chat", tags=["chat"])
+# Include routers
+app.include_router(assistants.router, prefix="/assistants", tags=["assistants"])
+app.include_router(executions.router, prefix="/execute", tags=["executions"])
 app.include_router(
     knowledge_base.router, prefix="/knowledge_base", tags=["knowledge_base"]
 )
 app.include_router(website.router, prefix="/website", tags=["website"])
 app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
-app.include_router(chatbot.router, prefix="/chatbot", tags=["chatbot"])
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Application startup"""
+    logger.info("Starting AI Assistant Platform")
+    logger.info(
+        f"Registered assistant types: {backend.core.assistants.AssistantRegistry.list_types()}"
+    )
 
 
 @app.get("/")
 async def root():
-    return {"message": "Backend is running"}
+    """Health check endpoint"""
+    return {
+        "message": "AI Assistant Platform is running",
+        "version": "2.0.0",
+        "assistant_types": backend.core.assistants.AssistantRegistry.list_types(),
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}

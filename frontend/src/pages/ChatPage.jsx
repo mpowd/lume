@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { MessageSquare, Bot, RefreshCw, Database, Cpu } from 'lucide-react'
-import { useChatbots } from '../hooks/useChatbots'
+import { useAssistants } from '../hooks/useAssistants'
 import { chatAPI } from '../services/api'
-import ChatbotSelector from '../components/chat/ChatbotSelector'
+import AssistantSelector from '../components/chat/AssistantSelector'
 import MessageList from '../components/chat/MessageList'
 import ChatInput from '../components/chat/ChatInput'
 import LoadingSpinner from '../components/shared/LoadingSpinner'
@@ -10,13 +10,13 @@ import ErrorAlert from '../components/shared/ErrorAlert'
 import Button from '../components/shared/Button'
 
 export default function ChatPage() {
-  const { chatbots, loading: loadingChatbots, error: chatbotsError } = useChatbots()
-  const [selectedChatbot, setSelectedChatbot] = useState(null)
+  const { assistants, loading: loadingAssistants, error: assistantsError } = useAssistants()
+  const [selectedAssistant, setSelectedAssistant] = useState(null)
   const [messages, setMessages] = useState([{ role: 'assistant', content: 'Hi! Ask me anything.' }])
   const [loading, setLoading] = useState(false)
 
-  const handleSelectChatbot = (bot) => {
-    setSelectedChatbot(bot)
+  const handleSelectAssistant = (bot) => {
+    setSelectedAssistant(bot)
     setMessages([{ 
       role: 'assistant', 
       content: `Hi! I'm ${bot.name}. How can I help you today?` 
@@ -30,7 +30,7 @@ export default function ChatPage() {
     
     try {
       const response = await chatAPI.sendMessage(
-        selectedChatbot.id,
+        selectedAssistant.id,
         input,
         messages
       )
@@ -67,16 +67,16 @@ export default function ChatPage() {
   }
 
   const handleNewChat = () => {
-    if (selectedChatbot) {
+    if (selectedAssistant) {
       setMessages([{ 
         role: 'assistant', 
-        content: `Hi! I'm ${selectedChatbot.name}. How can I help you today?` 
+        content: `Hi! I'm ${selectedAssistant.name}. How can I help you today?` 
       }])
     }
   }
 
-  if (loadingChatbots) {
-    return <LoadingSpinner fullScreen text="Loading chatbots..." />
+  if (loadingAssistants) {
+    return <LoadingSpinner fullScreen text="Loading assistants..." />
   }
 
   return (
@@ -86,7 +86,7 @@ export default function ChatPage() {
         <div className="fixed top-0 left-0 right-0 z-10 border-b border-white/5 bg-slate-950/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
-              {!selectedChatbot ? (
+              {!selectedAssistant ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -95,18 +95,18 @@ export default function ChatPage() {
                       </div>
                       <div>
                         <h1 className="text-xl font-semibold text-white">Chat</h1>
-                        <p className="text-sm text-slate-400">Select a chatbot to start</p>
+                        <p className="text-sm text-slate-400">Select a assistant to start</p>
                       </div>
                     </div>
                   </div>
 
-                  {chatbotsError && <ErrorAlert message={chatbotsError} className="mb-4" />}
+                  {assistantsError && <ErrorAlert message={assistantsError} className="mb-4" />}
 
-                  {chatbots.length > 0 ? (
-                    <ChatbotSelector chatbots={chatbots} onSelect={handleSelectChatbot} />
+                  {assistants.length > 0 ? (
+                    <AssistantSelector assistants={assistants} onSelect={handleSelectAssistant} />
                   ) : (
                     <div className="py-12 text-center">
-                      <p className="text-slate-400">No chatbots available</p>
+                      <p className="text-slate-400">No assistants available</p>
                     </div>
                   )}
                 </>
@@ -117,24 +117,24 @@ export default function ChatPage() {
                       <Bot className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <h1 className="text-lg font-semibold text-white">{selectedChatbot.name}</h1>
+                      <h1 className="text-lg font-semibold text-white">{selectedAssistant.name}</h1>
                       <div className="flex items-center gap-3 text-xs text-slate-400">
                         <span className="flex items-center gap-1">
                           <Database className="w-3 h-3" />
-                          {selectedChatbot.collections?.length > 0 
-                            ? `${selectedChatbot.collections.length} sources` 
+                          {selectedAssistant.collections?.length > 0 
+                            ? `${selectedAssistant.collections.length} sources` 
                             : 'No sources'}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Cpu className="w-3 h-3" />
-                          {selectedChatbot.llm || 'Not set'}
+                          {selectedAssistant.llm || 'Not set'}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="secondary" onClick={() => setSelectedChatbot(null)}>
+                    <Button variant="secondary" onClick={() => setSelectedAssistant(null)}>
                       Change Bot
                     </Button>
                     <Button variant="secondary" icon={RefreshCw} onClick={handleNewChat}>
@@ -151,7 +151,7 @@ export default function ChatPage() {
         <div 
           className="flex-1 overflow-y-auto px-6 pb-8" 
           style={{ 
-            marginTop: selectedChatbot ? '90px' : '280px', 
+            marginTop: selectedAssistant ? '90px' : '280px', 
             marginBottom: '140px' 
           }}
         >
@@ -161,7 +161,7 @@ export default function ChatPage() {
         {/* Input */}
         <ChatInput 
           onSend={handleSendMessage}
-          disabled={!selectedChatbot}
+          disabled={!selectedAssistant}
           loading={loading}
         />
       </div>

@@ -6,22 +6,22 @@ import ProgressBar from '../shared/ProgressBar'
 
 export default function EvaluationRunner({ 
   dataset, 
-  chatbots, 
-  selectedChatbots, 
+  assistants, 
+  selectedAssistants, 
   onToggle, 
   onComplete 
 }) {
-  const { evaluating, evalProgress, evaluateChatbots } = useEvaluation()
+  const { evaluating, evalProgress, evaluateAssistants } = useEvaluation()
 
   const handleEvaluate = async () => {
-    if (selectedChatbots.length === 0) {
-      alert('Please select at least one chatbot')
+    if (selectedAssistants.length === 0) {
+      alert('Please select at least one assistant')
       return
     }
 
-    const result = await evaluateChatbots(dataset, selectedChatbots)
+    const result = await evaluateAssistants(dataset, selectedAssistants)
     if (result.success) {
-      alert(`Successfully evaluated ${result.count} chatbot(s)!`)
+      alert(`Successfully evaluated ${result.count} assistant(s)!`)
       onComplete()
     }
   }
@@ -34,14 +34,14 @@ export default function EvaluationRunner({
         <div>
           <p className="text-sm text-slate-400 mb-4">Select assistants to evaluate with this dataset</p>
           <div className="grid grid-cols-2 gap-3">
-            {chatbots.map(bot => (
+            {assistants.map(bot => (
               <label
                 key={bot.id}
                 className="flex items-center gap-3 p-4 bg-slate-950/30 border border-white/5 hover:border-white/10 rounded-xl transition-all group cursor-pointer"
               >
                 <input
                   type="checkbox"
-                  checked={selectedChatbots.includes(bot.id)}
+                  checked={selectedAssistants.includes(bot.id)}
                   onChange={() => onToggle(bot.id)}
                   className="w-5 h-5 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
                 />
@@ -61,7 +61,7 @@ export default function EvaluationRunner({
               <div className="flex items-center gap-3">
                 <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
                 <span className="text-white font-semibold">
-                  Evaluating {selectedChatbots.length} assistant(s)...
+                  Evaluating {selectedAssistants.length} assistant(s)...
                 </span>
               </div>
               <span className="text-2xl font-bold text-blue-400">{evalProgress}%</span>
@@ -73,12 +73,12 @@ export default function EvaluationRunner({
         <Button
           variant="success"
           onClick={handleEvaluate}
-          disabled={evaluating || selectedChatbots.length === 0}
+          disabled={evaluating || selectedAssistants.length === 0}
           icon={evaluating ? Loader2 : PlayCircle}
           fullWidth
           size="lg"
         >
-          {evaluating ? 'Evaluating...' : `Run Evaluation (${selectedChatbots.length} assistant${selectedChatbots.length !== 1 ? 's' : ''})`}
+          {evaluating ? 'Evaluating...' : `Run Evaluation (${selectedAssistants.length} assistant${selectedAssistants.length !== 1 ? 's' : ''})`}
         </Button>
       </div>
     </Card>

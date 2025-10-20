@@ -1,37 +1,80 @@
 import { useState } from 'react'
-import { Bot, Edit2, Trash2, X, Zap, Lock, Target } from 'lucide-react'
+import { MessageSquare, FileSearch, Bot, Image, Edit2, Trash2, X, Target } from 'lucide-react'
 import Card from '../shared/Card'
 import Badge from '../shared/Badge'
 
-export default function ChatbotCard({ chatbot, onEdit, onDelete }) {
+const TYPE_CONFIG = {
+  qa: {
+    icon: MessageSquare,
+    label: 'Q&A',
+    color: 'from-blue-500/20 to-purple-500/20',
+    hoverColor: 'from-blue-500/30 to-purple-500/30'
+  },
+  retrieval: {
+    icon: FileSearch,
+    label: 'Retrieval',
+    color: 'from-emerald-500/20 to-teal-500/20',
+    hoverColor: 'from-emerald-500/30 to-teal-500/30'
+  },
+  assistant: {
+    icon: Bot,
+    label: 'Assistant',
+    color: 'from-orange-500/20 to-red-500/20',
+    hoverColor: 'from-orange-500/30 to-red-500/30'
+  },
+  image: {
+    icon: Image,
+    label: 'Image',
+    color: 'from-pink-500/20 to-rose-500/20',
+    hoverColor: 'from-pink-500/30 to-rose-500/30'
+  }
+}
+
+export default function AssistantCard({ assistant, onEdit, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  
+  const typeConfig = TYPE_CONFIG[assistant.type] || TYPE_CONFIG.qa
+  const Icon = typeConfig.icon
+
+  // Get LLM display info
+  const getLLMInfo = () => {
+    const llmModel = assistant.llm
+    const llmProvider = assistant.llm_provider
+    
+    if (!llmModel && !llmProvider) {
+      return { provider: null, model: 'No LLM', hasLLM: false }
+    }
+    
+    return {
+      provider: llmProvider,
+      model: llmModel || 'Unknown Model',
+      hasLLM: true
+    }
+  }
+
+  const llmInfo = getLLMInfo()
 
   const handleDelete = (e) => {
     e.stopPropagation()
-    onDelete(chatbot.id)
+    onDelete(assistant.id, assistant.name)
     setConfirmDelete(false)
   }
 
   return (
-    <Card onClick={() => onEdit(chatbot)} className="p-6">
+    <Card onClick={() => onEdit(assistant)} className="p-6">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-all">
-            <Bot className="w-5 h-5 text-blue-400" />
+          <div className={`p-2.5 bg-gradient-to-br ${typeConfig.color} rounded-xl group-hover:${typeConfig.hoverColor} transition-all`}>
+            <Icon className="w-5 h-5 text-blue-400" />
           </div>
           <div>
             <h3 className="font-semibold text-white text-lg group-hover:text-blue-400 transition-colors">
-              {chatbot.name}
+              {assistant.name}
             </h3>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="blue" icon={Zap}>
-                {chatbot.workflow}
+              <Badge variant="blue">
+                {typeConfig.label}
               </Badge>
-              {chatbot.local_only && (
-                <Badge variant="green" icon={Lock}>
-                  Local
-                </Badge>
-              )}
             </div>
           </div>
         </div>
@@ -41,36 +84,40 @@ export default function ChatbotCard({ chatbot, onEdit, onDelete }) {
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-400">Model</span>
           <div className="flex items-center gap-2">
-            <Badge variant={chatbot.llm_provider === 'ollama' ? 'orange' : 'green'}>
-              {chatbot.llm_provider || 'openai'}
-            </Badge>
-            <span className="text-white font-medium">{chatbot.llm}</span>
+            {llmInfo.hasLLM && llmInfo.provider && (
+              <Badge variant={llmInfo.provider === 'ollama' ? 'orange' : 'green'}>
+                {llmInfo.provider}
+              </Badge>
+            )}
+            <span className={`font-medium ${llmInfo.hasLLM ? 'text-white' : 'text-slate-500'}`}>
+              {llmInfo.model}
+            </span>
           </div>
         </div>
 
-        {chatbot.collections && chatbot.collections.length > 0 && (
+        {assistant.collections && assistant.collections.length > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400">Sources</span>
-            <span className="text-white font-medium">{chatbot.collections.length}</span>
+            <span className="text-white font-medium">{assistant.collections.length}</span>
           </div>
         )}
 
-        {chatbot.reranking && (
+        {assistant.reranking && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400">Reranker</span>
-            <Badge variant={chatbot.reranker_provider === 'huggingface' ? 'orange' : 'purple'}>
-              {chatbot.reranker_provider || 'cohere'}
+            <Badge variant={assistant.reranker_provider === 'huggingface' ? 'orange' : 'purple'}>
+              {assistant.reranker_provider || 'cohere'}
             </Badge>
           </div>
         )}
       </div>
 
-      {chatbot.workflow === 'linear' && (
+      {assistant.type === 'qa' && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {chatbot.hybrid_search && <Badge variant="blue">Hybrid</Badge>}
-          {chatbot.hyde && <Badge variant="purple">HyDE</Badge>}
-          {chatbot.reranking && <Badge variant="green">Rerank</Badge>}
-          {chatbot.precise_citation && (
+          {assistant.hybrid_search && <Badge variant="blue">Hybrid</Badge>}
+          {assistant.hyde && <Badge variant="purple">HyDE</Badge>}
+          {assistant.reranking && <Badge variant="green">Rerank</Badge>}
+          {assistant.precise_citation && (
             <Badge variant="orange" icon={Target}>Precise</Badge>
           )}
         </div>
@@ -80,7 +127,7 @@ export default function ChatbotCard({ chatbot, onEdit, onDelete }) {
         <button
           onClick={(e) => {
             e.stopPropagation()
-            onEdit(chatbot)
+            onEdit(assistant)
           }}
           className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all font-medium"
         >

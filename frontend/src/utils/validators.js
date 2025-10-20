@@ -1,7 +1,7 @@
 
-export const validateChatbotForm = (formData) => {
-  if (!formData.chatbot_name) {
-    return 'Please enter a chatbot name'
+export const validateAssistantForm = (formData) => {
+  if (!formData.assistant_name) {
+    return 'Please enter a assistant name'
   }
   if (formData.workflow === 'linear' && formData.collections.length === 0) {
     return 'Please select at least one knowledge source'

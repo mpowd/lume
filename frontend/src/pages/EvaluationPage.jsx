@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { BarChart3, ArrowLeft, Edit3, Trash2, Calendar, Hash } from 'lucide-react'
 import { useCollections } from '../hooks/useCollections'
 import { useDatasets } from '../hooks/useDatasets'
-import { useChatbots } from '../hooks/useChatbots'
+import { useAssistants } from '../hooks/useAssistants'
 import CollectionSidebar from '../components/knowledge/CollectionSidebar'
 import ActionMenu from '../components/evaluation/ActionMenu'
 import DatasetCard from '../components/evaluation/DatasetCard'
@@ -17,13 +17,13 @@ import LoadingSpinner from '../components/shared/LoadingSpinner'
 export default function EvaluationPage() {
   const { collections, reload: reloadCollections } = useCollections()
   const { datasets, createDataset, generateDataset, updateDataset, deleteDataset, reload: reloadDatasets } = useDatasets()
-  const { chatbots } = useChatbots()
+  const { assistants } = useAssistants()
   
   const [activeCollection, setActiveCollection] = useState(null)
   const [view, setView] = useState('select-collection')
   const [selectedDataset, setSelectedDataset] = useState(null)
   const [editingDataset, setEditingDataset] = useState(null)
-  const [selectedChatbots, setSelectedChatbots] = useState([])
+  const [selectedAssistants, setSelectedAssistants] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -89,18 +89,18 @@ export default function EvaluationPage() {
     }
   }
 
-  const toggleChatbotSelection = (chatbotId) => {
-    setSelectedChatbots(prev =>
-      prev.includes(chatbotId)
-        ? prev.filter(id => id !== chatbotId)
-        : [...prev, chatbotId]
+  const toggleAssistantSelection = (assistantId) => {
+    setSelectedAssistants(prev =>
+      prev.includes(assistantId)
+        ? prev.filter(id => id !== assistantId)
+        : [...prev, assistantId]
     )
   }
 
   const handleEvaluationComplete = () => {
     setView('view-datasets')
     setSelectedDataset(null)
-    setSelectedChatbots([])
+    setSelectedAssistants([])
   }
 
   return (
@@ -239,9 +239,9 @@ export default function EvaluationPage() {
 
               <EvaluationRunner
                 dataset={selectedDataset}
-                chatbots={chatbots}
-                selectedChatbots={selectedChatbots}
-                onToggle={toggleChatbotSelection}
+                assistants={assistants}
+                selectedAssistants={selectedAssistants}
+                onToggle={toggleAssistantSelection}
                 onComplete={handleEvaluationComplete}
               />
             </div>

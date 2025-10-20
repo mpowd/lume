@@ -1,5 +1,12 @@
+import { useMemo } from 'react'
 import { Cpu, Lock, Loader2 } from 'lucide-react'
 import { OPENAI_MODELS } from '../../constants/models'
+
+// Keywords to filter out non-LLM models
+const NON_LLM_KEYWORDS = [
+  'embed', 'embedding', 'rerank', 'reranker', 
+  'jina', 'mxbai', 'nomic', 'snowflake', 'bge'
+]
 
 export default function ModelSelector({ 
   formData, 
@@ -8,6 +15,16 @@ export default function ModelSelector({
   loadingModels,
   formatModelSize 
 }) {
+  // Filter out embedding and reranking models, then sort by size (smallest first)
+  const filteredOllamaModels = useMemo(() => {
+    return ollamaModels
+      .filter(model => {
+        const lowerName = model.name.toLowerCase()
+        return !NON_LLM_KEYWORDS.some(keyword => lowerName.includes(keyword))
+      })
+      .sort((a, b) => a.size - b.size)
+  }, [ollamaModels])
+
   return (
     <div className="space-y-3">
       <label className="block text-sm font-medium text-slate-300">
@@ -33,7 +50,7 @@ export default function ModelSelector({
         <button
           type="button"
           onClick={() => {
-            const firstOllama = ollamaModels[0]?.name || 'mistral'
+            const firstOllama = filteredOllamaModels[0]?.name || 'mistral'
             setFormData({...formData, llm_provider: 'ollama', llm: firstOllama})
           }}
           className={`py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
@@ -69,12 +86,12 @@ export default function ModelSelector({
               <div className="col-span-full flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
               </div>
-            ) : ollamaModels.length === 0 ? (
+            ) : filteredOllamaModels.length === 0 ? (
               <div className="col-span-full p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
                 <p className="text-orange-400 text-sm">No Ollama models found. Make sure Ollama is running.</p>
               </div>
             ) : (
-              ollamaModels.map(model => (
+              filteredOllamaModels.map(model => (
                 <button
                   key={model.fullName}
                   type="button"

@@ -1,13 +1,13 @@
 import { Bot } from 'lucide-react'
-import ChatbotCard from './ChatbotCard'
+import AssistantCard from './AssistantCard'
 import EmptyState from '../shared/EmptyState'
 
-export default function ChatbotGrid({ chatbots, onEdit, onDelete }) {
-  if (chatbots.length === 0) {
+export default function AssistantGrid({ assistants, onEdit, onDelete }) {
+  if (assistants.length === 0) {
     return (
       <EmptyState
         icon={Bot}
-        title="No chatbots yet"
+        title="No assistants yet"
         description="Create your first assistant to get started"
       />
     )
@@ -15,10 +15,10 @@ export default function ChatbotGrid({ chatbots, onEdit, onDelete }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {chatbots.map(chatbot => (
-        <ChatbotCard
-          key={chatbot.id}
-          chatbot={chatbot}
+      {assistants.map(assistant => (
+        <AssistantCard
+          key={assistant.id}
+          assistant={assistant}
           onEdit={onEdit}
           onDelete={onDelete}
         />

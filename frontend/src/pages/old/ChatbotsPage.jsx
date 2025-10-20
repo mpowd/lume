@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Loader2, Bot, Sparkles, Database, Zap, X, Check, ChevronDown, ChevronUp, Settings, AlertCircle, Target, Cpu, Lock } from 'lucide-react'
-import { chatbotsAPI, knowledgeBaseAPI, ollamaAPI } from '../../services/api'
+import { assistantsAPI, knowledgeBaseAPI, ollamaAPI } from '../../services/api'
 
-export default function ChatbotsPage() {
-  const [chatbots, setChatbots] = useState([])
+export default function AssistantsPage() {
+  const [assistants, setAssistants] = useState([])
   const [collections, setCollections] = useState([])
   const [ollamaModels, setOllamaModels] = useState([])
   const [loadingModels, setLoadingModels] = useState(false)
@@ -11,12 +11,12 @@ export default function ChatbotsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
-  const [editingChatbot, setEditingChatbot] = useState(null)
+  const [editingAssistant, setEditingAssistant] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   
   const [formData, setFormData] = useState({
-    chatbot_name: '',
+    assistant_name: '',
     workflow: 'linear',
     collections: [],
     local_only: false,
@@ -73,14 +73,14 @@ export default function ChatbotsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [chatbotsData, collectionsData] = await Promise.all([
-        chatbotsAPI.getAll(),
+      const [assistantsData, collectionsData] = await Promise.all([
+        assistantsAPI.getAll(),
         knowledgeBaseAPI.getAll()
       ])
       
-      const mappedChatbots = chatbotsData.map(bot => ({
+      const mappedAssistants = assistantsData.map(bot => ({
         id: bot.id || bot._id,
-        name: bot.chatbot_name || bot.name,
+        name: bot.assistant_name || bot.name,
         workflow: bot.workflow,
         llm: bot.llm,
         llm_provider: bot.llm_provider || 'openai',
@@ -101,7 +101,7 @@ export default function ChatbotsPage() {
         created_at: bot.created_at
       }))
       
-      setChatbots(mappedChatbots)
+      setAssistants(mappedAssistants)
       setCollections(collectionsData.collection_names || [])
     } catch (err) {
       console.error('Error loading data:', err)
@@ -117,8 +117,8 @@ export default function ChatbotsPage() {
   }
 
   const handleSubmit = async () => {
-    if (!formData.chatbot_name) {
-      setError('Please enter a chatbot name')
+    if (!formData.assistant_name) {
+      setError('Please enter a assistant name')
       return
     }
     if (formData.workflow === 'linear' && formData.collections.length === 0) {
@@ -130,42 +130,42 @@ export default function ChatbotsPage() {
     setError(null)
     
     try {
-      if (editingChatbot) {
-        await chatbotsAPI.update(editingChatbot.id, formData)
+      if (editingAssistant) {
+        await assistantsAPI.update(editingAssistant.id, formData)
       } else {
-        await chatbotsAPI.create(formData)
+        await assistantsAPI.create(formData)
       }
       await loadData()
       resetForm()
     } catch (err) {
-      console.error('Error saving chatbot:', err)
-      setError('Failed to save chatbot. Please try again.')
+      console.error('Error saving assistant:', err)
+      setError('Failed to save assistant. Please try again.')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = (chatbot) => {
-    setEditingChatbot(chatbot)
+  const handleEdit = (assistant) => {
+    setEditingAssistant(assistant)
     setFormData({
-      chatbot_name: chatbot.name || chatbot.chatbot_name,
-      workflow: chatbot.workflow || 'linear',
-      collections: chatbot.collections || [],
-      local_only: chatbot.local_only || false,
-      hybrid_search: chatbot.hybrid_search ?? true,
-      hyde: chatbot.hyde ?? false,
-      hyde_prompt: chatbot.hyde_prompt || formData.hyde_prompt,
-      top_k: chatbot.top_k || 10,
-      reranking: chatbot.reranking ?? false,
-      reranker_provider: chatbot.reranker_provider || 'cohere',
-      reranker_model: chatbot.reranker_model || 'rerank-v3.5',
-      top_n: chatbot.top_n || 5,
-      llm: chatbot.llm || 'gpt-4o-mini',
-      llm_provider: chatbot.llm_provider || 'openai',
-      rag_prompt: chatbot.rag_prompt || formData.rag_prompt,
-      tools: chatbot.tools || [],
-      max_steps: chatbot.max_steps || 4,
-      precise_citation: chatbot.precise_citation ?? false
+      assistant_name: assistant.name || assistant.assistant_name,
+      workflow: assistant.workflow || 'linear',
+      collections: assistant.collections || [],
+      local_only: assistant.local_only || false,
+      hybrid_search: assistant.hybrid_search ?? true,
+      hyde: assistant.hyde ?? false,
+      hyde_prompt: assistant.hyde_prompt || formData.hyde_prompt,
+      top_k: assistant.top_k || 10,
+      reranking: assistant.reranking ?? false,
+      reranker_provider: assistant.reranker_provider || 'cohere',
+      reranker_model: assistant.reranker_model || 'rerank-v3.5',
+      top_n: assistant.top_n || 5,
+      llm: assistant.llm || 'gpt-4o-mini',
+      llm_provider: assistant.llm_provider || 'openai',
+      rag_prompt: assistant.rag_prompt || formData.rag_prompt,
+      tools: assistant.tools || [],
+      max_steps: assistant.max_steps || 4,
+      precise_citation: assistant.precise_citation ?? false
     })
     setShowForm(true)
     setShowAdvanced(false)
@@ -175,22 +175,22 @@ export default function ChatbotsPage() {
   const handleDelete = async (e, id) => {
     e.stopPropagation()
     try {
-      await chatbotsAPI.delete(id)
+      await assistantsAPI.delete(id)
       await loadData()
       setConfirmDelete(null)
     } catch (err) {
-      console.error('Error deleting chatbot:', err)
-      setError('Failed to delete chatbot. Please try again.')
+      console.error('Error deleting assistant:', err)
+      setError('Failed to delete assistant. Please try again.')
     }
   }
 
   const resetForm = () => {
     setShowForm(false)
-    setEditingChatbot(null)
+    setEditingAssistant(null)
     setShowAdvanced(false)
     setError(null)
     setFormData({
-      chatbot_name: '',
+      assistant_name: '',
       workflow: 'linear',
       collections: [],
       local_only: false,
@@ -262,8 +262,8 @@ export default function ChatbotsPage() {
                 <Bot className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Chatbots</h1>
-                <p className="text-sm text-slate-400">{chatbots.length} active assistant{chatbots.length !== 1 ? 's' : ''}</p>
+                <h1 className="text-2xl font-bold text-white">Assistants</h1>
+                <p className="text-sm text-slate-400">{assistants.length} active assistant{assistants.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
             
@@ -276,7 +276,7 @@ export default function ChatbotsPage() {
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <Plus className={`w-4 h-4 relative z-10 transition-transform duration-300 ${showForm ? 'rotate-45' : ''}`} />
-              <span className="relative z-10">{showForm ? 'Cancel' : 'New Chatbot'}</span>
+              <span className="relative z-10">{showForm ? 'Cancel' : 'New Assistant'}</span>
             </button>
           </div>
         </div>
@@ -301,7 +301,7 @@ export default function ChatbotsPage() {
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-5 h-5 text-blue-400" />
               <h2 className="text-xl font-semibold text-white">
-                {editingChatbot ? 'Edit Assistant' : 'Create New Assistant'}
+                {editingAssistant ? 'Edit Assistant' : 'Create New Assistant'}
               </h2>
             </div>
             
@@ -311,8 +311,8 @@ export default function ChatbotsPage() {
                   <label className="block text-sm font-medium text-slate-300">Name</label>
                   <input
                     type="text"
-                    value={formData.chatbot_name}
-                    onChange={(e) => setFormData({...formData, chatbot_name: e.target.value})}
+                    value={formData.assistant_name}
+                    onChange={(e) => setFormData({...formData, assistant_name: e.target.value})}
                     className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="e.g., Customer Support Bot"
                   />
@@ -672,11 +672,11 @@ export default function ChatbotsPage() {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleSubmit}
-                  disabled={saving || !formData.chatbot_name || (formData.workflow === 'linear' && formData.collections.length === 0)}
+                  disabled={saving || !formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0)}
                   className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saving ? 'Saving...' : (editingChatbot ? 'Update Assistant' : 'Create Assistant')}
+                  {saving ? 'Saving...' : (editingAssistant ? 'Update Assistant' : 'Create Assistant')}
                 </button>
                 <button
                   onClick={resetForm}
@@ -691,19 +691,19 @@ export default function ChatbotsPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {chatbots.length === 0 ? (
+          {assistants.length === 0 ? (
             <div className="col-span-full text-center py-16">
               <div className="inline-flex p-4 bg-slate-900/50 rounded-2xl mb-4">
                 <Bot className="w-12 h-12 text-slate-600" />
               </div>
-              <p className="text-slate-400 text-lg">No chatbots yet</p>
+              <p className="text-slate-400 text-lg">No assistants yet</p>
               <p className="text-slate-500 text-sm mt-2">Create your first assistant to get started</p>
             </div>
           ) : (
-            chatbots.map(chatbot => (
+            assistants.map(assistant => (
               <div
-                key={chatbot.id}
-                onClick={() => handleEdit(chatbot)}
+                key={assistant.id}
+                onClick={() => handleEdit(assistant)}
                 className="group relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -712,13 +712,13 @@ export default function ChatbotsPage() {
                       <Bot className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white text-lg group-hover:text-blue-400 transition-colors">{chatbot.name}</h3>
+                      <h3 className="font-semibold text-white text-lg group-hover:text-blue-400 transition-colors">{assistant.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                           <Zap className="w-3 h-3" />
-                          {chatbot.workflow}
+                          {assistant.workflow}
                         </span>
-                        {chatbot.local_only && (
+                        {assistant.local_only && (
                           <span className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
                             <Lock className="w-3 h-3" />
                             Local
@@ -734,49 +734,49 @@ export default function ChatbotsPage() {
                     <span className="text-slate-400">Model</span>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        chatbot.llm_provider === 'ollama' 
+                        assistant.llm_provider === 'ollama' 
                           ? 'bg-orange-500/20 text-orange-400' 
                           : 'bg-emerald-500/20 text-emerald-400'
                       }`}>
-                        {chatbot.llm_provider || 'openai'}
+                        {assistant.llm_provider || 'openai'}
                       </span>
-                      <span className="text-white font-medium">{chatbot.llm}</span>
+                      <span className="text-white font-medium">{assistant.llm}</span>
                     </div>
                   </div>
-                  {chatbot.collections && chatbot.collections.length > 0 && (
+                  {assistant.collections && assistant.collections.length > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-400">Sources</span>
-                      <span className="text-white font-medium">{chatbot.collections.length}</span>
+                      <span className="text-white font-medium">{assistant.collections.length}</span>
                     </div>
                   )}
-                  {chatbot.reranking && (
+                  {assistant.reranking && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-400">Reranker</span>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          chatbot.reranker_provider === 'huggingface' 
+                          assistant.reranker_provider === 'huggingface' 
                             ? 'bg-yellow-500/20 text-yellow-400' 
                             : 'bg-purple-500/20 text-purple-400'
                         }`}>
-                          {chatbot.reranker_provider || 'cohere'}
+                          {assistant.reranker_provider || 'cohere'}
                         </span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {chatbot.workflow === 'linear' && (
+                {assistant.workflow === 'linear' && (
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {chatbot.hybrid_search && (
+                    {assistant.hybrid_search && (
                       <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-lg">Hybrid</span>
                     )}
-                    {chatbot.hyde && (
+                    {assistant.hyde && (
                       <span className="px-2 py-1 bg-purple-500/10 text-purple-400 text-xs rounded-lg">HyDE</span>
                     )}
-                    {chatbot.reranking && (
+                    {assistant.reranking && (
                       <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-lg">Rerank</span>
                     )}
-                    {chatbot.precise_citation && (
+                    {assistant.precise_citation && (
                       <span className="px-2 py-1 bg-orange-500/10 text-orange-400 text-xs rounded-lg flex items-center gap-1">
                         <Target className="w-3 h-3" />
                         Precise
@@ -789,7 +789,7 @@ export default function ChatbotsPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleEdit(chatbot)
+                      handleEdit(assistant)
                     }}
                     className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all font-medium"
                   >
@@ -797,10 +797,10 @@ export default function ChatbotsPage() {
                     Edit
                   </button>
                   
-                  {confirmDelete === chatbot.id ? (
+                  {confirmDelete === assistant.id ? (
                     <>
                       <button
-                        onClick={(e) => handleDelete(e, chatbot.id)}
+                        onClick={(e) => handleDelete(e, assistant.id)}
                         className="flex-1 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all font-medium"
                       >
                         Confirm
@@ -819,7 +819,7 @@ export default function ChatbotsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        setConfirmDelete(chatbot.id)
+                        setConfirmDelete(assistant.id)
                       }}
                       className="flex-1 flex items-center justify-center gap-2 py-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-medium"
                     >
