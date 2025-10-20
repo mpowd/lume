@@ -16,8 +16,8 @@ class QAAssistantConfig(AssistantConfig):
 
     type: str = "qa"
     knowledge_base_ids: List[str]
-    llm_model: str = "gpt-4o-mini"
-    llm_provider: str = "openai"  # openai or ollama
+    llm_model: str
+    llm_provider: str  # openai or ollama
 
     # Retrieval settings
     hybrid_search: bool = True
@@ -27,8 +27,8 @@ class QAAssistantConfig(AssistantConfig):
 
     # Reranking settings
     reranking: bool = False
-    reranker_provider: Optional[str] = "cohere"  # cohere or huggingface
-    reranker_model: Optional[str] = "rerank-v3.5"
+    reranker_provider: Optional[str]  # cohere or huggingface
+    reranker_model: Optional[str]
     top_n: Optional[int] = None
 
     # Generation settings
