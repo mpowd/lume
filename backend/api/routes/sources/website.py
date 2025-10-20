@@ -207,7 +207,7 @@ async def upload_documents_stream(
                     try:
                         logger.info(f"Crawling {idx + 1}/{len(url_list)}: {url}")
 
-                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Crawling page {idx + 1} of {len(url_list)}', 'current': idx, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'current_url': url})}\n\n"
+                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Scraping page {idx + 1} of {len(url_list)}', 'current': idx, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'current_url': url})}\n\n"
 
                         result = await crawler.arun(url, config=crawler_config)
 

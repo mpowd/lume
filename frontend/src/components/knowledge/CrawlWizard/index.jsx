@@ -45,11 +45,11 @@ export default function CrawlWizard({
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-right-4 duration-500">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Website Crawler</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">Website Scraper</h1>
         <p className="text-slate-400">
           {step === 1 && 'Enter a URL to discover links'}
           {step === 2 && 'Analyzing website structure'}
-          {step === 3 && 'Choose which pages to add'}
+          {step === 3 && 'Choose which pages to scrape'}
         </p>
       </div>
 

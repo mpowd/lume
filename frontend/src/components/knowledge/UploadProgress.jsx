@@ -6,7 +6,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
   if (!isOpen || !progress) return null
 
   // Determine which stage we're in
-  const isCrawling = progress.status === 'crawling'
+  const isScraping = progress.status === 'crawling' || progress.status === 'scraping'
   const isChunking = progress.status === 'chunking'
   const isEmbedding = progress.status === 'embedding'
   const isComplete = progress.status === 'complete'
@@ -63,7 +63,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
             <h2 className="text-2xl font-bold text-white mb-2">
               {isComplete ? 'Upload Complete!' :
                isError ? 'Upload Failed' :
-               isCrawling ? 'Crawling Websites' :
+               isScraping ? 'Scraping Websites' :
                isChunking ? 'Chunking Documents' :
                isEmbedding ? 'Creating Embeddings' :
                'Processing Documents'}
@@ -74,21 +74,21 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
           {/* Two-Stage Progress */}
           {!isError && (
             <div className="space-y-6 mb-6">
-              {/* Stage 1: Crawling & Markdown Generation */}
+              {/* Stage 1: Scraping & Chunking */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className={`w-5 h-5 ${
-                      isCrawling || isChunking ? 'text-blue-400 animate-pulse' : 
+                      isScraping || isChunking ? 'text-blue-400 animate-pulse' : 
                       isEmbedding || isComplete ? 'text-green-400' : 
                       'text-slate-500'
                     }`} />
                     <span className={`font-medium ${
-                      isCrawling || isChunking ? 'text-white' : 
+                      isScraping || isChunking ? 'text-white' : 
                       isEmbedding || isComplete ? 'text-green-400' : 
                       'text-slate-500'
                     }`}>
-                      Stage 1: Crawling & Chunking
+                      Stage 1: Scraping & Chunking
                     </span>
                   </div>
                   <span className="text-sm text-slate-400">
@@ -100,11 +100,11 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                   current={progress.current || 0}
                   total={progress.total || 0}
                   showPercentage
-                  className={isCrawling || isChunking ? 'progress-shimmer' : ''}
+                  className={isScraping || isChunking ? 'progress-shimmer' : ''}
                   color={isEmbedding || isComplete ? 'green' : 'blue'}
                 />
 
-                {progress.current_url && (isCrawling || isChunking) && (
+                {progress.current_url && (isScraping || isChunking) && (
                   <div className="p-3 bg-slate-800/50 rounded-lg">
                     <div className="text-xs text-slate-500 mb-1">Currently processing:</div>
                     <div className="text-sm text-slate-300 font-mono truncate">{progress.current_url}</div>
@@ -154,7 +154,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                       </div>
                     )}
                   </>
-                ) : (isCrawling || isChunking) ? (
+                ) : (isScraping || isChunking) ? (
                   <div className="h-3 bg-slate-800/50 rounded-full relative overflow-hidden">
                     <div className="h-full w-0 bg-slate-700 rounded-full" />
                   </div>
@@ -168,7 +168,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
             <div className="grid grid-cols-3 gap-4 mb-6">
               <StatDisplay 
                 value={progress.processed?.length || progress.total_processed || 0} 
-                label="Pages Crawled" 
+                label="Pages Scraped" 
                 variant="success" 
               />
               <StatDisplay 
