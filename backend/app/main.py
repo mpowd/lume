@@ -19,6 +19,14 @@ from backend.api.routes import (
 )
 from backend.api.routes.sources import website
 
+from phoenix.otel import register
+
+# configure the Phoenix tracer
+tracer_provider = register(
+    project_name="lume",
+    auto_instrument=True,  # Auto-instrument your app based on installed OI dependencies
+)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

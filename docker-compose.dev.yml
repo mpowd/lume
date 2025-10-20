@@ -52,6 +52,15 @@ services:
     networks:
       - app_network
 
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./data/phoenix:/root/.phoenix
+    networks:
+      - app_network
+
 networks:
   app_network:
     driver: bridge
