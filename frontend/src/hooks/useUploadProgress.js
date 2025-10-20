@@ -42,8 +42,7 @@ export const useUploadProgress = () => {
           })
           eventSource.close()
           
-          // DON'T auto-close anymore - let user click Done button
-          if (onComplete) onComplete()
+          // Don't call onComplete here - let user click Done button first
         } else if (data.status === 'error') {
           setUploadProgress({
             status: 'error',
@@ -105,9 +104,11 @@ export const useUploadProgress = () => {
     }
   }
 
-  const closeProgress = () => {
+  const closeProgress = (onComplete) => {
     setIsUploading(false)
     setUploadProgress(null)
+    // Call onComplete when user manually closes
+    if (onComplete) onComplete()
   }
 
   const reset = () => {

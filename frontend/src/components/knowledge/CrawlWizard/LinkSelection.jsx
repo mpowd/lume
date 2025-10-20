@@ -18,7 +18,7 @@ export default function LinkSelection({
   onComplete 
 }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const { uploadProgress, isUploading, startUpload } = useUploadProgress()
+  const { uploadProgress, isUploading, startUpload, closeProgress } = useUploadProgress()
 
   const filteredUrls = discoveredUrls.filter(item => {
     if (!searchQuery) return true
@@ -32,7 +32,13 @@ export default function LinkSelection({
 
   const handleUpload = () => {
     const urlsToUpload = Object.keys(selectedUrls).filter(url => selectedUrls[url])
+    // Pass onComplete to startUpload but it won't be called automatically
     startUpload(collectionName, urlsToUpload, onComplete)
+  }
+
+  const handleClose = () => {
+    // Call closeProgress with onComplete callback
+    closeProgress(onComplete)
   }
 
   return (
@@ -203,7 +209,8 @@ export default function LinkSelection({
 
       <UploadProgress 
         isOpen={isUploading} 
-        progress={uploadProgress} 
+        progress={uploadProgress}
+        onClose={handleClose}
       />
     </>
   )
