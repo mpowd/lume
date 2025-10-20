@@ -16,7 +16,9 @@ export const useUploadProgress = () => {
       current: 0,
       total: urls.length,
       processed: [],
-      failed: []
+      failed: [],
+      total_chunks: 0,
+      embedded_chunks: 0
     })
 
     try {
@@ -35,14 +37,13 @@ export const useUploadProgress = () => {
             total: data.total_processed,
             processed: data.processed_urls,
             failed: data.failed_urls,
-            total_chunks: data.total_chunks
+            total_chunks: data.total_chunks || 0,
+            embedded_chunks: data.total_chunks || 0
           })
           eventSource.close()
           
-          setTimeout(() => {
-            setIsUploading(false)
-            if (onComplete) onComplete()
-          }, 3000)
+          // DON'T auto-close anymore - let user click Done button
+          if (onComplete) onComplete()
         } else if (data.status === 'error') {
           setUploadProgress({
             status: 'error',
@@ -50,10 +51,13 @@ export const useUploadProgress = () => {
             current: data.current || 0,
             total: urls.length,
             processed: data.processed || [],
-            failed: data.failed || []
+            failed: data.failed || [],
+            total_chunks: data.total_chunks || 0,
+            embedded_chunks: data.embedded_chunks || 0
           })
           eventSource.close()
         } else {
+          // Update progress with all fields including embedding progress
           setUploadProgress({
             status: data.status,
             message: data.message,
@@ -61,7 +65,9 @@ export const useUploadProgress = () => {
             total: data.total,
             processed: data.processed || [],
             failed: data.failed || [],
-            current_url: data.current_url
+            current_url: data.current_url,
+            total_chunks: data.total_chunks || 0,
+            embedded_chunks: data.embedded_chunks || 0
           })
         }
       }
@@ -75,12 +81,10 @@ export const useUploadProgress = () => {
           current: 0,
           total: urls.length,
           processed: [],
-          failed: []
+          failed: [],
+          total_chunks: 0,
+          embedded_chunks: 0
         })
-        
-        setTimeout(() => {
-          setIsUploading(false)
-        }, 3000)
       }
 
       return { success: true }
@@ -92,15 +96,18 @@ export const useUploadProgress = () => {
         current: 0,
         total: urls.length,
         processed: [],
-        failed: []
+        failed: [],
+        total_chunks: 0,
+        embedded_chunks: 0
       })
-      
-      setTimeout(() => {
-        setIsUploading(false)
-      }, 3000)
       
       return { success: false, error: error.message }
     }
+  }
+
+  const closeProgress = () => {
+    setIsUploading(false)
+    setUploadProgress(null)
   }
 
   const reset = () => {
@@ -112,6 +119,7 @@ export const useUploadProgress = () => {
     uploadProgress,
     isUploading,
     startUpload,
+    closeProgress,
     reset
   }
 }

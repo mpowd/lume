@@ -2,7 +2,7 @@ import { CheckCircle2, AlertCircle, Loader2, FileText, Sparkles } from 'lucide-r
 import ProgressBar from '../shared/ProgressBar'
 import StatDisplay from '../shared/StatDisplay'
 
-export default function UploadProgress({ isOpen, progress }) {
+export default function UploadProgress({ isOpen, progress, onClose }) {
   if (!isOpen || !progress) return null
 
   // Determine which stage we're in
@@ -12,14 +12,9 @@ export default function UploadProgress({ isOpen, progress }) {
   const isComplete = progress.status === 'complete'
   const isError = progress.status === 'error'
 
-  // Calculate progress percentages
-  const crawlingProgress = progress.total > 0 
-    ? Math.round((progress.current / progress.total) * 100) 
-    : 0
-
-  const embeddingProgress = progress.total_chunks > 0 && progress.embedded_chunks
-    ? Math.round((progress.embedded_chunks / progress.total_chunks) * 100)
-    : 0
+  // Safe number extraction
+  const totalChunks = progress.total_chunks ?? 0
+  const embeddedChunks = progress.embedded_chunks ?? 0
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-6 animate-in fade-in duration-200">
@@ -134,19 +129,19 @@ export default function UploadProgress({ isOpen, progress }) {
                       Stage 2: Creating Embeddings
                     </span>
                   </div>
-                  {(isEmbedding || isComplete) && (
+                  {(isEmbedding || isComplete) && totalChunks > 0 && (
                     <span className="text-sm text-slate-400">
-                      {progress.embedded_chunks || progress.total_chunks || 0} / {progress.total_chunks || 0} chunks
+                      {embeddedChunks} / {totalChunks} chunks
                     </span>
                   )}
                 </div>
                 
-                {(isEmbedding || isComplete) ? (
+                {(isEmbedding || isComplete) && totalChunks > 0 ? (
                   <>
                     <ProgressBar
-                      current={progress.embedded_chunks || progress.total_chunks || 0}
-                      total={progress.total_chunks || 1}
-                      showPercentage
+                      current={embeddedChunks}
+                      total={totalChunks}
+                      showPercentage={true}
                       className={isEmbedding ? 'progress-shimmer' : ''}
                       color={isComplete ? 'green' : 'purple'}
                     />
@@ -159,11 +154,11 @@ export default function UploadProgress({ isOpen, progress }) {
                       </div>
                     )}
                   </>
-                ) : (
-                  <div className="h-2 bg-slate-800/50 rounded-full">
+                ) : (isCrawling || isChunking) ? (
+                  <div className="h-3 bg-slate-800/50 rounded-full relative overflow-hidden">
                     <div className="h-full w-0 bg-slate-700 rounded-full" />
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           )}
@@ -177,7 +172,7 @@ export default function UploadProgress({ isOpen, progress }) {
                 variant="success" 
               />
               <StatDisplay 
-                value={progress.total_chunks || 0} 
+                value={totalChunks} 
                 label="Chunks Created" 
                 variant="info" 
               />
@@ -204,6 +199,16 @@ export default function UploadProgress({ isOpen, progress }) {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Done Button - Only show when complete or error */}
+          {(isComplete || isError) && onClose && (
+            <button
+              onClick={onClose}
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+            >
+              {isComplete ? 'Done' : 'Close'}
+            </button>
           )}
         </div>
       </div>
