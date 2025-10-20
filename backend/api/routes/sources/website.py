@@ -200,7 +200,7 @@ async def upload_documents_stream(
             processed_urls = []
 
             # STAGE 1: Crawl all URLs
-            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Crawling websites...', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
+            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Scrape websites...', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
 
             async with AsyncWebCrawler() as crawler:
                 for idx, url in enumerate(url_list):
