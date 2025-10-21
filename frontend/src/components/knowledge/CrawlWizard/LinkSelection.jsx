@@ -32,12 +32,10 @@ export default function LinkSelection({
 
   const handleUpload = () => {
     const urlsToUpload = Object.keys(selectedUrls).filter(url => selectedUrls[url])
-    // Pass onComplete to startUpload but it won't be called automatically
     startUpload(collectionName, urlsToUpload, onComplete)
   }
 
   const handleClose = () => {
-    // Call closeProgress with onComplete callback
     closeProgress(onComplete)
   }
 
@@ -124,14 +122,7 @@ export default function LinkSelection({
                         }`}>
                           {item.title || 'Untitled Page'}
                         </h4>
-                        {item.score !== undefined && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg flex-shrink-0">
-                            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                            <span className="text-xs font-semibold text-purple-300">
-                              {(item.score * 100).toFixed(0)}%
-                            </span>
-                          </div>
-                        )}
+                        {/* Score display removed */}
                       </div>
 
                       <a
@@ -200,7 +191,7 @@ export default function LinkSelection({
             <div>
               <h4 className="text-sm font-semibold text-white mb-1">Smart Link Discovery</h4>
               <p className="text-sm text-slate-400 leading-relaxed">
-                Links are automatically scored based on relevance and quality. Click any link to preview it in your browser before adding to your knowledge base.
+                Links are automatically discovered and organized. Click any link to preview it in your browser before adding to your knowledge base.
               </p>
             </div>
           </div>
