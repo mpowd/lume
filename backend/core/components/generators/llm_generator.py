@@ -119,6 +119,7 @@ Instructions:
 2. Track which chunk numbers you actually used
 3. Only include chunk indices you directly referenced
 4. If you didn't use a chunk, don't include its index
+5. Do not include the used chunks in the answer directly
 
 {format_instructions}
 
