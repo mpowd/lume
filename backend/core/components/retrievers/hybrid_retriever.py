@@ -131,8 +131,8 @@ class HybridRetriever:
         # Get base retriever
         retriever = self._get_base_retriever(
             collection_name=collection_name,
-            hybrid_search=config.get("hybrid_search", True),
-            top_k=config.get("top_k", 10),
+            hybrid_search=config.get("hybrid_search"),
+            top_k=config.get("top_k"),
         )
 
         # Apply HyDE if enabled
@@ -167,11 +167,11 @@ class HybridRetriever:
                 top_n,
             )
             logger.info(f"Applied reranking with top_n={top_n}")
-        else:
-            # Apply long context reorder only if not reranking
-            retriever = retriever | RunnableLambda(
-                LongContextReorder().transform_documents
-            )
+        # else:
+        #     # Apply long context reorder only if not reranking
+        #     retriever = retriever | RunnableLambda(
+        #         LongContextReorder().transform_documents
+        #     )
 
         # Execute retrieval
         documents = retriever.invoke(query_to_use)
