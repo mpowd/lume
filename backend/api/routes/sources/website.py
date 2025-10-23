@@ -237,7 +237,7 @@ async def upload_documents_stream(
                             crawled_documents.append(
                                 {
                                     "url": url,
-                                    "markdown": result.markdown.raw_markdown,
+                                    "markdown": result.markdown.fit_markdown,
                                     "title": doc["title"],
                                 }
                             )
