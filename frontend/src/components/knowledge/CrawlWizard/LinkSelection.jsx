@@ -42,6 +42,11 @@ export default function LinkSelection({
   return (
     <>
       <div className="space-y-6">
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-white mb-3">Review Discovered Links</h2>
+          <p className="text-slate-400">Select which pages to add to your knowledge base</p>
+        </div>
+
         <Card className="p-6 backdrop-blur-xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-6">
@@ -122,7 +127,6 @@ export default function LinkSelection({
                         }`}>
                           {item.title || 'Untitled Page'}
                         </h4>
-                        {/* Score display removed */}
                       </div>
 
                       <a
@@ -179,7 +183,7 @@ export default function LinkSelection({
             fullWidth
             size="lg"
           >
-            Add {getSelectedCount()} Links
+            Add {getSelectedCount()} Link{getSelectedCount() !== 1 ? 's' : ''}
           </Button>
         </div>
 

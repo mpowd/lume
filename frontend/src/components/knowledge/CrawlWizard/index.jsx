@@ -1,21 +1,14 @@
 import { useState } from 'react'
 import { useWebCrawl } from '../../../hooks/useWebCrawl'
-import Wizard from '../../shared/Wizard'
 import CrawlSettings from './CrawlSettings'
 import LinkDiscovery from './LinkDiscovery'
 import LinkSelection from './LinkSelection'
+import ManualUrlEntry from './ManualUrlEntry'
+import Button from '../../shared/Button'
+import { ChevronLeft } from 'lucide-react'
 
-export default function CrawlWizard({ 
-  collectionName, 
-  onBack, 
-  onComplete 
-}) {
-  const [step, setStep] = useState(1)
-  const [crawlSettings, setCrawlSettings] = useState({
-    base_url: '',
-    include_external: false
-  })
-
+export default function CrawlWizard({ collectionName, onBack, onComplete }) {
+  const [step, setStep] = useState('settings') // 'settings', 'discovering', 'selection', 'manual'
   const {
     discoveredUrls,
     selectedUrls,
@@ -24,59 +17,84 @@ export default function CrawlWizard({
     crawl,
     toggleUrlSelection,
     selectAll,
-    getSelectedCount
+    getSelectedCount,
+    reset
   } = useWebCrawl()
 
-  const handleStartCrawl = async () => {
-    setStep(2)
-    const result = await crawl(crawlSettings.base_url, crawlSettings.include_external)
+  const handleDiscover = async (baseUrl, includeExternal) => {
+    setStep('discovering')
+    const result = await crawl(baseUrl, includeExternal)
+    
     if (result.success) {
-      setStep(3)
+      setStep('selection')
     } else {
-      setStep(1)
+      setStep('settings')
     }
   }
 
+  const handleManualEntry = () => {
+    setStep('manual')
+  }
+
   const handleReset = () => {
-    setStep(1)
-    setCrawlSettings({ base_url: '', include_external: false })
+    reset()
+    setStep('settings')
+  }
+
+  const handleBackFromManual = () => {
+    setStep('settings')
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button variant="secondary" onClick={handleReset}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="w-full max-w-5xl animate-in fade-in slide-in-from-right-4 duration-500">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Website Scraper</h1>
-        <p className="text-slate-400">
-          {step === 1 && 'Enter a URL to discover links'}
-          {step === 2 && 'Analyzing website structure'}
-          {step === 3 && 'Choose which pages to scrape'}
-        </p>
-      </div>
+    <div className="w-full">
+      {step !== 'settings' && step !== 'manual' && (
+        <Button variant="ghost" onClick={onBack} icon={ChevronLeft} className="mb-8">
+          Back to sources
+        </Button>
+      )}
 
-      <Wizard currentStep={step} totalSteps={3} className="mb-8" />
-
-      {step === 1 && (
-        <CrawlSettings
-          settings={crawlSettings}
-          onChange={setCrawlSettings}
-          onStart={handleStartCrawl}
-          onBack={onBack}
+      {step === 'settings' && (
+        <CrawlSettings 
+          onDiscover={handleDiscover}
+          onManualEntry={handleManualEntry}
+          loading={crawling}
         />
       )}
 
-      {step === 2 && (
-        <LinkDiscovery />
+      {step === 'discovering' && <LinkDiscovery />}
+
+      {step === 'selection' && (
+        <div className="max-w-6xl mx-auto">
+          <LinkSelection
+            collectionName={collectionName}
+            discoveredUrls={discoveredUrls}
+            selectedUrls={selectedUrls}
+            onToggle={toggleUrlSelection}
+            onSelectAll={selectAll}
+            getSelectedCount={getSelectedCount}
+            onReset={handleReset}
+            onComplete={onComplete}
+          />
+        </div>
       )}
 
-      {step === 3 && (
-        <LinkSelection
+      {step === 'manual' && (
+        <ManualUrlEntry
           collectionName={collectionName}
-          discoveredUrls={discoveredUrls}
-          selectedUrls={selectedUrls}
-          onToggle={toggleUrlSelection}
-          onSelectAll={selectAll}
-          getSelectedCount={getSelectedCount}
-          onReset={handleReset}
+          onBack={handleBackFromManual}
           onComplete={onComplete}
         />
       )}
