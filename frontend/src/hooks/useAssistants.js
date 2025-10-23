@@ -10,16 +10,21 @@ export const useAssistants = () => {
     setLoading(true)
     setError(null)
     try {
-      // Changed: Remove the is_active filter or set to null to get all assistants
+      // Get all QA assistants (don't filter by is_active to get all)
       const data = await assistantsAPI.getAll('qa', null)
       
-      console.log('Loaded assistants:', data) // Debug log
+      console.log('Loaded assistants from API:', data) // Debug log
       
       // Map from assistant format to component format
-      // Use values as-is from backend, which should provide all defaults
+      // IMPORTANT: Preserve original fields needed by EvaluationRunner
       const mappedAssistants = data.map(assistant => ({
+        // Use BOTH id and _id for compatibility
         id: assistant.id,
+        _id: assistant.id, // Add _id field for EvaluationRunner
         name: assistant.name,
+        description: assistant.description || '',
+        type: assistant.type || 'qa', // Preserve type field
+        is_active: assistant.is_active !== false, // Default to true if not specified
         workflow: 'linear',
         llm: assistant.config?.llm_model || null,
         llm_provider: assistant.config?.llm_provider || null,
@@ -37,10 +42,15 @@ export const useAssistants = () => {
         tools: assistant.config?.tools || [],
         max_steps: assistant.config?.max_steps,
         precise_citation: assistant.config?.precise_citation,
-        created_at: assistant.created_at
+        created_at: assistant.created_at,
+        created_by: assistant.created_by || 'user'
       }))
       
       console.log('Mapped assistants:', mappedAssistants) // Debug log
+      console.log('Assistants for evaluation (type=qa, is_active=true):', 
+        mappedAssistants.filter(a => a.type === 'qa' && a.is_active)
+      ) // Debug log
+      
       setAssistants(mappedAssistants)
     } catch (err) {
       console.error('Error loading assistants:', err)
@@ -58,6 +68,7 @@ export const useAssistants = () => {
         name: formData.assistant_name,
         description: formData.description || '',
         type: 'qa',
+        is_active: true, // Set active by default when creating
         config: {
           type: 'qa',
           name: formData.assistant_name,
@@ -116,6 +127,8 @@ export const useAssistants = () => {
       const updateData = {
         name: formData.assistant_name,
         description: '',
+        type: 'qa',
+        is_active: true, // Keep active when updating
         config: {
           type: 'qa',
           name: formData.assistant_name,

@@ -477,7 +477,18 @@ export const evaluationAPI = {
     }
   },
 
-  evaluateAssistant: async (datasetName, assistantId, questions, groundTruths, answers, contexts) => {
+  /**
+   * Evaluate assistant with selected evaluation LLM
+   * @param {string} datasetName - Dataset name
+   * @param {string} assistantId - Assistant ID
+   * @param {string[]} questions - Questions array
+   * @param {string[]} groundTruths - Ground truth answers
+   * @param {string[]} answers - Assistant answers
+   * @param {string[][]} contexts - Retrieved contexts
+   * @param {string} evalLLMModel - Evaluation LLM model (e.g., 'gpt-4o-mini')
+   * @param {string} evalLLMProvider - Evaluation LLM provider (e.g., 'openai', 'ollama')
+   */
+  evaluateAssistant: async (datasetName, assistantId, questions, groundTruths, answers, contexts, evalLLMModel, evalLLMProvider) => {
     try {
       const response = await api.post('/evaluation/evaluate-assistant', {
         dataset_name: datasetName,
@@ -485,7 +496,9 @@ export const evaluationAPI = {
         questions: questions,
         ground_truths: groundTruths,
         answers: answers,
-        retrieved_contexts: contexts
+        retrieved_contexts: contexts,
+        eval_llm_model: evalLLMModel,
+        eval_llm_provider: evalLLMProvider
       })
       return response.data
     } catch (error) {
@@ -505,4 +518,16 @@ export const evaluationAPI = {
   }
 }
 
+
+getEvaluationsByDataset: async (datasetName) => {
+  try {
+    const response = await api.get(`/evaluation/datasets/${datasetName}/evaluations`)
+    return response.data
+  } catch (error) {
+    console.error('Get Evaluations By Dataset Error:', error)
+    throw error
+  }
+}
+
 export default api
+

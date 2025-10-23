@@ -710,3 +710,163 @@ async def get_evaluation_by_id(evaluation_id: str):
         raise HTTPException(
             status_code=500, detail=f"Error retrieving evaluation: {str(e)}"
         )
+
+
+# In your backend evaluation router file
+
+
+class EvaluateAssistantRequest(BaseModel):
+    dataset_name: str
+    assistant_id: str
+    questions: List[str]
+    ground_truths: List[str]
+    answers: List[str]
+    retrieved_contexts: List[List[str]]
+    eval_llm_model: str
+    eval_llm_provider: str
+
+
+@router.post("/evaluate-assistant")
+async def evaluate_assistant(request: EvaluateAssistantRequest):
+    """
+    Evaluate an assistant's performance using RAGAS metrics
+    """
+    try:
+        # Import RAGAS here
+        from ragas import evaluate
+        from ragas.metrics import (
+            answer_relevancy,
+            faithfulness,
+            context_recall,
+            context_precision,
+        )
+        from datasets import Dataset
+
+        # Initialize evaluation LLM based on provider
+        if request.eval_llm_provider == "openai":
+            eval_llm = ChatOpenAI(model=request.eval_llm_model)
+        elif request.eval_llm_provider == "ollama":
+            eval_llm = ChatOllama(model=request.eval_llm_model)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported LLM provider: {request.eval_llm_provider}",
+            )
+
+        # Prepare data for RAGAS
+        data = {
+            "question": request.questions,
+            "answer": request.answers,
+            "contexts": request.retrieved_contexts,
+            "ground_truth": request.ground_truths,
+        }
+
+        dataset = Dataset.from_dict(data)
+
+        # Run evaluation
+        result = evaluate(
+            dataset,
+            metrics=[answer_relevancy, faithfulness, context_recall, context_precision],
+            llm=eval_llm,
+        )
+
+        # OLD CODE (doesn't work):
+        # metrics = result.to_dict()
+
+        # NEW CODE (works):
+        # Convert result to pandas DataFrame, then to dict
+        result_df = result.to_pandas()
+        metrics = result_df.to_dict("records")[0] if len(result_df) > 0 else {}
+
+        # Also get overall scores
+        overall_scores = {
+            metric: (
+                float(result_df[metric].mean()) if metric in result_df.columns else None
+            )
+            for metric in [
+                "answer_relevancy",
+                "faithfulness",
+                "context_recall",
+                "context_precision",
+            ]
+        }
+
+        # Store evaluation result in MongoDB
+        evaluation_result = {
+            "dataset_name": request.dataset_name,
+            "assistant_id": request.assistant_id,
+            "eval_llm_model": request.eval_llm_model,
+            "eval_llm_provider": request.eval_llm_provider,
+            "metrics": overall_scores,  # Store the averaged metrics
+            "detailed_results": result_df.to_dict(
+                "records"
+            ),  # Store per-question results
+            "created_at": datetime.now(timezone.utc),
+        }
+
+        # Save to MongoDB - use the same pattern as the existing chatbot evaluation
+        mongodb_client = MongoDBClient.get_instance()
+        inserted_id = mongodb_client.persist_docs(
+            docs=[evaluation_result], collection_name="evaluations"
+        )
+
+        evaluation_result["_id"] = (
+            str(inserted_id[0]) if isinstance(inserted_id, list) else str(inserted_id)
+        )
+
+        return {
+            "success": True,
+            "evaluation_id": evaluation_result["_id"],
+            "metrics": overall_scores,
+            "detailed_results": result_df.to_dict("records"),
+        }
+
+    except Exception as e:
+        logging.error(f"Evaluation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Add this to your evaluation router (after the existing endpoints)
+
+
+@router.get("/datasets/{dataset_name}/evaluations")
+async def get_evaluations_by_dataset(dataset_name: str):
+    """
+    Get all evaluations for a specific dataset.
+    """
+    try:
+        mongodb_client = MongoDBClient.get_instance()
+        evaluations = list(
+            mongodb_client.get_collection("evaluations").find(
+                {"dataset_name": dataset_name}
+            )
+        )
+
+        for eval in evaluations:
+            eval["_id"] = str(eval["_id"])
+
+            # Handle NaN and Inf values in metrics
+            if "metrics" in eval:
+                for key, value in eval["metrics"].items():
+                    if isinstance(value, float) and (
+                        math.isnan(value) or math.isinf(value)
+                    ):
+                        eval["metrics"][key] = None
+
+            # Handle NaN and Inf in detailed results
+            if "detailed_results" in eval:
+                for detail in eval["detailed_results"]:
+                    for key, value in list(detail.items()):
+                        if isinstance(value, float) and (
+                            math.isnan(value) or math.isinf(value)
+                        ):
+                            detail[key] = None
+
+        return {"status": "success", "evaluations": evaluations}
+    except Exception as e:
+        logger.error(
+            f"Error retrieving evaluations for dataset {dataset_name}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving evaluations: {str(e)}"
+        )
