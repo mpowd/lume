@@ -39,9 +39,10 @@ export const useAssistants = () => {
         reranker_model: assistant.config?.reranker_model,
         top_n: assistant.config?.top_n,
         rag_prompt: assistant.config?.rag_prompt,
+        precise_citation: assistant.config?.precise_citation,
+        precise_citation_prompt: assistant.config?.precise_citation_prompt, // ← ADDED
         tools: assistant.config?.tools || [],
         max_steps: assistant.config?.max_steps,
-        precise_citation: assistant.config?.precise_citation,
         created_at: assistant.created_at,
         created_by: assistant.created_by || 'user'
       }))
@@ -87,6 +88,7 @@ export const useAssistants = () => {
           top_n: formData.top_n,
           rag_prompt: formData.rag_prompt,
           precise_citation: formData.precise_citation,
+          precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
           local_only: formData.local_only,
           tools: formData.tools || [],
           max_steps: formData.max_steps
@@ -147,12 +149,14 @@ export const useAssistants = () => {
           top_n: formData.top_n,
           rag_prompt: formData.rag_prompt,
           precise_citation: formData.precise_citation,
+          precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
           local_only: formData.local_only,
           tools: formData.tools || [],
           max_steps: formData.max_steps
         }
       }
       
+      console.log('Updating assistant with data:', updateData) // Debug log
       await assistantsAPI.update(id, updateData)
       await loadAssistants()
       return { success: true }

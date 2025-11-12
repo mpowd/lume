@@ -3,12 +3,38 @@ import { Sparkles, Database, Check, Lock } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
 import { ollamaAPI } from '../../services/api'
 import FormInput from '../shared/FormInput'
-import FormTextarea from '../shared/FormTextarea'
 import Button from '../shared/Button'
 import Card from '../shared/Card'
 import ModelSelector from './ModelSelector'
 import AdvancedSettings from './AdvancedSettings'
 import { formatModelSize } from '../../utils/formatters'
+
+const DEFAULT_RAG_PROMPT = `Answer the question using only the context provided.
+
+Retrieved Context: {context}
+
+User Question: {question}
+
+Answer conversationally. User is not aware of context.`
+
+const DEFAULT_PRECISE_CITATION_PROMPT = `You are answering a question using provided context chunks.
+Each chunk is numbered starting from 0. Track which chunks you use.
+
+Retrieved Context Chunks:
+{context_with_indices}
+
+User Question: {question}
+
+Instructions:
+1. Answer using ONLY information from the chunks above
+2. Track which chunk numbers you actually used
+3. Only include chunk indices you directly referenced
+4. If you didn't use a chunk, don't include its index
+5. Do not include the used chunks in the answer directly
+
+{format_instructions}
+
+Be precise with chunk indices!`
 
 export default function AssistantForm({ 
   assistant, 
@@ -36,7 +62,8 @@ export default function AssistantForm({
     top_n: 5,
     llm: 'gpt-4o-mini',
     llm_provider: 'openai',
-    rag_prompt: 'Answer the question using only the context\n\nRetrieved Context: {context}\n\nUser Question: {question}\nAnswer the user conversationally. User is not aware of context.',
+    rag_prompt: DEFAULT_RAG_PROMPT,
+    precise_citation_prompt: DEFAULT_PRECISE_CITATION_PROMPT,
     tools: [],
     max_steps: 4,
     precise_citation: false
@@ -63,7 +90,8 @@ export default function AssistantForm({
         top_n: assistant.top_n || 5,
         llm: assistant.llm || 'gpt-4o-mini',
         llm_provider: assistant.llm_provider || 'openai',
-        rag_prompt: assistant.rag_prompt || formData.rag_prompt,
+        rag_prompt: assistant.rag_prompt || DEFAULT_RAG_PROMPT,
+        precise_citation_prompt: assistant.precise_citation_prompt || DEFAULT_PRECISE_CITATION_PROMPT,
         tools: assistant.tools || [],
         max_steps: assistant.max_steps || 4,
         precise_citation: assistant.precise_citation ?? false
@@ -234,6 +262,8 @@ export default function AssistantForm({
               setFormData={setFormData}
               showAdvanced={showAdvanced}
               setShowAdvanced={setShowAdvanced}
+              defaultRagPrompt={DEFAULT_RAG_PROMPT}
+              defaultPreciseCitationPrompt={DEFAULT_PRECISE_CITATION_PROMPT}
             />
           </>
         )}

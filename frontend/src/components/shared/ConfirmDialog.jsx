@@ -39,7 +39,7 @@ export default function ConfirmDialog({
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 transition-colors"
+            className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -65,7 +65,7 @@ export default function ConfirmDialog({
             <div className="flex gap-3 mt-6">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-600 bg-slate-700/50 text-slate-200 font-medium hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-600 bg-slate-700/50 text-slate-200 font-medium hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 cursor-pointer"
               >
                 {cancelText}
               </button>
@@ -74,7 +74,7 @@ export default function ConfirmDialog({
                   onConfirm()
                   onClose()
                 }}
-                className={`flex-1 px-4 py-2.5 rounded-lg text-white font-medium transition-colors focus:outline-none focus:ring-2 ${styles.button}`}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-white font-medium transition-colors focus:outline-none focus:ring-2 ${styles.button} cursor-pointer`}
               >
                 {confirmText}
               </button>

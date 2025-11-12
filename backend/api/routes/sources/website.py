@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import logging
 from datetime import datetime
 from uuid import uuid4
@@ -21,10 +21,17 @@ async def get_links(
     include_external_domains: bool = Query(
         False, description="Include external domains"
     ),
+    collection_name: Optional[str] = Query(
+        None, description="Collection name to check for existing URLs"
+    ),
 ):
-    """Get links from a website"""
+    """
+    Get links from a website and mark which ones already exist in the collection.
+
+    Returns links with an 'exists_in_collection' flag for URLs that are already in MongoDB.
+    """
     logger.info(
-        f"Get links request: {base_url}, include_external={include_external_domains}"
+        f"Get links request: {base_url}, collection={collection_name}, include_external={include_external_domains}"
     )
 
     from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LinkPreviewConfig
@@ -42,6 +49,7 @@ async def get_links(
         score_links=True,
         only_text=True,
         verbose=True,
+        check_robots_txt=True,
     )
 
     try:
@@ -56,9 +64,38 @@ async def get_links(
 
                 all_links = internal_links + external_links
 
+                # Get existing URLs from MongoDB if collection_name is provided
+                existing_urls = set()
+                if collection_name:
+                    try:
+                        from backend.db.mongodb import MongoDBClient
+
+                        mongodb_client = MongoDBClient.get_instance()
+                        logger.info(
+                            f"Checking for existing URLs in collection: {collection_name}"
+                        )
+                        existing_docs = mongodb_client.get_docs(
+                            filter={},
+                            collection_name=collection_name,
+                            projection={"url": 1},
+                        )
+
+                        # Create a set of existing URLs for fast lookup
+                        existing_urls = {
+                            doc.get("url") for doc in existing_docs if doc.get("url")
+                        }
+                        logger.info(
+                            f"Found {len(existing_urls)} existing URLs in collection"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Could not check existing URLs: {str(e)}")
+                        # Continue without duplicate checking if there's an error
+
                 # Transform links to match frontend expectations
                 transformed_links = []
                 for link in all_links:
+                    link_url = link.get("href", "")
+
                     # Get scores (normalized properly by Crawl4AI)
                     intrinsic_score = link.get("intrinsic_score", 0)  # 0-10 scale
                     contextual_score = link.get("contextual_score", 0)  # 0-1 scale
@@ -72,25 +109,39 @@ async def get_links(
                     # Use total_score if available, otherwise use normalized intrinsic
                     final_score = total_score if total_score else normalized_intrinsic
 
+                    # Check if URL exists in collection
+                    exists_in_collection = link_url in existing_urls
+
                     transformed_links.append(
                         {
-                            "href": link.get("href", ""),
-                            "url": link.get("href", ""),
+                            "href": link_url,
+                            "url": link_url,
                             "text": link.get("text", ""),
                             "title": link.get("title", "Untitled"),
                             "score": final_score,  # 0-1 normalized score
                             "total_score": final_score,
                             "base_domain": link.get("base_domain", ""),
+                            "exists_in_collection": exists_in_collection,  # Flag for existing URLs
                         }
                     )
 
-                # Sort by score descending
-                transformed_links.sort(key=lambda x: x["score"], reverse=True)
+                # Sort: new URLs first (by score), then existing URLs at the bottom
+                transformed_links.sort(
+                    key=lambda x: (x["exists_in_collection"], -x["score"])
+                )
+
+                new_count = len(
+                    [l for l in transformed_links if not l["exists_in_collection"]]
+                )
+                existing_count = len(
+                    [l for l in transformed_links if l["exists_in_collection"]]
+                )
 
                 logger.info(
                     f"Found {len(internal_links)} internal links, "
                     f"{len(external_links)} external links. "
-                    f"Returning {len(transformed_links)} total."
+                    f"Returning {len(transformed_links)} total "
+                    f"({new_count} new, {existing_count} already exist)."
                 )
 
                 return transformed_links
@@ -117,6 +168,8 @@ async def upload_documents_stream(
     """
     Upload selected URLs to the knowledge base with real-time progress streaming.
     Shows two-stage progress: crawling/chunking and embedding.
+
+    Skips URLs that already exist in the MongoDB collection.
     """
 
     async def generate_progress():
@@ -130,14 +183,38 @@ async def upload_documents_stream(
                 f"Starting streaming upload for {len(url_list)} URLs to collection '{collection_name}'"
             )
 
+            from backend.db.mongodb import MongoDBClient
+
+            # Check for existing URLs before processing
+            mongodb_client = MongoDBClient.get_instance()
+            existing_docs = mongodb_client.get_docs(
+                filter={}, collection_name=collection_name, projection={"url": 1}
+            )
+            existing_urls = {doc.get("url") for doc in existing_docs if doc.get("url")}
+
+            # Filter out URLs that already exist
+            new_urls = [url for url in url_list if url not in existing_urls]
+            skipped_urls = [url for url in url_list if url in existing_urls]
+
+            if skipped_urls:
+                logger.info(
+                    f"Skipping {len(skipped_urls)} URLs that already exist in the collection"
+                )
+                yield f"data: {json.dumps({'status': 'info', 'message': f'Skipping {len(skipped_urls)} URLs that already exist', 'current': 0, 'total': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                await asyncio.sleep(0.5)
+
+            if not new_urls:
+                logger.info("All URLs already exist in collection, nothing to upload")
+                yield f"data: {json.dumps({'status': 'complete', 'message': 'All URLs already exist in collection', 'current': len(url_list), 'total': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                return
+
             # Send initial status
-            yield f"data: {json.dumps({'status': 'starting', 'message': 'Initializing upload...', 'current': 0, 'total': len(url_list), 'processed': [], 'failed': []})}\n\n"
+            yield f"data: {json.dumps({'status': 'starting', 'message': f'Processing {len(new_urls)} new URLs...', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
             await asyncio.sleep(0.1)
 
             from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
             from crawl4ai.content_filter_strategy import PruningContentFilter
             from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-            from backend.db.mongodb import MongoDBClient
             from langchain_qdrant import (
                 QdrantVectorStore,
                 RetrievalMode,
@@ -150,7 +227,6 @@ async def upload_documents_stream(
             from qdrant_client import QdrantClient
 
             # Initialize clients
-            mongodb_client = MongoDBClient.get_instance()
             qdrant_client = QdrantClient(url="http://qdrant:6333")
 
             # Get collection configuration
@@ -160,7 +236,7 @@ async def upload_documents_stream(
             )
 
             if not collection_info:
-                yield f"data: {json.dumps({'status': 'error', 'message': f'Collection configuration not found for {collection_name}', 'current': 0, 'total': len(url_list), 'processed': [], 'failed': []})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Collection configuration not found for {collection_name}', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             config_doc = collection_info[0]
@@ -179,7 +255,7 @@ async def upload_documents_stream(
                 )
                 sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
             else:
-                yield f"data: {json.dumps({'status': 'error', 'message': f'Unsupported embedding model: {embedding_model}', 'current': 0, 'total': len(url_list), 'processed': [], 'failed': []})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Unsupported embedding model: {embedding_model}', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             # Configure crawler
@@ -199,15 +275,14 @@ async def upload_documents_stream(
             failed_urls = []
             processed_urls = []
 
-            # STAGE 1: Crawl all URLs
-            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Scrape websites...', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
+            # Phase 1: Crawl and chunk documents
+            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Starting to crawl URLs...', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
 
             async with AsyncWebCrawler() as crawler:
-                for idx, url in enumerate(url_list):
+                for idx, url in enumerate(new_urls, 1):
                     try:
-                        logger.info(f"Crawling {idx + 1}/{len(url_list)}: {url}")
-
-                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Scraping page {idx + 1} of {len(url_list)}', 'current': idx, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'current_url': url})}\n\n"
+                        logger.info(f"[{idx}/{len(new_urls)}] Crawling: {url}")
+                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Crawling URL {idx}/{len(new_urls)}...', 'current': idx, 'total': len(new_urls), 'current_url': url, 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
                         result = await crawler.arun(url, config=crawler_config)
 
@@ -215,7 +290,6 @@ async def upload_documents_stream(
                             doc = {
                                 "url": url,
                                 "markdown": result.markdown.fit_markdown,
-                                "raw_markdown": result.markdown.raw_markdown,
                                 "title": result.metadata.get("title", "Untitled"),
                                 "description": result.metadata.get("description", ""),
                                 "timestamp": datetime.now().isoformat(),
@@ -227,9 +301,6 @@ async def upload_documents_stream(
                                 },
                             }
 
-                            mongodb_client.persist_docs(
-                                docs=[doc], collection_name="temp"
-                            )
                             mongodb_client.persist_docs(
                                 docs=[doc], collection_name=collection_name
                             )
@@ -244,32 +315,29 @@ async def upload_documents_stream(
                             processed_urls.append(url)
 
                             logger.info(f"✓ Successfully crawled: {url}")
+
                         else:
                             error_msg = getattr(
                                 result, "error_message", "Unknown error"
                             )
                             logger.error(f"✗ Failed to crawl {url}: {error_msg}")
                             failed_urls.append({"url": url, "error": error_msg})
-
-                        await asyncio.sleep(0.1)
+                            yield f"data: {json.dumps({'status': 'crawling', 'message': f'Failed to crawl {url}', 'current': idx, 'total': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
                     except Exception as e:
                         logger.error(f"✗ Error crawling {url}: {str(e)}")
                         failed_urls.append({"url": url, "error": str(e)})
+                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Error crawling {url}', 'current': idx, 'total': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
             if not crawled_documents:
-                yield f"data: {json.dumps({'status': 'error', 'message': 'No documents were successfully crawled', 'current': 0, 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': 'No documents were successfully crawled', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': failed_urls, 'skipped': skipped_urls})}\n\n"
                 return
 
-            # STAGE 2: Chunk the documents
-            yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
+            # Phase 2: Chunk documents
+            yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': 0, 'total': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+            await asyncio.sleep(0.1)
 
-            logger.info(f"Chunking {len(crawled_documents)} documents...")
-
-            headers_to_split_on = [
-                ("#", "Header 1"),
-                ("##", "Header 2"),
-            ]
+            headers_to_split_on = [("#", "Header 1"), ("##", "Header 2")]
             markdown_splitter = MarkdownHeaderTextSplitter(
                 headers_to_split_on=headers_to_split_on, strip_headers=True
             )
@@ -283,8 +351,10 @@ async def upload_documents_stream(
             all_chunks = []
             all_uuids = []
 
-            for doc_data in crawled_documents:
+            for doc_idx, doc_data in enumerate(crawled_documents, 1):
                 try:
+                    yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking document {doc_idx}/{len(crawled_documents)}...', 'current': doc_idx, 'total': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+
                     md_header_splits = markdown_splitter.split_text(
                         doc_data["markdown"]
                     )
@@ -305,17 +375,9 @@ async def upload_documents_stream(
                 except Exception as e:
                     logger.error(f"Error chunking document {doc_data['url']}: {str(e)}")
 
-            if not all_chunks:
-                yield f"data: {json.dumps({'status': 'error', 'message': 'No chunks were created from the documents', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls})}\n\n"
-                return
-
-            # STAGE 3: Create embeddings with progress updates
-            total_chunks = len(all_chunks)
-            batch_size = 50  # Process in batches for progress updates
-
-            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {total_chunks} chunks...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': 0})}\n\n"
-
-            logger.info(f"Creating embeddings for {total_chunks} chunks...")
+            # Phase 3: Create embeddings
+            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {len(all_chunks)} chunks...', 'current': 0, 'total': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+            await asyncio.sleep(0.1)
 
             qdrant = QdrantVectorStore(
                 client=qdrant_client,
@@ -327,245 +389,23 @@ async def upload_documents_stream(
                 sparse_vector_name="sparse",
             )
 
-            # Process chunks in batches to show progress
+            # Add documents in batches with progress updates
+            batch_size = 50
             for i in range(0, len(all_chunks), batch_size):
                 batch_chunks = all_chunks[i : i + batch_size]
                 batch_uuids = all_uuids[i : i + batch_size]
 
                 qdrant.add_documents(documents=batch_chunks, ids=batch_uuids)
 
-                embedded_count = min(i + batch_size, total_chunks)
-
-                yield f"data: {json.dumps({'status': 'embedding', 'message': f'Embedding chunks ({embedded_count}/{total_chunks})...', 'current': len(processed_urls), 'total': len(url_list), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': embedded_count})}\n\n"
-
+                current = min(i + batch_size, len(all_chunks))
+                yield f"data: {json.dumps({'status': 'embedding', 'message': f'Embedding progress: {current}/{len(all_chunks)} chunks', 'current': current, 'total': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
                 await asyncio.sleep(0.1)
 
-            logger.info(f"✓ Successfully uploaded {total_chunks} chunks to Qdrant")
-
-            # Send completion status
-            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully processed {len(crawled_documents)} documents!', 'current': len(processed_urls), 'total': len(url_list), 'total_processed': len(crawled_documents), 'processed': processed_urls, 'failed': failed_urls, 'total_chunks': total_chunks, 'embedded_chunks': total_chunks})}\n\n"
+            # Final success message
+            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully uploaded {len(crawled_documents)} documents ({len(all_chunks)} chunks)', 'current': len(all_chunks), 'total': len(all_chunks), 'processed': processed_urls, 'failed': failed_urls, 'skipped': skipped_urls, 'total_chunks': len(all_chunks)})}\n\n"
 
         except Exception as e:
             logger.error(f"Error in streaming upload: {str(e)}")
-            yield f"data: {json.dumps({'status': 'error', 'message': f'Error: {str(e)}', 'current': 0, 'total': 0, 'processed': [], 'failed': []})}\n\n"
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e), 'current': 0, 'total': 0, 'processed': [], 'failed': [], 'skipped': []})}\n\n"
 
-    return StreamingResponse(
-        generate_progress(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-# @router.post("/upload-documents")
-# async def upload_documents(request: UploadDocumentsRequest):
-#     """
-#     Upload selected URLs to the knowledge base (non-streaming version).
-
-#     This endpoint:
-#     1. Crawls each URL with Crawl4AI to extract markdown content
-#     2. Stores the raw markdown in MongoDB
-#     3. Chunks the content
-#     4. Creates embeddings
-#     5. Stores vectors in Qdrant
-#     """
-#     try:
-#         logger.info(
-#             f"Processing {len(request.urls)} URLs for collection '{request.collection_name}'"
-#         )
-
-#         from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-#         from backend.db.mongodb import MongoDBClient
-#         from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-#         from langchain_text_splitters import (
-#             MarkdownHeaderTextSplitter,
-#             RecursiveCharacterTextSplitter,
-#         )
-#         from langchain_core.documents import Document
-#         from qdrant_client import QdrantClient
-
-#         # Initialize clients
-#         mongodb_client = MongoDBClient.get_instance()
-#         qdrant_client = QdrantClient(url="http://qdrant:6333")
-
-#         # Get collection configuration
-#         collection_info = mongodb_client.get_docs(
-#             filter={"collection_name": request.collection_name},
-#             collection_name="configurations",
-#         )
-
-#         if not collection_info:
-#             raise HTTPException(
-#                 status_code=404,
-#                 detail=f"Collection configuration not found for '{request.collection_name}'",
-#             )
-
-#         config_doc = collection_info[0]
-#         chunk_size = config_doc.get("chunk_size", 1000)
-#         chunk_overlap = config_doc.get("chunk_overlap", 100)
-#         embedding_model = config_doc.get("dense_embedding_model")
-
-#         # Import embedding utilities
-#         from langchain_ollama import OllamaEmbeddings
-
-#         # Initialize embeddings based on model
-#         if embedding_model == "jina/jina-embeddings-v2-base-de":
-#             dense_embeddings = OllamaEmbeddings(
-#                 model="jina/jina-embeddings-v2-base-de",
-#                 base_url="http://host.docker.internal:11434",
-#             )
-#             sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
-#         else:
-#             raise HTTPException(
-#                 status_code=400,
-#                 detail=f"Unsupported embedding model: {embedding_model}",
-#             )
-
-#         # Configure crawler
-#         crawler_config = CrawlerRunConfig(only_text=True, verbose=True)
-
-#         crawled_documents = []
-#         failed_urls = []
-
-#         # Step 1: Crawl all URLs and store in MongoDB
-#         logger.info("Step 1: Crawling URLs...")
-#         async with AsyncWebCrawler() as crawler:
-#             for url in request.urls:
-#                 try:
-#                     logger.info(f"Crawling: {url}")
-#                     result = await crawler.arun(url, config=crawler_config)
-
-#                     if result.success and result.markdown:
-#                         # Create document for MongoDB
-#                         doc = {
-#                             "url": url,
-#                             "markdown": result.markdown.raw_markdown,
-#                             "title": result.metadata.get("title", "Untitled"),
-#                             "description": result.metadata.get("description", ""),
-#                             "timestamp": datetime.now().isoformat(),
-#                             "metadata": {
-#                                 "status_code": result.status_code,
-#                                 "content_type": result.metadata.get(
-#                                     "content_type", "text/html"
-#                                 ),
-#                             },
-#                         }
-
-#                         # Store in MongoDB temp collection
-#                         mongodb_client.persist_docs(docs=[doc], collection_name="temp")
-
-#                         # Also store in the target collection
-#                         mongodb_client.persist_docs(
-#                             docs=[doc], collection_name=request.collection_name
-#                         )
-
-#                         crawled_documents.append(
-#                             {
-#                                 "url": url,
-#                                 "markdown": result.markdow2.raw_markdown,
-#                                 "title": doc["title"],
-#                             }
-#                         )
-
-#                         logger.info(f"✓ Successfully crawled: {url}")
-#                     else:
-#                         error_msg = getattr(result, "error_message", "Unknown error")
-#                         logger.error(f"✗ Failed to crawl {url}: {error_msg}")
-#                         failed_urls.append({"url": url, "error": error_msg})
-
-#                 except Exception as e:
-#                     logger.error(f"✗ Error crawling {url}: {str(e)}")
-#                     failed_urls.append({"url": url, "error": str(e)})
-
-#         if not crawled_documents:
-#             return {
-#                 "success": False,
-#                 "message": "No documents were successfully crawled",
-#                 "uploaded_count": 0,
-#                 "failed_count": len(failed_urls),
-#                 "failed_urls": failed_urls,
-#             }
-
-#         # Step 2: Chunk the documents
-#         logger.info(f"Step 2: Chunking {len(crawled_documents)} documents...")
-
-#         headers_to_split_on = [
-#             ("#", "Header 1"),
-#             ("##", "Header 2"),
-#         ]
-#         markdown_splitter = MarkdownHeaderTextSplitter(
-#             headers_to_split_on=headers_to_split_on, strip_headers=True
-#         )
-
-#         text_splitter = RecursiveCharacterTextSplitter(
-#             chunk_size=chunk_size,
-#             chunk_overlap=chunk_overlap,
-#             separators=["\n\n", "\n", ".", ";", ",", " "],
-#         )
-
-#         all_chunks = []
-#         all_uuids = []
-
-#         for doc_data in crawled_documents:
-#             try:
-#                 # Split by markdown headers
-#                 md_header_splits = markdown_splitter.split_text(doc_data["markdown"])
-
-#                 # Further split into chunks
-#                 chunks = text_splitter.split_documents(md_header_splits)
-
-#                 # Add metadata to each chunk
-#                 for chunk in chunks:
-#                     if not chunk.metadata:
-#                         chunk.metadata = {}
-
-#                     chunk.metadata["source_url"] = doc_data["url"]
-#                     chunk.metadata["title"] = doc_data["title"]
-
-#                     all_chunks.append(chunk)
-#                     all_uuids.append(str(uuid4()))
-
-#                 logger.info(f"Created {len(chunks)} chunks from {doc_data['url']}")
-
-#             except Exception as e:
-#                 logger.error(f"Error chunking document {doc_data['url']}: {str(e)}")
-
-#         if not all_chunks:
-#             raise HTTPException(
-#                 status_code=500, detail="No chunks were created from the documents"
-#             )
-
-#         # Step 3: Create embeddings and store in Qdrant
-#         logger.info(f"Step 3: Creating embeddings for {len(all_chunks)} chunks...")
-
-#         qdrant = QdrantVectorStore(
-#             client=qdrant_client,
-#             collection_name=request.collection_name,
-#             embedding=dense_embeddings,
-#             sparse_embedding=sparse_embeddings,
-#             retrieval_mode=RetrievalMode.HYBRID,
-#             vector_name="dense",
-#             sparse_vector_name="sparse",
-#         )
-
-#         qdrant.add_documents(documents=all_chunks, ids=all_uuids)
-
-#         logger.info(f"✓ Successfully uploaded {len(all_chunks)} chunks to Qdrant")
-
-#         return {
-#             "success": True,
-#             "uploaded_count": len(crawled_documents),
-#             "failed_count": len(failed_urls),
-#             "total_chunks": len(all_chunks),
-#             "urls": [doc["url"] for doc in crawled_documents],
-#             "failed_urls": failed_urls,
-#         }
-
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Error uploading documents: {str(e)}")
-#         raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(generate_progress(), media_type="text/event-stream")

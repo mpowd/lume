@@ -18,12 +18,15 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
     toggleUrlSelection,
     selectAll,
     getSelectedCount,
+    getNewUrlsCount,
+    getExistingUrlsCount,
     reset
   } = useWebCrawl()
 
   const handleDiscover = async (baseUrl, includeExternal) => {
     setStep('discovering')
-    const result = await crawl(baseUrl, includeExternal)
+    // Pass collection name to check for existing URLs
+    const result = await crawl(baseUrl, includeExternal, collectionName)
     
     if (result.success) {
       setStep('selection')
@@ -68,6 +71,7 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
 
       {step === 'settings' && (
         <CrawlSettings 
+          collectionName={collectionName}
           onDiscover={handleDiscover}
           onManualEntry={handleManualEntry}
           loading={crawling}
@@ -85,6 +89,8 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
             onToggle={toggleUrlSelection}
             onSelectAll={selectAll}
             getSelectedCount={getSelectedCount}
+            getNewUrlsCount={getNewUrlsCount}
+            getExistingUrlsCount={getExistingUrlsCount}
             onReset={handleReset}
             onComplete={onComplete}
           />

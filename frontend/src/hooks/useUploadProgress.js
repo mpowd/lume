@@ -21,69 +21,86 @@ export const useUploadProgress = () => {
       embedded_chunks: 0
     })
 
+    let eventSource = null
+    let hasReceivedComplete = false
+
     try {
-      const eventSource = new EventSource(
-        `http://localhost:8000/website/upload-documents-stream?collection_name=${encodeURIComponent(collectionName)}&urls=${encodeURIComponent(JSON.stringify(urls))}`
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      
+      eventSource = new EventSource(
+        `${API_BASE_URL}/website/upload-documents-stream?collection_name=${encodeURIComponent(collectionName)}&urls=${encodeURIComponent(JSON.stringify(urls))}`
       )
 
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        
-        if (data.status === 'complete') {
-          setUploadProgress({
-            status: 'complete',
-            message: 'Upload complete!',
-            current: data.total_processed,
-            total: data.total_processed,
-            processed: data.processed_urls,
-            failed: data.failed_urls,
-            total_chunks: data.total_chunks || 0,
-            embedded_chunks: data.total_chunks || 0
-          })
-          eventSource.close()
+        try {
+          const data = JSON.parse(event.data)
           
-          // Don't call onComplete here - let user click Done button first
-        } else if (data.status === 'error') {
-          setUploadProgress({
-            status: 'error',
-            message: data.message || 'An error occurred',
-            current: data.current || 0,
-            total: urls.length,
-            processed: data.processed || [],
-            failed: data.failed || [],
-            total_chunks: data.total_chunks || 0,
-            embedded_chunks: data.embedded_chunks || 0
-          })
-          eventSource.close()
-        } else {
-          // Update progress with all fields including embedding progress
-          setUploadProgress({
-            status: data.status,
-            message: data.message,
-            current: data.current,
-            total: data.total,
-            processed: data.processed || [],
-            failed: data.failed || [],
-            current_url: data.current_url,
-            total_chunks: data.total_chunks || 0,
-            embedded_chunks: data.embedded_chunks || 0
-          })
+          if (data.status === 'complete') {
+            hasReceivedComplete = true
+            setUploadProgress({
+              status: 'complete',
+              message: 'Upload complete!',
+              current: data.total_processed || data.total || urls.length,
+              total: data.total_processed || data.total || urls.length,
+              processed: data.processed_urls || data.processed || [],
+              failed: data.failed_urls || data.failed || [],
+              total_chunks: data.total_chunks || 0,
+              embedded_chunks: data.total_chunks || 0
+            })
+            eventSource.close()
+          } else if (data.status === 'error') {
+            hasReceivedComplete = true
+            setUploadProgress({
+              status: 'error',
+              message: data.message || 'An error occurred',
+              current: data.current || 0,
+              total: urls.length,
+              processed: data.processed || [],
+              failed: data.failed || [],
+              total_chunks: data.total_chunks || 0,
+              embedded_chunks: data.embedded_chunks || 0
+            })
+            eventSource.close()
+          } else {
+            // Update progress with all fields including embedding progress
+            setUploadProgress({
+              status: data.status,
+              message: data.message,
+              current: data.current,
+              total: data.total,
+              processed: data.processed || [],
+              failed: data.failed || [],
+              current_url: data.current_url,
+              total_chunks: data.total_chunks || 0,
+              embedded_chunks: data.embedded_chunks || 0
+            })
+          }
+        } catch (parseError) {
+          console.error('Error parsing SSE data:', parseError, event.data)
         }
       }
 
       eventSource.onerror = (error) => {
         console.error('EventSource error:', error)
-        eventSource.close()
-        setUploadProgress({
-          status: 'error',
-          message: 'Connection error. Please try again.',
-          current: 0,
-          total: urls.length,
-          processed: [],
-          failed: [],
-          total_chunks: 0,
-          embedded_chunks: 0
-        })
+        
+        // Only show error if we haven't received a complete message
+        // Sometimes the connection closes naturally after completion
+        if (!hasReceivedComplete) {
+          setUploadProgress({
+            status: 'error',
+            message: 'Connection error. Please check if the backend is running.',
+            current: 0,
+            total: urls.length,
+            processed: [],
+            failed: [],
+            total_chunks: 0,
+            embedded_chunks: 0
+          })
+        }
+        
+        if (eventSource) {
+          eventSource.close()
+        }
       }
 
       return { success: true }
@@ -99,6 +116,10 @@ export const useUploadProgress = () => {
         total_chunks: 0,
         embedded_chunks: 0
       })
+      
+      if (eventSource) {
+        eventSource.close()
+      }
       
       return { success: false, error: error.message }
     }

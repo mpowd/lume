@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner'
 import DatasetList from '../components/evaluation/DatasetList'
 import DatasetCreator from '../components/evaluation/DatasetCreator'
 import EvaluationRunner from '../components/evaluation/EvaluationRunner'
-import EvaluationWorkflow from '../components/evaluation/EvaluationWorkflow'  // ← CHANGED: New workflow component
+import EvaluationWorkflow from '../components/evaluation/EvaluationWorkflow'
 import DatasetManager from '../components/evaluation/DatasetManager'
 
 export default function EvaluationPage() {
@@ -71,7 +71,7 @@ export default function EvaluationPage() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header */}
       <div className="border-b border-white/5 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-[1600px] mx-auto px-8 py-6">
@@ -185,7 +185,6 @@ export default function EvaluationPage() {
           />
         )}
 
-        {/* ← CHANGED: Use new EvaluationWorkflow instead of EvaluationResults */}
         {view === 'results' && (
           <EvaluationWorkflow
             datasets={datasets}

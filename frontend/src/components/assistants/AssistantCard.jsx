@@ -130,6 +130,7 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
             onEdit(assistant)
           }}
           className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all font-medium"
+          style={{cursor: 'pointer'}}
         >
           <Edit2 className="w-4 h-4" />
           Edit
@@ -140,6 +141,7 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
             <button
               onClick={handleDelete}
               className="flex-1 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all font-medium"
+              style={{cursor: 'pointer'}}
             >
               Confirm
             </button>
@@ -149,6 +151,7 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
                 setConfirmDelete(false)
               }}
               className="px-4 py-2 bg-slate-950/50 text-slate-300 border border-white/10 rounded-xl hover:bg-slate-900/50 transition-all"
+              style={{cursor: 'pointer'}}
             >
               <X className="w-4 h-4" />
             </button>
@@ -160,6 +163,7 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
               setConfirmDelete(true)
             }}
             className="flex-1 flex items-center justify-center gap-2 py-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-medium"
+            style={{cursor: 'pointer'}}
           >
             <Trash2 className="w-4 h-4" />
             Delete

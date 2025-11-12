@@ -34,6 +34,7 @@ class QAAssistantConfig(AssistantConfig):
     # Generation settings
     rag_prompt: Optional[str] = None
     precise_citation: bool = False
+    precise_citation_prompt: Optional[str] = None
 
 
 class QAAssistantInput(AssistantInput):
@@ -111,6 +112,7 @@ class QAAssistant(BaseAssistant):
                     "llm_provider": config.llm_provider,
                     "rag_prompt": config.rag_prompt,
                     "precise_citation": config.precise_citation,
+                    "precise_citation_prompt": config.precise_citation_prompt,
                     "reranking": config.reranking,
                 },
             )

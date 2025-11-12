@@ -27,6 +27,34 @@ class CitedAnswer(BaseModel):
 class LLMGenerator:
     """LLM-based answer generator"""
 
+    # Default prompts
+    DEFAULT_RAG_PROMPT = """Answer the question using only the context provided.
+
+Retrieved Context: {context}
+
+User Question: {question}
+
+Answer conversationally. User is not aware of context."""
+
+    DEFAULT_PRECISE_CITATION_PROMPT = """You are answering a question using provided context chunks.
+Each chunk is numbered starting from 0. Track which chunks you use.
+
+Retrieved Context Chunks:
+{context_with_indices}
+
+User Question: {question}
+
+Instructions:
+1. Answer using ONLY information from the chunks above
+2. Track which chunk numbers you actually used
+3. Only include chunk indices you directly referenced
+4. If you didn't use a chunk, don't include its index
+5. Do not include the used chunks in the answer directly
+
+{format_instructions}
+
+Be precise with chunk indices!"""
+
     def _get_llm(self, model_name: str, provider: str):
         """Get LLM instance"""
         if provider == "openai":
@@ -106,26 +134,12 @@ class LLMGenerator:
 
             parser = PydanticOutputParser(pydantic_object=CitedAnswer)
 
-            prompt_template = """You are answering a question using provided context chunks.
-Each chunk is numbered starting from 0. Track which chunks you use.
+            # Use custom precise citation prompt if provided, otherwise use default
+            precise_citation_prompt = config.get(
+                "precise_citation_prompt", self.DEFAULT_PRECISE_CITATION_PROMPT
+            )
 
-Retrieved Context Chunks:
-{context_with_indices}
-
-User Question: {question}
-
-Instructions:
-1. Answer using ONLY information from the chunks above
-2. Track which chunk numbers you actually used
-3. Only include chunk indices you directly referenced
-4. If you didn't use a chunk, don't include its index
-5. Do not include the used chunks in the answer directly
-
-{format_instructions}
-
-Be precise with chunk indices!"""
-
-            prompt = ChatPromptTemplate.from_template(prompt_template)
+            prompt = ChatPromptTemplate.from_template(precise_citation_prompt)
 
             chain = (
                 {
@@ -163,13 +177,8 @@ Be precise with chunk indices!"""
         else:
             logger.info("Using standard citation mode")
 
-            rag_prompt = config.get(
-                "rag_prompt",
-                "Answer the question using only the context provided.\n\n"
-                "Retrieved Context: {context}\n\n"
-                "User Question: {question}\n\n"
-                "Answer conversationally. User is not aware of context.",
-            )
+            # Use custom RAG prompt if provided, otherwise use default
+            rag_prompt = config.get("rag_prompt", self.DEFAULT_RAG_PROMPT)
 
             prompt = ChatPromptTemplate.from_template(rag_prompt)
 

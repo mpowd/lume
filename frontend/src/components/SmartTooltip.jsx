@@ -69,7 +69,7 @@ const SmartTooltip = ({ source, context, index, getSourceUrl, getSourceScore, ge
           <div className="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 shadow-2xl shadow-blue-500/20 max-h-[60vh] flex flex-col">
             <div className="flex items-start gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-              <span className="text-xs font-semibold text-blue-400">Relevanter Textabschnitt</span>
+              <span className="text-xs font-semibold text-blue-400">Relevant chunk</span>
             </div>
             <div className="chunk-content overflow-y-auto text-sm text-slate-300 pr-2 flex-1">
               <ReactMarkdown 

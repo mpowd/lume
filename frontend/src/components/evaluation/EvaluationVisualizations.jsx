@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ArrowLeft, Grid, BarChart3, Activity, MessageSquare, TrendingUp, Zap } from 'lucide-react'
 import Card from '../shared/Card'
 import Button from '../shared/Button'
@@ -38,12 +38,33 @@ export default function EvaluationVisualizations({
     selectedAssistants.includes(e.assistant_id)
   )
 
-  const metrics = [
-    { key: 'answer_relevancy', label: 'Answer Relevancy', color: '#3b82f6' },
-    { key: 'faithfulness', label: 'Faithfulness', color: '#10b981' },
-    { key: 'context_recall', label: 'Context Recall', color: '#f59e0b' },
-    { key: 'context_precision', label: 'Context Precision', color: '#8b5cf6' }
-  ]
+  // Determine which metrics are available based on dataset structure
+  // Check if dataset has ground truth contexts
+  const hasGroundTruthContext = useMemo(() => {
+    if (!dataset?.qa_pairs || dataset.qa_pairs.length === 0) return false
+    // Check if any QA pair has ground_truth_context
+    return dataset.qa_pairs.some(pair => 
+      pair.ground_truth_context && 
+      (Array.isArray(pair.ground_truth_context) ? pair.ground_truth_context.length > 0 : pair.ground_truth_context)
+    )
+  }, [dataset])
+
+  // Filter metrics based on what's available
+  const metrics = useMemo(() => {
+    const allMetrics = [
+      { key: 'answer_relevancy', label: 'Answer Relevancy', color: '#3b82f6' },
+      { key: 'faithfulness', label: 'Faithfulness', color: '#10b981' },
+      { key: 'context_recall', label: 'Context Recall', color: '#f59e0b' },
+      { key: 'context_precision', label: 'Context Precision', color: '#8b5cf6' }
+    ]
+
+    // Filter out context_recall if there's no ground truth context
+    if (!hasGroundTruthContext) {
+      return allMetrics.filter(m => m.key !== 'context_recall')
+    }
+
+    return allMetrics
+  }, [hasGroundTruthContext])
 
   return (
     <div className="space-y-6">

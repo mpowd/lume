@@ -85,6 +85,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4"
+            style={{cursor: 'pointer'}}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Overview
@@ -202,6 +203,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                         <button
                           onClick={() => handleViewDetails(dataset)}
                           className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors text-slate-400 hover:text-blue-400"
+                          style={{cursor: 'pointer'}}
                           title="View details"
                         >
                           <Eye className="w-4 h-4" />
@@ -209,6 +211,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                         <button
                           onClick={() => onEdit(dataset)}
                           className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors text-slate-400 hover:text-purple-400"
+                          style={{cursor: 'pointer'}}
                           title="Edit dataset"
                         >
                           <Edit3 className="w-4 h-4" />
@@ -216,6 +219,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                         <button
                           onClick={() => handleDeleteClick(dataset)}
                           className="p-2 hover:bg-red-500/10 rounded-lg transition-colors text-slate-400 hover:text-red-400"
+                          style={{cursor: 'pointer'}}
                           title="Delete dataset"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -223,6 +227,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                         <button
                           onClick={() => toggleExpand(dataset._id)}
                           className="p-2 hover:bg-white/5 rounded-lg transition-colors text-slate-400 hover:text-white"
+                          style={{cursor: 'pointer'}}
                           title={isExpanded ? "Collapse" : "Expand"}
                         >
                           {isExpanded ? (
@@ -270,6 +275,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                           <button
                             onClick={() => handleViewDetails(dataset)}
                             className="w-full py-2 px-4 rounded-lg border border-white/10 bg-slate-900/30 hover:bg-slate-900/50 text-sm text-slate-400 hover:text-white transition-colors"
+                            style={{cursor: 'pointer'}}
                           >
                             View all {qaPairs.length} pairs
                           </button>

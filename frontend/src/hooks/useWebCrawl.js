@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { websiteAPI } from '../services/api'
 
 export const useWebCrawl = () => {
   const [discoveredUrls, setDiscoveredUrls] = useState([])
@@ -6,38 +7,30 @@ export const useWebCrawl = () => {
   const [crawling, setCrawling] = useState(false)
   const [error, setError] = useState(null)
 
-  const crawl = async (baseUrl, includeExternal = false) => {
+  const crawl = async (baseUrl, includeExternal = false, collectionName = null) => {
     setDiscoveredUrls([])
     setSelectedUrls({})
     setCrawling(true)
     setError(null)
 
     try {
-      const params = new URLSearchParams({
-        base_url: baseUrl,
-        include_external_domains: includeExternal.toString(),
-      })
-
-      const response = await fetch(`http://localhost:8000/website/links?${params}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch links')
-      }
-
-      const links = await response.json()
+      // Pass collectionName to check for existing URLs
+      const links = await websiteAPI.getLinks(baseUrl, includeExternal, collectionName)
       
       const transformedLinks = links.map(link => ({
         url: link.href || link.url,
         title: link.text || link.title || 'Untitled',
         score: link.total_score || link.score || 0,
-        base_domain: link.base_domain || ''
+        base_domain: link.base_domain || '',
+        exists_in_collection: link.exists_in_collection || false  // NEW FIELD
       }))
 
       setDiscoveredUrls(transformedLinks)
       
+      // Only auto-select URLs that DON'T already exist in collection
       const initialSelection = transformedLinks.reduce((acc, link) => ({ 
         ...acc, 
-        [link.url]: true 
+        [link.url]: !link.exists_in_collection  // Only select if it doesn't exist
       }), {})
       
       setSelectedUrls(initialSelection)
@@ -60,13 +53,25 @@ export const useWebCrawl = () => {
   }
 
   const selectAll = (select) => {
+    // Only allow selecting URLs that don't exist in collection
     setSelectedUrls(
-      discoveredUrls.reduce((acc, item) => ({ ...acc, [item.url]: select }), {})
+      discoveredUrls.reduce((acc, item) => ({ 
+        ...acc, 
+        [item.url]: item.exists_in_collection ? false : select 
+      }), {})
     )
   }
 
   const getSelectedCount = () => {
     return Object.values(selectedUrls).filter(Boolean).length
+  }
+
+  const getNewUrlsCount = () => {
+    return discoveredUrls.filter(url => !url.exists_in_collection).length
+  }
+
+  const getExistingUrlsCount = () => {
+    return discoveredUrls.filter(url => url.exists_in_collection).length
   }
 
   const reset = () => {
@@ -85,6 +90,8 @@ export const useWebCrawl = () => {
     toggleUrlSelection,
     selectAll,
     getSelectedCount,
+    getNewUrlsCount,
+    getExistingUrlsCount,
     reset
   }
 }

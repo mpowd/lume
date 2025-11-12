@@ -1,10 +1,17 @@
-import { Settings, Target, Lock } from 'lucide-react'
+import { Settings, Target, Lock, AlertCircle } from 'lucide-react'
 import { COHERE_RERANKERS, HUGGINGFACE_RERANKERS } from '../../constants/models'
 import FormInput from '../shared/FormInput'
 import FormTextarea from '../shared/FormTextarea'
 import Accordion from '../shared/Accordion'
 
-export default function AdvancedSettings({ formData, setFormData, showAdvanced, setShowAdvanced }) {
+export default function AdvancedSettings({ 
+  formData, 
+  setFormData, 
+  showAdvanced, 
+  setShowAdvanced,
+  defaultRagPrompt,
+  defaultPreciseCitationPrompt 
+}) {
   return (
     <Accordion
       title="Advanced Settings"
@@ -160,13 +167,80 @@ export default function AdvancedSettings({ formData, setFormData, showAdvanced, 
           </div>
         </div>
 
-        <FormTextarea
-          label="RAG Prompt Template"
-          value={formData.rag_prompt}
-          onChange={(e) => setFormData({...formData, rag_prompt: e.target.value})}
-          rows={6}
-          className="font-mono text-sm"
-        />
+        {/* Prompt Configuration Section */}
+        <div className="pt-6 border-t border-white/10 space-y-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-300">Prompt Configuration</h3>
+            {formData.precise_citation && (
+              <div className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-300 font-medium">
+                Precise Citation Mode
+              </div>
+            )}
+          </div>
+
+          {/* Show the appropriate prompt based on precise_citation setting */}
+          {formData.precise_citation ? (
+            <>
+              {/* Info box explaining precise citation mode */}
+              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-200">
+                  <p className="font-medium mb-1">Precise Citation Mode Active</p>
+                  <p className="text-xs text-blue-300">
+                    This prompt uses structured output to track which context chunks are used. 
+                    Required placeholders: <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{context_with_indices}'}</code>, <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{question}'}</code>, <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{format_instructions}'}</code>
+                  </p>
+                </div>
+              </div>
+
+              <FormTextarea
+                label="Precise Citation Prompt"
+                value={formData.precise_citation_prompt}
+                onChange={(e) => setFormData({...formData, precise_citation_prompt: e.target.value})}
+                rows={10}
+                className="font-mono text-sm"
+              />
+              
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, precise_citation_prompt: defaultPreciseCitationPrompt})}
+                className="text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                Reset to default precise citation prompt
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Info box explaining standard mode */}
+              <div className="flex gap-3 p-3 bg-slate-800/50 border border-white/10 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-slate-300">
+                  <p className="font-medium mb-1">Standard RAG Mode</p>
+                  <p className="text-xs text-slate-400">
+                    This prompt generates answers using all retrieved context. 
+                    Required placeholders: <code className="bg-slate-700/50 px-1 rounded text-slate-300">{'{context}'}</code>, <code className="bg-slate-700/50 px-1 rounded text-slate-300">{'{question}'}</code>
+                  </p>
+                </div>
+              </div>
+
+              <FormTextarea
+                label="RAG Prompt Template"
+                value={formData.rag_prompt}
+                onChange={(e) => setFormData({...formData, rag_prompt: e.target.value})}
+                rows={6}
+                className="font-mono text-sm"
+              />
+              
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, rag_prompt: defaultRagPrompt})}
+                className="text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                Reset to default RAG prompt
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </Accordion>
   )

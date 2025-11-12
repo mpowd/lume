@@ -178,7 +178,8 @@ export const createQAAssistant = async ({
   rerankerModel = 'rerank-v3.5',
   topN = null,
   ragPrompt = null,
-  preciseCitation = false
+  preciseCitation = false,
+  preciseCitationPrompt = null  // ← ADDED
 }) => {
   return assistantsAPI.create({
     name,
@@ -201,7 +202,8 @@ export const createQAAssistant = async ({
       reranker_model: rerankerModel,
       top_n: topN,
       rag_prompt: ragPrompt,
-      precise_citation: preciseCitation
+      precise_citation: preciseCitation,
+      precise_citation_prompt: preciseCitationPrompt  // ← ADDED
     },
     created_by: 'user'
   })
@@ -364,14 +366,18 @@ export const knowledgeBaseAPI = {
 
 // Website/Crawling API
 export const websiteAPI = {
-  getLinks: async (baseUrl, includeExternal = false) => {
+  getLinks: async (baseUrl, includeExternal = false, collectionName = null) => {
     try {
-      const response = await api.get('/website/links', {
-        params: {
-          base_url: baseUrl,
-          include_external_domains: includeExternal
-        }
-      })
+      const params = {
+        base_url: baseUrl,
+        include_external_domains: includeExternal
+      }
+      
+      if (collectionName) {
+        params.collection_name = collectionName
+      }
+
+      const response = await api.get('/website/links', { params })
       return response.data
     } catch (error) {
       console.error('Get Links Error:', error)
@@ -515,19 +521,17 @@ export const evaluationAPI = {
       console.error('Get Evaluations Error:', error)
       throw error
     }
-  }
-}
+  },
 
-
-getEvaluationsByDataset: async (datasetName) => {
-  try {
-    const response = await api.get(`/evaluation/datasets/${datasetName}/evaluations`)
-    return response.data
-  } catch (error) {
-    console.error('Get Evaluations By Dataset Error:', error)
-    throw error
+  getEvaluationsByDataset: async (datasetName) => {
+    try {
+      const response = await api.get(`/evaluation/datasets/${datasetName}/evaluations`)
+      return response.data
+    } catch (error) {
+      console.error('Get Evaluations By Dataset Error:', error)
+      throw error
+    }
   }
 }
 
 export default api
-

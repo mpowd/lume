@@ -199,7 +199,10 @@ class MongoDBClient:
         return list(collection.find({"url": source_url}))
 
     def get_docs(
-        self, filter: Dict[str, Any], collection_name: str
+        self,
+        filter: Dict[str, Any],
+        collection_name: str,
+        projection: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve documents by a key-value pair.
@@ -207,12 +210,16 @@ class MongoDBClient:
         Args:
             filter: Filter dictionary
             collection_name: Name of the collection to query
+            projection: Optional projection dictionary to limit returned fields
 
         Returns:
             List[Dict[str, Any]]: List of retrieved documents
         """
         collection = self.get_collection(collection_name)
-        return list(collection.find(filter))
+        if projection:
+            return list(collection.find(filter, projection))
+        else:
+            return list(collection.find(filter))
 
     def get_all_documents(self, collection_name: str = "temp") -> List[Dict[str, Any]]:
         """
