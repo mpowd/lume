@@ -1,4 +1,3 @@
-
 export default function Card({ 
   children, 
   onClick, 
@@ -9,11 +8,10 @@ export default function Card({
     <div
       onClick={onClick}
       className={`
-        bg-gradient-to-br from-slate-900/50 to-slate-900/30
-        backdrop-blur-xl border border-white/10 rounded-2xl
-        ${hover ? 'hover:border-white/20 hover:from-slate-900/70 hover:to-slate-900/50' : ''}
-        ${onClick ? 'cursor-pointer' : ''}
-        transition-all
+        bg-transparent border border-white/10 rounded-2xl
+        ${hover ? 'hover:border-white/20' : ''}
+        ${onClick ? 'cursor-pointer hover:bg-white/[0.02]' : ''}
+        transition-all duration-200
         ${className}
       `}
     >

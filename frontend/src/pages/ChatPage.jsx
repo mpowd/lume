@@ -80,22 +80,22 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="flex h-screen bg-background">
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="fixed top-0 left-0 right-0 z-10 border-b border-white/5 bg-slate-950/95 backdrop-blur-xl">
+        <div className="fixed top-0 left-0 right-0 z-10 border-b border-white/5 bg-background-elevated/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
               {!selectedAssistant ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl">
-                        <MessageSquare className="w-6 h-6 text-blue-400" />
+                      <div className="p-2.5 bg-transparent border border-brand-teal/30 rounded-2xl">
+                        <MessageSquare className="w-6 h-6 text-brand-teal" />
                       </div>
                       <div>
                         <h1 className="text-xl font-semibold text-white">Chat</h1>
-                        <p className="text-sm text-slate-400">Select a assistant to start</p>
+                        <p className="text-sm text-text-tertiary">Select an assistant to start</p>
                       </div>
                     </div>
                   </div>
@@ -106,19 +106,19 @@ export default function ChatPage() {
                     <AssistantSelector assistants={assistants} onSelect={handleSelectAssistant} />
                   ) : (
                     <div className="py-12 text-center">
-                      <p className="text-slate-400">No assistants available</p>
+                      <p className="text-text-tertiary">No assistants available</p>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl">
-                      <Bot className="w-5 h-5 text-blue-400" />
+                    <div className="p-2 bg-transparent border border-brand-teal/30 rounded-2xl">
+                      <Bot className="w-5 h-5 text-brand-teal" />
                     </div>
                     <div>
                       <h1 className="text-lg font-semibold text-white">{selectedAssistant.name}</h1>
-                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                      <div className="flex items-center gap-3 text-xs text-text-tertiary">
                         <span className="flex items-center gap-1">
                           <Database className="w-3 h-3" />
                           {selectedAssistant.collections?.length > 0 

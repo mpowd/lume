@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* ============================================
+   TAILWIND V4 THEME CONFIGURATION
+   ============================================ */
+
+@theme {
+  /* Brand Colors */
+  --color-brand-teal: #14b8a6;
+  --color-brand-teal-dark: #0d9488;
+  
+  /* Background Colors - Pure Grayscale */
+  --color-background: #0f0f0f;
+  --color-background-elevated: #1a1a1a;
+  
+  /* Border Colors */
+  --color-border-subtle: rgb(255 255 255 / 0.05);
+  --color-border-default: rgb(255 255 255 / 0.1);
+  --color-border-strong: rgb(255 255 255 / 0.2);
+  --color-border-brand: rgb(20 184 166 / 0.3);
+  --color-border-brand-hover: rgb(20 184 166 / 0.5);
+  
+  /* Text Colors - Grayscale Hierarchy */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #d4d4d8;
+  --color-text-tertiary: #a1a1aa;
+  --color-text-quaternary: #71717a;
+  --color-text-disabled: #52525b;
+  
+  /* Semantic Colors */
+  --color-success: #34d399;
+  --color-success-bg: rgb(52 211 153 / 0.1);
+  --color-success-border: rgb(52 211 153 / 0.2);
+  
+  --color-danger: #f87171;
+  --color-danger-bg: rgb(239 68 68 / 0.1);
+  --color-danger-border: rgb(239 68 68 / 0.2);
+  
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgb(251 191 36 / 0.1);
+  --color-warning-border: rgb(251 191 36 / 0.2);
+  
+  --color-info: #60a5fa;
+  --color-info-bg: rgb(96 165 250 / 0.1);
+  --color-info-border: rgb(96 165 250 / 0.2);
+  
+  /* Shadows */
+  --shadow-brand: 0 0 20px rgb(20 184 166 / 0.15);
+  --shadow-brand-hover: 0 0 25px rgb(20 184 166 / 0.25);
+}
+
+/* ============================================
+   GLOBAL RESETS
+   ============================================ */
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-brand);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-from-top {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in {
+  animation: slide-in-from-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-top {
+  animation: slide-in-from-top 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================
+   FOCUS VISIBLE STYLES
+   ============================================ */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.2);
+}

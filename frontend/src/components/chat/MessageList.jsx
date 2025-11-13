@@ -25,14 +25,14 @@ export default function MessageList({ messages, loading }) {
 
       {loading && (
         <div className="flex gap-4 message-enter">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center border border-white/10 bg-slate-900/50 backdrop-blur-xl">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center border border-white/10 bg-transparent backdrop-blur-xl">
             <LoadingSpinner size="sm" />
           </div>
-          <div className="bg-slate-900/50 backdrop-blur-xl px-5 py-4 rounded-2xl border border-white/10">
+          <div className="bg-transparent backdrop-blur-xl px-5 py-4 rounded-2xl border border-white/10">
             <div className="flex gap-1.5">
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+              <div className="w-2 h-2 bg-text-tertiary rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-text-tertiary rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+              <div className="w-2 h-2 bg-text-tertiary rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
             </div>
           </div>
         </div>

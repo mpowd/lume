@@ -268,7 +268,7 @@ export default function ChatPage() {
                       </div>
                       <div>
                         <h1 className="text-xl font-semibold text-white">Chat</h1>
-                        <p className="text-sm text-slate-400">Select a assistant to start</p>
+                        <p className="text-sm text-slate-400">Select an assistant to start</p>
                       </div>
                     </div>
                   </div>
@@ -432,7 +432,7 @@ export default function ChatPage() {
             <div className="gradient-border">
               <div className="gradient-border-inner p-4">
                 <div className="flex items-end gap-3">
-                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); handleSend() }}} placeholder={selectedAssistant ? "Ask me anything..." : "Select a assistant to start..."} disabled={!selectedAssistant || loading} rows={1} className="flex-1 bg-transparent text-white placeholder:text-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-slate-600 cursor-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }} />
+                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); handleSend() }}} placeholder={selectedAssistant ? "Ask me anything..." : "Select an assistant to start..."} disabled={!selectedAssistant || loading} rows={1} className="flex-1 bg-transparent text-white placeholder:text-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-slate-600 cursor-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }} />
                   <button onClick={handleSend} disabled={!input.trim() || !selectedAssistant || loading} className="flex-shrink-0 w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-slate-800 disabled:to-slate-800 transition-all duration-200 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 disabled:shadow-none">
                     {loading ? <Loader2 className="w-5 h-5 text-slate-500 animate-spin" /> : <Send className={`w-5 h-5 ${input.trim() && selectedAssistant ? 'text-white' : 'text-slate-600'}`} />}
                   </button>

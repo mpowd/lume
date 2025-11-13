@@ -1,11 +1,33 @@
 import { Loader2 } from 'lucide-react'
 
 const variants = {
-  primary: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40',
-  secondary: 'bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white',
-  danger: 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400',
-  success: 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-600/25',
-  ghost: 'bg-transparent hover:bg-white/5 text-slate-400 hover:text-white'
+  primary: `
+    border border-white/20 bg-transparent text-white
+    hover:border-brand-teal/50 hover:bg-white/5
+  `,
+  standout: `
+    border border-brand-teal/40 bg-[rgb(20,184,166,0.08)] text-white
+    hover:border-brand-teal/60 hover:bg-[rgb(20,184,166,0.12)]
+    shadow-[0_0_20px_rgb(20,184,166,0.15)]
+    hover:shadow-[0_0_25px_rgb(20,184,166,0.25)]
+    hover:-translate-y-0.5
+  `,
+  secondary: `
+    border border-white/10 bg-transparent text-text-tertiary
+    hover:border-brand-teal/30 hover:bg-white/5 hover:text-white
+  `,
+  ghost: `
+    border border-transparent bg-transparent text-text-tertiary
+    hover:bg-white/5 hover:border-brand-teal/20 hover:text-white
+  `,
+  danger: `
+    border border-danger-border bg-transparent text-danger
+    hover:border-[rgb(239,68,68,0.5)] hover:bg-danger-bg
+  `,
+  success: `
+    border border-success-border bg-transparent text-white
+    hover:border-[rgb(52,211,153,0.5)] hover:bg-success-bg
+  `
 }
 
 const sizes = {
@@ -36,11 +58,12 @@ export default function Button({
         ${variants[variant]}
         ${sizes[size]}
         ${fullWidth ? 'w-full' : ''}
-        rounded-xl font-medium transition-all
+        rounded-xl font-medium
         flex items-center justify-center gap-2
+        transition-all duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
-        hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100
-        cursor-pointer
+        active:scale-[0.98] disabled:active:scale-100
+        disabled:hover:translate-y-0
         ${className}
       `}
     >

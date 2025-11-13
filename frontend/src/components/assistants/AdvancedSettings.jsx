@@ -19,39 +19,39 @@ export default function AdvancedSettings({
       isOpen={showAdvanced}
       onToggle={() => setShowAdvanced(!showAdvanced)}
     >
-      <div className="space-y-6 p-6 bg-slate-950/30 rounded-xl border border-white/5">
+      <div className="space-y-6 p-6 bg-transparent rounded-xl border border-white/5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-slate-950/50 border border-white/10 rounded-xl hover:border-white/20 transition-all group">
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Hybrid Search</span>
+            <label className="flex items-center justify-between p-4 bg-transparent border border-white/10 rounded-xl hover:border-white/20 transition-all group cursor-pointer">
+              <span className="text-sm font-medium text-text-secondary group-hover:text-white transition-colors">Hybrid Search</span>
               <input
                 type="checkbox"
                 checked={formData.hybrid_search}
                 onChange={(e) => setFormData({...formData, hybrid_search: e.target.checked})}
-                className="w-5 h-5 rounded-lg"
+                className="w-5 h-5 rounded-lg cursor-pointer"
               />
             </label>
             
-            <label className="flex items-center justify-between p-4 bg-slate-950/50 border border-white/10 rounded-xl hover:border-white/20 transition-all group">
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">HyDE</span>
+            <label className="flex items-center justify-between p-4 bg-transparent border border-white/10 rounded-xl hover:border-white/20 transition-all group cursor-pointer">
+              <span className="text-sm font-medium text-text-secondary group-hover:text-white transition-colors">HyDE</span>
               <input
                 type="checkbox"
                 checked={formData.hyde}
                 onChange={(e) => setFormData({...formData, hyde: e.target.checked})}
-                className="w-5 h-5 rounded-lg"
+                className="w-5 h-5 rounded-lg cursor-pointer"
               />
             </label>
 
-            <label className="flex items-center justify-between p-4 bg-slate-950/50 border border-white/10 rounded-xl hover:border-white/20 transition-all group">
+            <label className="flex items-center justify-between p-4 bg-transparent border border-white/10 rounded-xl hover:border-white/20 transition-all group cursor-pointer">
               <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Precise Citation</span>
+                <Target className="w-4 h-4 text-brand-teal" />
+                <span className="text-sm font-medium text-text-secondary group-hover:text-white transition-colors">Precise Citation</span>
               </div>
               <input
                 type="checkbox"
                 checked={formData.precise_citation}
                 onChange={(e) => setFormData({...formData, precise_citation: e.target.checked})}
-                className="w-5 h-5 rounded-lg"
+                className="w-5 h-5 rounded-lg cursor-pointer"
               />
             </label>
           </div>
@@ -66,21 +66,21 @@ export default function AdvancedSettings({
               max="100"
             />
 
-            <label className="flex items-center justify-between p-4 bg-slate-950/50 border border-white/10 rounded-xl hover:border-white/20 transition-all group">
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Enable Reranking</span>
+            <label className="flex items-center justify-between p-4 bg-transparent border border-white/10 rounded-xl hover:border-white/20 transition-all group cursor-pointer">
+              <span className="text-sm font-medium text-text-secondary group-hover:text-white transition-colors">Enable Reranking</span>
               <input
                 type="checkbox"
                 checked={formData.reranking}
                 onChange={(e) => setFormData({...formData, reranking: e.target.checked})}
-                className="w-5 h-5 rounded-lg"
+                className="w-5 h-5 rounded-lg cursor-pointer"
               />
             </label>
 
             {formData.reranking && (
               <>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-300">Reranker Provider</label>
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950/50 rounded-xl border border-white/10">
+                  <label className="block text-sm font-medium text-text-secondary">Reranker Provider</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-transparent rounded-xl border border-white/10">
                     <button
                       type="button"
                       onClick={() => !formData.local_only && setFormData({
@@ -89,13 +89,15 @@ export default function AdvancedSettings({
                         reranker_model: 'rerank-v3.5'
                       })}
                       disabled={formData.local_only}
-                      className={`py-2.5 rounded-lg font-medium transition-all ${
-                        formData.reranker_provider === 'cohere'
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg'
+                      className={`
+                        py-2.5 rounded-lg font-medium transition-all
+                        ${formData.reranker_provider === 'cohere'
+                          ? 'border border-[rgb(168,85,247,0.5)] bg-white/5 text-white'
                           : formData.local_only
-                          ? 'text-slate-600 cursor-not-allowed'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                          ? 'border border-transparent text-text-disabled cursor-not-allowed'
+                          : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
+                        }
+                      `}
                     >
                       Cohere {formData.local_only && <Lock className="w-3 h-3 inline ml-1" />}
                     </button>
@@ -106,11 +108,13 @@ export default function AdvancedSettings({
                         reranker_provider: 'huggingface',
                         reranker_model: 'BAAI/bge-reranker-v2-m3'
                       })}
-                      className={`py-2.5 rounded-lg font-medium transition-all ${
-                        formData.reranker_provider === 'huggingface'
-                          ? 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`
+                        py-2.5 rounded-lg font-medium transition-all
+                        ${formData.reranker_provider === 'huggingface'
+                          ? 'border border-warning-border bg-white/5 text-white'
+                          : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
+                        }
+                      `}
                     >
                       HuggingFace
                     </button>
@@ -118,7 +122,7 @@ export default function AdvancedSettings({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-300">Reranker Model</label>
+                  <label className="block text-sm font-medium text-text-secondary">Reranker Model</label>
                   <div className="grid grid-cols-1 gap-2">
                     {formData.reranker_provider === 'cohere' ? (
                       COHERE_RERANKERS.map(model => (
@@ -126,11 +130,13 @@ export default function AdvancedSettings({
                           key={model}
                           type="button"
                           onClick={() => setFormData({...formData, reranker_model: model})}
-                          className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left ${
-                            formData.reranker_model === model
-                              ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg ring-2 ring-purple-400/50'
-                              : 'bg-slate-950/50 text-slate-400 border border-white/10 hover:border-white/20 hover:text-white'
-                          }`}
+                          className={`
+                            py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left
+                            ${formData.reranker_model === model
+                              ? 'border border-[rgb(168,85,247,0.5)] bg-white/5 text-white shadow-[0_0_20px_rgb(168,85,247,0.15)]'
+                              : 'bg-transparent text-text-tertiary border border-white/10 hover:border-white/20 hover:text-white'
+                            }
+                          `}
                         >
                           {model}
                         </button>
@@ -141,11 +147,13 @@ export default function AdvancedSettings({
                           key={model}
                           type="button"
                           onClick={() => setFormData({...formData, reranker_model: model})}
-                          className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left ${
-                            formData.reranker_model === model
-                              ? 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg ring-2 ring-yellow-400/50'
-                              : 'bg-slate-950/50 text-slate-400 border border-white/10 hover:border-white/20 hover:text-white'
-                          }`}
+                          className={`
+                            py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left
+                            ${formData.reranker_model === model
+                              ? 'border border-warning-border bg-white/5 text-white shadow-[0_0_20px_rgb(251,191,36,0.15)]'
+                              : 'bg-transparent text-text-tertiary border border-white/10 hover:border-white/20 hover:text-white'
+                            }
+                          `}
                         >
                           {model}
                         </button>
@@ -170,9 +178,9 @@ export default function AdvancedSettings({
         {/* Prompt Configuration Section */}
         <div className="pt-6 border-t border-white/10 space-y-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-300">Prompt Configuration</h3>
+            <h3 className="text-sm font-semibold text-text-secondary">Prompt Configuration</h3>
             {formData.precise_citation && (
-              <div className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-300 font-medium">
+              <div className="px-2 py-0.5 bg-info-bg border border-info-border rounded text-xs text-info font-medium">
                 Precise Citation Mode
               </div>
             )}
@@ -182,13 +190,13 @@ export default function AdvancedSettings({
           {formData.precise_citation ? (
             <>
               {/* Info box explaining precise citation mode */}
-              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-200">
-                  <p className="font-medium mb-1">Precise Citation Mode Active</p>
-                  <p className="text-xs text-blue-300">
+              <div className="flex gap-3 p-3 bg-info-bg border border-info-border rounded-lg">
+                <AlertCircle className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-text-secondary">
+                  <p className="font-medium mb-1 text-white">Precise Citation Mode Active</p>
+                  <p className="text-xs text-text-tertiary">
                     This prompt uses structured output to track which context chunks are used. 
-                    Required placeholders: <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{context_with_indices}'}</code>, <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{question}'}</code>, <code className="bg-blue-900/30 px-1 rounded text-blue-100">{'{format_instructions}'}</code>
+                    Required placeholders: <code className="bg-white/5 px-1 rounded text-text-secondary">{'{context_with_indices}'}</code>, <code className="bg-white/5 px-1 rounded text-text-secondary">{'{question}'}</code>, <code className="bg-white/5 px-1 rounded text-text-secondary">{'{format_instructions}'}</code>
                   </p>
                 </div>
               </div>
@@ -204,7 +212,7 @@ export default function AdvancedSettings({
               <button
                 type="button"
                 onClick={() => setFormData({...formData, precise_citation_prompt: defaultPreciseCitationPrompt})}
-                className="text-xs text-slate-400 hover:text-white transition-colors"
+                className="text-xs text-text-tertiary hover:text-white transition-colors"
               >
                 Reset to default precise citation prompt
               </button>
@@ -212,13 +220,13 @@ export default function AdvancedSettings({
           ) : (
             <>
               {/* Info box explaining standard mode */}
-              <div className="flex gap-3 p-3 bg-slate-800/50 border border-white/10 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-slate-300">
-                  <p className="font-medium mb-1">Standard RAG Mode</p>
-                  <p className="text-xs text-slate-400">
+              <div className="flex gap-3 p-3 bg-transparent border border-white/10 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-text-tertiary flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-text-secondary">
+                  <p className="font-medium mb-1 text-white">Standard RAG Mode</p>
+                  <p className="text-xs text-text-tertiary">
                     This prompt generates answers using all retrieved context. 
-                    Required placeholders: <code className="bg-slate-700/50 px-1 rounded text-slate-300">{'{context}'}</code>, <code className="bg-slate-700/50 px-1 rounded text-slate-300">{'{question}'}</code>
+                    Required placeholders: <code className="bg-white/5 px-1 rounded text-text-secondary">{'{context}'}</code>, <code className="bg-white/5 px-1 rounded text-text-secondary">{'{question}'}</code>
                   </p>
                 </div>
               </div>
@@ -234,7 +242,7 @@ export default function AdvancedSettings({
               <button
                 type="button"
                 onClick={() => setFormData({...formData, rag_prompt: defaultRagPrompt})}
-                className="text-xs text-slate-400 hover:text-white transition-colors"
+                className="text-xs text-text-tertiary hover:text-white transition-colors"
               >
                 Reset to default RAG prompt
               </button>

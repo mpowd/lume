@@ -1,4 +1,3 @@
-
 export default function FormInput({
   label,
   type = 'text',
@@ -14,8 +13,8 @@ export default function FormInput({
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          {label} {required && <span className="text-red-400">*</span>}
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          {label} {required && <span className="text-danger">*</span>}
         </label>
       )}
       <input
@@ -27,7 +26,14 @@ export default function FormInput({
         min={min}
         max={max}
         step={step}
-        className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all hover:border-white/20"
+        className="
+          w-full px-4 py-3 
+          bg-transparent border border-white/10 rounded-xl 
+          text-white placeholder:text-text-quaternary 
+          transition-all duration-200
+          hover:border-white/20
+          focus:outline-none focus:border-brand-teal/50
+        "
       />
     </div>
   )

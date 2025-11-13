@@ -59,13 +59,13 @@ export default function KnowledgeBasePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-slate-400">Loading...</div>
+        <div className="text-text-tertiary">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-full flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-full flex bg-background">
       <CollectionSidebar
         collections={collections}
         activeCollection={activeCollection}
@@ -84,24 +84,24 @@ export default function KnowledgeBasePage() {
         ) : view === 'menu' ? (
           <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full mb-4">
-                <DatabaseIcon className="w-5 h-5 text-blue-400" />
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-transparent border border-brand-teal/30 rounded-full mb-4">
+                <DatabaseIcon className="w-5 h-5 text-brand-teal" />
                 <h1 className="text-xl font-semibold text-white">{activeCollection}</h1>
               </div>
-              <p className="text-slate-400">What would you like to do?</p>
+              <p className="text-text-tertiary">What would you like to do?</p>
             </div>
 
             <div className="grid gap-4 mb-8">
               <Card onClick={() => setView('add')} className="p-8" hover>
                 <div className="flex items-start gap-6">
-                  <div className="p-4 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl transition-all">
-                    <Upload className="w-8 h-8 text-blue-400" />
+                  <div className="p-4 bg-transparent border border-brand-teal/30 rounded-2xl transition-all group-hover:border-brand-teal/50">
+                    <Upload className="w-8 h-8 text-brand-teal" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                    <h3 className="text-xl font-semibold text-white mb-2 transition-colors">
                       Add Knowledge
                     </h3>
-                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
+                    <p className="text-text-tertiary transition-colors">
                       Import content from websites, files, or other sources
                     </p>
                   </div>
@@ -110,14 +110,14 @@ export default function KnowledgeBasePage() {
 
               <Card onClick={() => setView('view')} className="p-8" hover>
                 <div className="flex items-start gap-6">
-                  <div className="p-4 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl transition-all">
-                    <Eye className="w-8 h-8 text-purple-400" />
+                  <div className="p-4 bg-transparent border border-white/20 rounded-2xl transition-all group-hover:border-brand-teal/50">
+                    <Eye className="w-8 h-8 text-text-secondary" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                    <h3 className="text-xl font-semibold text-white mb-2 transition-colors">
                       View Knowledge
                     </h3>
-                    <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
+                    <p className="text-text-tertiary transition-colors">
                       Browse and manage your stored documents and vectors
                     </p>
                   </div>
@@ -149,7 +149,7 @@ export default function KnowledgeBasePage() {
 
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold text-white mb-3">View Knowledge</h2>
-              <p className="text-slate-400">Access your stored data through these interfaces</p>
+              <p className="text-text-tertiary">Access your stored data through these interfaces</p>
             </div>
 
             <div className="space-y-4">
@@ -160,17 +160,17 @@ export default function KnowledgeBasePage() {
               >
                 <Card className="p-8" hover>
                   <div className="flex items-center gap-6">
-                    <div className="p-5 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl transition-all">
-                      <DatabaseIcon className="w-10 h-10 text-purple-400" />
+                    <div className="p-5 bg-transparent border border-white/20 rounded-2xl transition-all group-hover:border-brand-teal/50">
+                      <DatabaseIcon className="w-10 h-10 text-text-secondary group-hover:text-brand-teal transition-colors" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-2xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                      <h3 className="text-2xl font-semibold text-white mb-2 transition-colors">
                         Qdrant Vector Database
                       </h3>
-                      <p className="text-slate-400 group-hover:text-slate-300 transition-colors mb-3">
+                      <p className="text-text-tertiary transition-colors mb-3">
                         Browse and search through vector embeddings
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-slate-500 group-hover:text-purple-400 transition-colors">
+                      <div className="flex items-center gap-2 text-sm text-text-quaternary group-hover:text-brand-teal transition-colors">
                         <span className="font-mono">localhost:6333</span>
                         <ExternalLink className="w-4 h-4" />
                       </div>
@@ -186,17 +186,17 @@ export default function KnowledgeBasePage() {
               >
                 <Card className="p-8" hover>
                   <div className="flex items-center gap-6">
-                    <div className="p-5 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl transition-all">
-                      <FileText className="w-10 h-10 text-blue-400" />
+                    <div className="p-5 bg-transparent border border-white/20 rounded-2xl transition-all group-hover:border-brand-teal/50">
+                      <FileText className="w-10 h-10 text-text-secondary group-hover:text-brand-teal transition-colors" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-2xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-2xl font-semibold text-white mb-2 transition-colors">
                         MongoDB Document Store
                       </h3>
-                      <p className="text-slate-400 group-hover:text-slate-300 transition-colors mb-3">
+                      <p className="text-text-tertiary transition-colors mb-3">
                         View original documents and metadata
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-slate-500 group-hover:text-blue-400 transition-colors">
+                      <div className="flex items-center gap-2 text-sm text-text-quaternary group-hover:text-brand-teal transition-colors">
                         <span className="font-mono">localhost:8081</span>
                         <ExternalLink className="w-4 h-4" />
                       </div>

@@ -17,19 +17,19 @@ export default function CollectionSidebar({
           <div className="flex gap-2">
             <button
               onClick={onRefresh}
-              className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/30 rounded-xl transition-all cursor-pointer"
+              className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
             >
-              <RefreshCw className="w-4 h-4 text-blue-400" />
+              <RefreshCw className="w-4 h-4 text-brand-teal" />
             </button>
             <button
               onClick={onCreate}
-              className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/30 rounded-xl transition-all cursor-pointer"
+              className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
             >
-              <Plus className="w-4 h-4 text-blue-400" />
+              <Plus className="w-4 h-4 text-brand-teal" />
             </button>
           </div>
         </div>
-        <p className="text-sm text-slate-400">Your knowledge sources</p>
+        <p className="text-sm text-text-tertiary">Your knowledge sources</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -49,25 +49,25 @@ export default function CollectionSidebar({
             <button
               key={collection}
               onClick={() => onSelect(collection)}
-              className={`w-full text-left p-4 rounded-xl transition-all group cursor-pointer ${
+              className={`w-full text-left p-4 rounded-xl transition-all group ${
                 activeCollection === collection
-                  ? 'bg-blue-500/10 border border-blue-500/30'
-                  : 'bg-slate-900/30 border border-white/5 hover:border-white/10 hover:bg-slate-900/50'
+                  ? 'bg-white/5 border border-brand-teal/50'
+                  : 'bg-transparent border border-white/5 hover:border-white/10 hover:bg-white/[0.02]'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg transition-all ${
-                  activeCollection === collection ? 'bg-blue-500/20' : 'bg-slate-800/50 group-hover:bg-slate-800'
+                  activeCollection === collection ? 'bg-transparent border border-brand-teal/30' : 'bg-transparent border border-white/10 group-hover:border-white/20'
                 }`}>
-                  <Database className={`w-4 h-4 ${activeCollection === collection ? 'text-blue-400' : 'text-slate-400'}`} />
+                  <Database className={`w-4 h-4 ${activeCollection === collection ? 'text-brand-teal' : 'text-text-tertiary'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-medium truncate ${activeCollection === collection ? 'text-white' : 'text-slate-300'}`}>
+                  <p className={`font-medium truncate ${activeCollection === collection ? 'text-white' : 'text-text-secondary'}`}>
                     {collection}
                   </p>
                 </div>
                 {activeCollection === collection && (
-                  <ChevronRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-brand-teal flex-shrink-0" />
                 )}
               </div>
             </button>

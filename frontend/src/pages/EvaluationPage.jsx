@@ -64,24 +64,24 @@ export default function EvaluationPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <div className="h-full flex items-center justify-center bg-background">
         <LoadingSpinner />
       </div>
     )
   }
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-full bg-background">
       {/* Header */}
-      <div className="border-b border-white/5 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-white/5 bg-background-elevated/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-[1600px] mx-auto px-8 py-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-xl bg-transparent border border-white/20 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-text-secondary" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Evaluation</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm text-text-tertiary mt-0.5">
                 Test and measure assistant performance
               </p>
             </div>

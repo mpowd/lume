@@ -86,7 +86,7 @@ export default function AssistantsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-background">
       <PageHeader
         icon={Bot}
         title="Assistants"
@@ -121,7 +121,6 @@ export default function AssistantsPage() {
         />
       </div>
 
-      {}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={closeConfirmDialog}

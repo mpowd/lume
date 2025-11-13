@@ -8,7 +8,7 @@ export default function MessageBubble({ message }) {
     <div className={`flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''} message-enter`}>
       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 border border-white/10 ${
         role === 'user' 
-          ? 'bg-gradient-to-br from-blue-500 to-purple-600' 
+          ? 'bg-transparent border border-brand-teal/30' 
           : 'bg-slate-900/50 backdrop-blur-xl'
       }`}>
         {role === 'user' ? (
@@ -21,7 +21,7 @@ export default function MessageBubble({ message }) {
       <div className="flex-1 max-w-[80%] space-y-3">
         <div className={`px-5 py-4 rounded-2xl ${
           role === 'user' 
-            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+            ? 'bg-transparent border border-brand-teal/30 text-white' 
             : 'bg-slate-900/50 backdrop-blur-xl text-slate-100 border border-white/10'
         }`}>
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{content}</p>

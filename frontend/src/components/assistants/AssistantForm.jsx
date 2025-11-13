@@ -154,7 +154,7 @@ export default function AssistantForm({
   return (
     <Card className="p-8">
       <div className="flex items-center gap-3 mb-6">
-        <Sparkles className="w-5 h-5 text-blue-400" />
+        <Sparkles className="w-5 h-5 text-brand-teal" />
         <h2 className="text-xl font-semibold text-white">
           {assistant ? 'Edit Assistant' : 'Create New Assistant'}
         </h2>
@@ -171,27 +171,31 @@ export default function AssistantForm({
           />
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">Workflow Type</label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950/50 rounded-xl border border-white/10">
+            <label className="block text-sm font-medium text-text-secondary">Workflow Type</label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-transparent rounded-xl border border-white/10">
               <button
                 type="button"
                 onClick={() => setFormData({...formData, workflow: 'linear'})}
-                className={`py-2.5 rounded-lg font-medium transition-all ${
-                  formData.workflow === 'linear'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`
+                  py-2.5 rounded-lg font-medium transition-all
+                  ${formData.workflow === 'linear'
+                    ? 'border border-brand-teal/50 bg-white/5 text-white'
+                    : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
+                  }
+                `}
               >
                 Linear
               </button>
               <button
                 type="button"
                 onClick={() => setFormData({...formData, workflow: 'agentic'})}
-                className={`py-2.5 rounded-lg font-medium transition-all ${
-                  formData.workflow === 'agentic'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`
+                  py-2.5 rounded-lg font-medium transition-all
+                  ${formData.workflow === 'agentic'
+                    ? 'border border-brand-teal/50 bg-white/5 text-white'
+                    : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
+                  }
+                `}
               >
                 Agentic
               </button>
@@ -202,13 +206,13 @@ export default function AssistantForm({
         {formData.workflow === 'linear' && (
           <>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-300 mb-3">
+              <label className="block text-sm font-medium text-text-secondary mb-3">
                 <Database className="w-4 h-4 inline mr-2" />
-                Knowledge Sources {formData.collections.length === 0 && <span className="text-red-400 text-xs">(Select at least one)</span>}
+                Knowledge Sources {formData.collections.length === 0 && <span className="text-danger text-xs">(Select at least one)</span>}
               </label>
               {collections.length === 0 ? (
-                <div className="p-4 bg-slate-950/50 border border-white/10 rounded-xl text-center">
-                  <p className="text-slate-400 text-sm">No knowledge bases available. Please create one first.</p>
+                <div className="p-4 bg-transparent border border-white/10 rounded-xl text-center">
+                  <p className="text-text-tertiary text-sm">No knowledge bases available. Please create one first.</p>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -217,13 +221,16 @@ export default function AssistantForm({
                       key={col}
                       type="button"
                       onClick={() => toggleCollection(col)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        formData.collections.includes(col)
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                          : 'bg-slate-950/50 text-slate-400 border border-white/10 hover:border-white/20 hover:text-white'
-                      }`}
+                      className={`
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all 
+                        flex items-center gap-1
+                        ${formData.collections.includes(col)
+                          ? 'border border-brand-teal/50 bg-white/5 text-white'
+                          : 'bg-transparent text-text-tertiary border border-white/10 hover:border-brand-teal/30 hover:text-white'
+                        }
+                      `}
                     >
-                      {formData.collections.includes(col) && <Check className="w-3 h-3 inline mr-1" />}
+                      {formData.collections.includes(col) && <Check className="w-3 h-3" />}
                       {col}
                     </button>
                   ))}
@@ -231,13 +238,13 @@ export default function AssistantForm({
               )}
             </div>
 
-            <div className="p-4 bg-slate-950/30 border border-white/10 rounded-xl">
+            <div className="p-4 bg-transparent border border-white/10 rounded-xl">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-3">
-                  <Lock className="w-5 h-5 text-green-400" />
+                  <Lock className="w-5 h-5 text-success" />
                   <div>
-                    <span className="text-sm font-medium text-slate-300">Local Data Processing Only</span>
-                    <p className="text-xs text-slate-500 mt-1">Restrict to local models and processing (no external APIs)</p>
+                    <span className="text-sm font-medium text-text-secondary">Local Data Processing Only</span>
+                    <p className="text-xs text-text-quaternary mt-1">Restrict to local models and processing (no external APIs)</p>
                   </div>
                 </div>
                 <input
@@ -271,7 +278,7 @@ export default function AssistantForm({
         <div className="flex gap-3 pt-4">
           <Button
             type="submit"
-            variant="primary"
+            variant="standout"
             fullWidth
             loading={loading}
             disabled={!formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0)}

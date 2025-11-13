@@ -29,7 +29,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
       {carouselScroll > 0 && (
         <button 
           onClick={() => scrollCarousel('left')} 
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-slate-900/90 hover:bg-slate-800 border border-white/10 rounded-2xl transition-all cursor-pointer shadow-lg"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-white/5 border border-white/10 rounded-2xl transition-all shadow-lg"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
@@ -44,18 +44,18 @@ export default function AssistantSelector({ assistants, onSelect }) {
           <div 
             key={bot.id} 
             onClick={() => onSelect(bot)} 
-            className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-slate-900/30 border-white/10 hover:border-white/20 hover:bg-slate-900/50"
+            className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-transparent border-white/10 hover:border-brand-teal/30 hover:bg-white/[0.02]"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-slate-800/50">
-                  <Bot className="w-5 h-5 text-slate-400" />
+                <div className="p-2 rounded-xl bg-transparent border border-white/10">
+                  <Bot className="w-5 h-5 text-brand-teal" />
                 </div>
                 <h3 className="font-semibold text-white text-base">{bot.name}</h3>
               </div>
             </div>
 
-            <p className="text-sm text-slate-400 mb-4 line-clamp-2">
+            <p className="text-sm text-text-tertiary mb-4 line-clamp-2">
               {bot.workflow === 'agentic' 
                 ? 'Agentic workflow with tools' 
                 : `RAG assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
@@ -64,11 +64,11 @@ export default function AssistantSelector({ assistants, onSelect }) {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs">
-                <div className="p-1.5 bg-slate-800/50 rounded-lg">
-                  <Database className="w-3.5 h-3.5 text-blue-400" />
+                <div className="p-1.5 bg-transparent border border-white/10 rounded-lg">
+                  <Database className="w-3.5 h-3.5 text-brand-teal" />
                 </div>
-                <span className="text-slate-400">Knowledge:</span>
-                <span className="text-slate-300 font-medium">
+                <span className="text-text-tertiary">Knowledge:</span>
+                <span className="text-text-secondary font-medium">
                   {bot.collections && bot.collections.length > 0 
                     ? bot.collections.length === 1 
                       ? bot.collections[0] 
@@ -78,11 +78,11 @@ export default function AssistantSelector({ assistants, onSelect }) {
               </div>
 
               <div className="flex items-center gap-2 text-xs">
-                <div className="p-1.5 bg-slate-800/50 rounded-lg">
-                  <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                <div className="p-1.5 bg-transparent border border-white/10 rounded-lg">
+                  <Cpu className="w-3.5 h-3.5 text-brand-teal" />
                 </div>
-                <span className="text-slate-400">Model:</span>
-                <span className="text-slate-300 font-medium">{bot.llm || 'Not set'}</span>
+                <span className="text-text-tertiary">Model:</span>
+                <span className="text-text-secondary font-medium">{bot.llm || 'Not set'}</span>
               </div>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
       {carouselRef.current && carouselScroll < (carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10) && (
         <button 
           onClick={() => scrollCarousel('right')} 
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-slate-900/90 hover:bg-slate-800 border border-white/10 rounded-2xl transition-all cursor-pointer shadow-lg"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-white/5 border border-white/10 rounded-2xl transition-all shadow-lg"
         >
           <ChevronRight className="w-5 h-5 text-white" />
         </button>
