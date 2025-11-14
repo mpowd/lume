@@ -41,18 +41,17 @@ const SmartTooltip = ({ source, context, index, getSourceUrl, getSourceScore, ge
         href={url} 
         target="_blank" 
         rel="noopener noreferrer" 
-        className="block px-3 py-1.5 rounded-xl transition-all cursor-pointer hover:opacity-90" 
-        style={getSourceStyle(score)}
+        className="block px-2.5 py-1 bg-transparent border border-white/5 hover:border-brand-teal/30 rounded-lg transition-all cursor-pointer" 
       >
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${getDotColor(score)}`} />
-          <span className="text-xs text-white font-medium">{getSourceDomain(source)}</span>
+        <div className="flex items-center gap-1.5">
+          <div className={`w-1.5 h-1.5 rounded-full ${getDotColor(score)}`} />
+          <span className="text-[11px] text-text-tertiary font-medium">{getSourceDomain(source)}</span>
           {hasScore && (
-            <span className="text-[10px] text-white/70">
+            <span className="text-[10px] text-text-quaternary">
               {(score * 100).toFixed(0)}%
             </span>
           )}
-          <svg className="w-3 h-3 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-2.5 h-2.5 text-text-quaternary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
         </div>
@@ -66,43 +65,43 @@ const SmartTooltip = ({ source, context, index, getSourceUrl, getSourceScore, ge
             [showBelow ? 'marginTop' : 'marginBottom']: '0.5rem'
           }}
         >
-          <div className="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 shadow-2xl shadow-blue-500/20 max-h-[60vh] flex flex-col">
+          <div className="bg-background-elevated border border-brand-teal/30 rounded-2xl p-4 shadow-2xl shadow-brand-teal/20 max-h-[60vh] flex flex-col">
             <div className="flex items-start gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-              <span className="text-xs font-semibold text-blue-400">Relevant chunk</span>
+              <Sparkles className="w-4 h-4 text-brand-teal flex-shrink-0 mt-0.5" />
+              <span className="text-xs font-semibold text-brand-teal">Relevant chunk</span>
             </div>
-            <div className="chunk-content overflow-y-auto text-sm text-slate-300 pr-2 flex-1">
+            <div className="chunk-content overflow-y-auto text-sm text-text-secondary pr-2 flex-1">
               <ReactMarkdown 
                 components={{
-                  h1: ({node, ...props}) => <h1 className="text-lg font-bold text-slate-100 mt-4 mb-2 first:mt-0" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-base font-semibold text-slate-100 mt-3 mb-2 first:mt-0" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-slate-100 mt-2 mb-1 first:mt-0" {...props} />,
+                  h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mt-4 mb-2 first:mt-0" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-base font-semibold text-white mt-3 mb-2 first:mt-0" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white mt-2 mb-1 first:mt-0" {...props} />,
                   p: ({node, ...props}) => <p className="mb-3 leading-relaxed" {...props} />,
                   ul: ({node, ...props}) => <ul className="list-disc ml-5 mb-3 space-y-1" {...props} />,
                   ol: ({node, ...props}) => <ol className="list-decimal ml-5 mb-3 space-y-1" {...props} />,
                   li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
                   code: ({node, inline, ...props}) => inline 
-                    ? <code className="bg-slate-800/80 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props} /> 
-                    : <code className="block bg-slate-800/80 border border-slate-700/50 text-slate-300 p-3 rounded-lg overflow-x-auto text-xs font-mono" {...props} />,
+                    ? <code className="bg-white/5 text-brand-teal px-1.5 py-0.5 rounded text-xs font-mono" {...props} /> 
+                    : <code className="block bg-white/5 border border-white/10 text-text-secondary p-3 rounded-lg overflow-x-auto text-xs font-mono" {...props} />,
                   pre: ({node, ...props}) => <pre className="mb-3" {...props} />,
-                  a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
-                  strong: ({node, ...props}) => <strong className="font-semibold text-slate-100" {...props} />,
+                  a: ({node, ...props}) => <a className="text-brand-teal hover:underline" {...props} />,
+                  strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
                   em: ({node, ...props}) => <em className="italic" {...props} />,
-                  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-slate-400 my-3" {...props} />,
+                  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-brand-teal pl-4 italic text-text-tertiary my-3" {...props} />,
                 }}
               >
                 {context}
               </ReactMarkdown>
             </div>
             {hasScore && (
-              <div className="mt-3 pt-2 border-t border-slate-700/50 text-xs text-slate-400">
+              <div className="mt-3 pt-2 border-t border-white/10 text-xs text-text-tertiary">
                 <span className="font-semibold">Relevance Score:</span> {(score * 100).toFixed(1)}%
               </div>
             )}
           </div>
           {/* Arrow pointing to the source */}
           <div 
-            className="w-3 h-3 bg-slate-900 border-blue-500/30 transform rotate-45 absolute left-6"
+            className="w-3 h-3 bg-background-elevated border-brand-teal/30 transform rotate-45 absolute left-6"
             style={{
               [showBelow ? 'top' : 'bottom']: '-6px',
               borderTop: showBelow ? '1px solid' : 'none',

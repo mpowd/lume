@@ -152,7 +152,7 @@ export default function ChatPage() {
           className="flex-1 overflow-y-auto px-6 pb-8" 
           style={{ 
             marginTop: selectedAssistant ? '90px' : '280px', 
-            marginBottom: '140px' 
+            marginBottom: '120px' 
           }}
         >
           <MessageList messages={messages} loading={loading} />

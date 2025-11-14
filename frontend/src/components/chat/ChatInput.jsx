@@ -26,10 +26,27 @@ export default function ChatInput({ onSend, disabled, loading }) {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-white/5 bg-background-elevated/95 backdrop-blur-xl p-6">
+    <div className="fixed bottom-0 left-0 right-0 z-10 p-6">
+      <style>{`
+        .chat-textarea {
+          outline: none !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        .chat-textarea:focus {
+          outline: none !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        .chat-textarea:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+      `}</style>
       <div className="max-w-4xl mx-auto">
-        <div className="relative bg-transparent border border-white/10 hover:border-brand-teal/30 rounded-3xl p-4 transition-all">
-          <div className="flex items-end gap-3">
+        <div className="relative bg-transparent border border-white/10 hover:border-brand-teal/30 rounded-3xl transition-all">
+          <div className="flex items-center gap-3 px-5 py-3">
             <textarea
               ref={textareaRef}
               value={input}
@@ -38,8 +55,15 @@ export default function ChatInput({ onSend, disabled, loading }) {
               placeholder={disabled ? "Select an assistant to start..." : "Ask me anything..."}
               disabled={disabled || loading}
               rows={1}
-              className="flex-1 bg-transparent text-white placeholder:text-text-quaternary focus:outline-none resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-text-disabled"
-              style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
+              className="chat-textarea flex-1 bg-transparent text-white placeholder:text-text-quaternary resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-text-disabled"
+              style={{ 
+                scrollbarWidth: 'thin', 
+                scrollbarColor: 'rgba(255,255,255,0.1) transparent',
+                minHeight: '24px',
+                outline: 'none',
+                boxShadow: 'none',
+                border: 'none'
+              }}
             />
             <button
               onClick={handleSend}
@@ -54,9 +78,6 @@ export default function ChatInput({ onSend, disabled, loading }) {
             </button>
           </div>
         </div>
-        <p className="text-center text-xs text-text-quaternary mt-4">
-          AI can make mistakes. Verify important information.
-        </p>
       </div>
     </div>
   )

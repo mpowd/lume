@@ -144,8 +144,14 @@ body,
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-textarea:focus-visible,
 select:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgb(20 184 166 / 0.2);
+}
+
+/* Override focus styles for textarea - no focus rectangle */
+textarea:focus-visible,
+textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }

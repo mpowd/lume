@@ -5,9 +5,9 @@ import { getSourceDomain, getSourceUrl, getSourceScore, getSourceStyle, getDotCo
 export default function SourcesList({ sources, contexts }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/30 rounded-xl">
-        <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-xs font-medium text-slate-400">Sources</span>
+      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-white/5 rounded-lg">
+        <Sparkles className="w-3 h-3 text-brand-teal" />
+        <span className="text-[11px] font-medium text-text-quaternary">Sources</span>
       </div>
 
       {sources.map((source, i) => (
