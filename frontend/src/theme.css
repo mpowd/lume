@@ -66,6 +66,11 @@ body,
   min-height: 100vh;
 }
 
+/* Prevent blue flash on page load */
+body {
+  background-color: #0f0f0f !important;
+}
+
 /* ============================================
    CUSTOM SCROLLBAR
    ============================================ */
@@ -85,7 +90,7 @@ body,
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-brand);
+  background: var(--color-brand-teal);
 }
 
 /* ============================================
@@ -154,4 +159,17 @@ textarea:focus-visible,
 textarea:focus {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* ============================================
+   CHECKBOX STYLING - TURQUOISE ACCENT
+   ============================================ */
+
+input[type="checkbox"] {
+  accent-color: var(--color-brand-teal);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--color-brand-teal);
+  border-color: var(--color-brand-teal);
 }

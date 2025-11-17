@@ -34,7 +34,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
           left: 0;
           width: 100%;
           height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+          background: linear-gradient(90deg, transparent, rgba(20, 184, 166, 0.1), transparent);
           animation: progress-shimmer 2s infinite;
         }
       `}</style>
@@ -44,8 +44,8 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
           {/* Header Status */}
           <div className="text-center mb-8">
             {isComplete ? (
-              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-10 h-10 text-green-400" />
+              <div className="w-20 h-20 bg-brand-teal/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-10 h-10 text-brand-teal" />
               </div>
             ) : isError ? (
               <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -53,9 +53,9 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
               </div>
             ) : (
               <div className="relative w-20 h-20 mx-auto mb-4">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse" />
+                <div className="absolute inset-0 bg-brand-teal/20 rounded-full animate-pulse" />
                 <div className="absolute inset-2 bg-slate-900 rounded-full flex items-center justify-center">
-                  <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+                  <Loader2 className="w-10 h-10 text-brand-teal animate-spin" />
                 </div>
               </div>
             )}
@@ -79,13 +79,13 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className={`w-5 h-5 ${
-                      isScraping || isChunking ? 'text-blue-400 animate-pulse' : 
-                      isEmbedding || isComplete ? 'text-green-400' : 
+                      isScraping || isChunking ? 'text-white animate-pulse' : 
+                      isEmbedding || isComplete ? 'text-brand-teal' : 
                       'text-slate-500'
                     }`} />
                     <span className={`font-medium ${
                       isScraping || isChunking ? 'text-white' : 
-                      isEmbedding || isComplete ? 'text-green-400' : 
+                      isEmbedding || isComplete ? 'text-brand-teal' : 
                       'text-slate-500'
                     }`}>
                       Stage 1: Scraping & Chunking
@@ -101,7 +101,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                   total={progress.total || 0}
                   showPercentage
                   className={isScraping || isChunking ? 'progress-shimmer' : ''}
-                  color={isEmbedding || isComplete ? 'green' : 'blue'}
+                  color={isEmbedding || isComplete ? 'teal' : 'white'}
                 />
 
                 {progress.current_url && (isScraping || isChunking) && (
@@ -117,13 +117,13 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className={`w-5 h-5 ${
-                      isEmbedding ? 'text-purple-400 animate-pulse' : 
-                      isComplete ? 'text-green-400' : 
+                      isEmbedding ? 'text-brand-teal animate-pulse' : 
+                      isComplete ? 'text-brand-teal' : 
                       'text-slate-500'
                     }`} />
                     <span className={`font-medium ${
                       isEmbedding ? 'text-white' : 
-                      isComplete ? 'text-green-400' : 
+                      isComplete ? 'text-brand-teal' : 
                       'text-slate-500'
                     }`}>
                       Stage 2: Creating Embeddings
@@ -143,12 +143,12 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                       total={totalChunks}
                       showPercentage={true}
                       className={isEmbedding ? 'progress-shimmer' : ''}
-                      color={isComplete ? 'green' : 'purple'}
+                      color={isComplete ? 'teal' : 'teal'}
                     />
                     
                     {isEmbedding && (
-                      <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                        <div className="text-sm text-purple-300">
+                      <div className="p-3 bg-brand-teal/10 border border-brand-teal/20 rounded-lg">
+                        <div className="text-sm text-slate-300">
                           Generating vector embeddings and storing in database...
                         </div>
                       </div>
@@ -205,7 +205,7 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
           {(isComplete || isError) && onClose && (
             <button
               onClick={onClose}
-              className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+              className="w-full py-3 px-4 bg-brand-teal hover:bg-brand-teal-dark text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
             >
               {isComplete ? 'Done' : 'Close'}
             </button>

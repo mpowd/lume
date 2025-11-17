@@ -99,7 +99,7 @@ export default function ManualUrlEntry({ collectionName, onBack, onComplete }) {
           <style>{`
             .scrollbar-thin::-webkit-scrollbar { width: 8px; }
             .scrollbar-thin::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
-            .scrollbar-thin::-webkit-scrollbar-thumb { background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234)); border-radius: 4px; }
+            .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-brand-teal); border-radius: 4px; }
           `}</style>
 
           {urls.map((url, index) => (
@@ -110,12 +110,12 @@ export default function ManualUrlEntry({ collectionName, onBack, onComplete }) {
               <div className="flex items-start gap-3">
                 <div className={`p-3 rounded-xl flex-shrink-0 ${
                   url && !urlErrors[index] 
-                    ? 'bg-blue-500/20' 
+                    ? 'bg-brand-teal/20' 
                     : 'bg-slate-800/50'
                 }`}>
                   <Globe className={`w-5 h-5 ${
                     url && !urlErrors[index] 
-                      ? 'text-blue-400' 
+                      ? 'text-brand-teal' 
                       : 'text-slate-400'
                   }`} />
                 </div>
@@ -136,7 +136,7 @@ export default function ManualUrlEntry({ collectionName, onBack, onComplete }) {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                      className="flex items-center gap-2 text-sm text-brand-teal hover:text-brand-teal-dark transition-colors"
                     >
                       <span>Preview URL</span>
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -178,15 +178,16 @@ export default function ManualUrlEntry({ collectionName, onBack, onComplete }) {
             icon={Database}
             fullWidth
             size="lg"
+            className="bg-brand-teal hover:bg-brand-teal-dark text-white font-semibold shadow-lg hover:shadow-xl transition-all"
           >
             Add {validUrlCount} URL{validUrlCount !== 1 ? 's' : ''}
           </Button>
         </div>
 
-        <Card className="p-6 bg-gradient-to-br from-purple-500/5 to-blue-500/5 border-purple-500/20">
+        <Card className="p-6 bg-gradient-to-br from-brand-teal/5 to-brand-teal/10 border-brand-teal/20">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-purple-500/10 rounded-xl">
-              <Globe className="w-6 h-6 text-purple-400" />
+            <div className="p-3 bg-brand-teal/10 rounded-xl">
+              <Globe className="w-6 h-6 text-brand-teal" />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-white mb-1">Manual URL Control</h4>

@@ -251,7 +251,7 @@ export default function AssistantForm({
                   type="checkbox"
                   checked={formData.local_only}
                   onChange={(e) => handleLocalOnlyToggle(e.target.checked)}
-                  className="w-5 h-5 rounded-lg cursor-pointer"
+                  className="w-5 h-5 rounded-lg cursor-pointer accent-brand-teal"
                 />
               </label>
             </div>

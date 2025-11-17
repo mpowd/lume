@@ -7,8 +7,8 @@ const TYPE_CONFIG = {
   qa: {
     icon: MessageSquare,
     label: 'Q&A',
-    color: 'from-blue-500/20 to-purple-500/20',
-    hoverColor: 'from-blue-500/30 to-purple-500/30'
+    color: 'from-brand-teal/20 to-brand-teal-dark/20',
+    hoverColor: 'from-brand-teal/30 to-brand-teal-dark/30'
   },
   retrieval: {
     icon: FileSearch,
@@ -65,10 +65,10 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className={`p-2.5 bg-gradient-to-br ${typeConfig.color} rounded-xl group-hover:${typeConfig.hoverColor} transition-all`}>
-            <Icon className="w-5 h-5 text-blue-400" />
+            <Icon className="w-5 h-5 text-brand-teal" />
           </div>
           <div>
-            <h3 className="font-semibold text-white text-lg group-hover:text-blue-400 transition-colors">
+            <h3 className="font-semibold text-white text-lg group-hover:text-brand-teal transition-colors">
               {assistant.name}
             </h3>
             <div className="flex items-center gap-2 mt-1">
@@ -129,7 +129,7 @@ export default function AssistantCard({ assistant, onEdit, onDelete }) {
             e.stopPropagation()
             onEdit(assistant)
           }}
-          className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all font-medium"
+          className="flex-1 flex items-center justify-center gap-2 py-2 text-brand-teal hover:bg-brand-teal/10 rounded-xl transition-all font-medium"
           style={{cursor: 'pointer'}}
         >
           <Edit2 className="w-4 h-4" />

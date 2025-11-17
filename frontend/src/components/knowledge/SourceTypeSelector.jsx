@@ -19,30 +19,27 @@ export default function SourceTypeSelector({ onSelect }) {
               disabled={!type.implemented}
               className={`group relative overflow-hidden p-8 rounded-2xl border transition-all text-left ${
                 type.implemented
-                  ? 'bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border-white/10 hover:border-blue-500/30 cursor-pointer'
+                  ? 'bg-gradient-to-br from-slate-900/50 to-slate-900/30 hover:from-slate-900/70 hover:to-slate-900/50 border-white/10 hover:border-brand-teal/30 cursor-pointer'
                   : 'bg-slate-900/20 border-white/5 opacity-50 cursor-not-allowed'
               }`}
             >
               <div className={`absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity ${
-                type.color === 'blue' ? 'from-blue-500/5 to-purple-500/5' :
-                type.color === 'purple' ? 'from-purple-500/5 to-pink-500/5' :
-                type.color === 'green' ? 'from-green-500/5 to-emerald-500/5' :
-                'from-slate-500/5 to-slate-600/5'
+                type.implemented ? 'from-brand-teal/5 to-brand-teal/10' : 'from-slate-500/5 to-slate-600/5'
               }`} />
               
               <div className="relative">
-                <div className={`p-4 rounded-2xl mb-4 inline-flex ${
+                <div className={`p-4 rounded-2xl mb-4 inline-flex transition-all ${
                   type.implemented 
-                    ? `bg-${type.color}-500/10 group-hover:bg-${type.color}-500/20`
+                    ? 'bg-brand-teal/10 group-hover:bg-brand-teal/20'
                     : 'bg-slate-800/30'
-                } transition-all`}>
+                }`}>
                   <Icon className={`w-8 h-8 ${
-                    type.implemented ? `text-${type.color}-400` : 'text-slate-600'
+                    type.implemented ? 'text-brand-teal' : 'text-slate-600'
                   }`} />
                 </div>
                 
                 <h3 className={`text-xl font-semibold mb-2 ${
-                  type.implemented ? 'text-white group-hover:text-blue-400' : 'text-slate-600'
+                  type.implemented ? 'text-white group-hover:text-brand-teal' : 'text-slate-600'
                 } transition-colors`}>
                   {type.label}
                 </h3>

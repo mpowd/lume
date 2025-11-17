@@ -114,11 +114,14 @@ export default function AssistantsPage() {
           </div>
         )}
 
-        <AssistantGrid
-          assistants={assistants}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+        {/* Only show the grid when not showing the form */}
+        {!showForm && (
+          <AssistantGrid
+            assistants={assistants}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        )}
       </div>
 
       <ConfirmDialog

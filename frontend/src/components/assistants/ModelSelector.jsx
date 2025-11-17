@@ -40,7 +40,7 @@ export default function ModelSelector({
           className={`
             py-2.5 rounded-lg font-medium transition-all
             ${formData.llm_provider === 'openai'
-              ? 'border border-success-border bg-white/5 text-white'
+              ? 'border border-brand-teal/50 bg-white/5 text-white'
               : formData.local_only
               ? 'border border-transparent text-text-disabled cursor-not-allowed'
               : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
@@ -59,7 +59,7 @@ export default function ModelSelector({
             py-2.5 rounded-lg font-medium transition-all 
             flex items-center justify-center gap-2
             ${formData.llm_provider === 'ollama'
-              ? 'border border-warning-border bg-white/5 text-white'
+              ? 'border border-brand-teal/50 bg-white/5 text-white'
               : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
             }
           `}

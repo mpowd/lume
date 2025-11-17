@@ -28,7 +28,7 @@ export default function AdvancedSettings({
                 type="checkbox"
                 checked={formData.hybrid_search}
                 onChange={(e) => setFormData({...formData, hybrid_search: e.target.checked})}
-                className="w-5 h-5 rounded-lg cursor-pointer"
+                className="w-5 h-5 rounded-lg cursor-pointer accent-brand-teal"
               />
             </label>
             
@@ -38,7 +38,7 @@ export default function AdvancedSettings({
                 type="checkbox"
                 checked={formData.hyde}
                 onChange={(e) => setFormData({...formData, hyde: e.target.checked})}
-                className="w-5 h-5 rounded-lg cursor-pointer"
+                className="w-5 h-5 rounded-lg cursor-pointer accent-brand-teal"
               />
             </label>
 
@@ -51,7 +51,7 @@ export default function AdvancedSettings({
                 type="checkbox"
                 checked={formData.precise_citation}
                 onChange={(e) => setFormData({...formData, precise_citation: e.target.checked})}
-                className="w-5 h-5 rounded-lg cursor-pointer"
+                className="w-5 h-5 rounded-lg cursor-pointer accent-brand-teal"
               />
             </label>
           </div>
@@ -72,7 +72,7 @@ export default function AdvancedSettings({
                 type="checkbox"
                 checked={formData.reranking}
                 onChange={(e) => setFormData({...formData, reranking: e.target.checked})}
-                className="w-5 h-5 rounded-lg cursor-pointer"
+                className="w-5 h-5 rounded-lg cursor-pointer accent-brand-teal"
               />
             </label>
 
@@ -92,7 +92,7 @@ export default function AdvancedSettings({
                       className={`
                         py-2.5 rounded-lg font-medium transition-all
                         ${formData.reranker_provider === 'cohere'
-                          ? 'border border-[rgb(168,85,247,0.5)] bg-white/5 text-white'
+                          ? 'border border-brand-teal/50 bg-white/5 text-white'
                           : formData.local_only
                           ? 'border border-transparent text-text-disabled cursor-not-allowed'
                           : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
@@ -111,7 +111,7 @@ export default function AdvancedSettings({
                       className={`
                         py-2.5 rounded-lg font-medium transition-all
                         ${formData.reranker_provider === 'huggingface'
-                          ? 'border border-warning-border bg-white/5 text-white'
+                          ? 'border border-brand-teal/50 bg-white/5 text-white'
                           : 'border border-transparent text-text-tertiary hover:text-white hover:border-white/10'
                         }
                       `}
@@ -133,7 +133,7 @@ export default function AdvancedSettings({
                           className={`
                             py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left
                             ${formData.reranker_model === model
-                              ? 'border border-[rgb(168,85,247,0.5)] bg-white/5 text-white shadow-[0_0_20px_rgb(168,85,247,0.15)]'
+                              ? 'border border-brand-teal/50 bg-white/5 text-white shadow-[0_0_20px_rgb(20,184,166,0.15)]'
                               : 'bg-transparent text-text-tertiary border border-white/10 hover:border-white/20 hover:text-white'
                             }
                           `}
@@ -150,7 +150,7 @@ export default function AdvancedSettings({
                           className={`
                             py-2.5 px-4 rounded-xl text-sm font-medium transition-all text-left
                             ${formData.reranker_model === model
-                              ? 'border border-warning-border bg-white/5 text-white shadow-[0_0_20px_rgb(251,191,36,0.15)]'
+                              ? 'border border-brand-teal/50 bg-white/5 text-white shadow-[0_0_20px_rgb(20,184,166,0.15)]'
                               : 'bg-transparent text-text-tertiary border border-white/10 hover:border-white/20 hover:text-white'
                             }
                           `}

@@ -6,9 +6,9 @@ export default function LinkDiscovery() {
     <Card className="p-12 backdrop-blur-xl">
       <div className="text-center">
         <div className="relative w-24 h-24 mx-auto mb-6">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse" />
+          <div className="absolute inset-0 bg-brand-teal/20 rounded-full animate-pulse" />
           <div className="absolute inset-2 bg-slate-900 rounded-full flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+            <Loader2 className="w-10 h-10 text-brand-teal animate-spin" />
           </div>
         </div>
         

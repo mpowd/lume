@@ -66,7 +66,7 @@ export default function LinkSelection({
           isExisting 
             ? 'opacity-60 bg-slate-800/30 border-slate-700/30' 
             : isSelected 
-              ? 'border-blue-500/40 bg-blue-500/5' 
+              ? 'border-brand-teal/40 bg-brand-teal/5' 
               : ''
         }`}
       >
@@ -81,7 +81,7 @@ export default function LinkSelection({
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggle(item.url)}
-                className="w-5 h-5 rounded-lg border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer transition-all"
+                className="w-5 h-5 rounded-lg border-white/20 bg-slate-950 text-brand-teal focus:ring-2 focus:ring-brand-teal/50 cursor-pointer transition-all"
               />
             )}
           </div>
@@ -90,13 +90,13 @@ export default function LinkSelection({
             isExisting
               ? 'bg-slate-700/30'
               : isSelected 
-                ? 'bg-blue-500/20' 
+                ? 'bg-brand-teal/20' 
                 : 'bg-slate-800/50'
           }`}>
             {isExisting ? (
               <Archive className="w-5 h-5 text-slate-500" />
             ) : (
-              <Globe className={`w-5 h-5 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`} />
+              <Globe className={`w-5 h-5 ${isSelected ? 'text-brand-teal' : 'text-slate-400'}`} />
             )}
           </div>
 
@@ -127,7 +127,7 @@ export default function LinkSelection({
               className={`group/link flex items-center gap-2 text-sm transition-colors mb-3 ${
                 isExisting
                   ? 'text-slate-500 hover:text-slate-400'
-                  : 'text-slate-400 hover:text-blue-400'
+                  : 'text-slate-400 hover:text-brand-teal'
               }`}
             >
               <span className="truncate font-mono">{item.url}</span>
@@ -151,7 +151,7 @@ export default function LinkSelection({
               isExisting
                 ? 'bg-slate-700/30 text-slate-500 hover:bg-slate-700/50'
                 : isSelected 
-                  ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400' 
+                  ? 'bg-brand-teal/10 hover:bg-brand-teal/20 text-brand-teal' 
                   : 'bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white'
             }`}
             title="Open in new tab"
@@ -161,7 +161,7 @@ export default function LinkSelection({
         </div>
 
         {isSelected && !isExisting && (
-          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-600 rounded-l-2xl" />
+          <div className="absolute top-0 left-0 w-1 h-full bg-brand-teal rounded-l-2xl" />
         )}
       </Card>
     )
@@ -242,14 +242,14 @@ export default function LinkSelection({
           <style>{`
             .scrollbar-thin::-webkit-scrollbar { width: 8px; }
             .scrollbar-thin::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
-            .scrollbar-thin::-webkit-scrollbar-thumb { background: linear-gradient(135deg, rgb(59, 130, 246), rgb(147, 51, 234)); border-radius: 4px; }
+            .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-brand-teal); border-radius: 4px; }
           `}</style>
 
           {/* New URLs Section */}
           {filteredNewUrls.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Globe className="w-5 h-5 text-blue-400" />
+                <Globe className="w-5 h-5 text-brand-teal" />
                 New URLs ({filteredNewUrls.length})
               </h3>
               {filteredNewUrls.map((item, idx) => renderUrlCard(item, `new-${idx}`, false))}
@@ -292,15 +292,16 @@ export default function LinkSelection({
             icon={Database}
             fullWidth
             size="lg"
+            className="bg-brand-teal hover:bg-brand-teal-dark text-white font-semibold shadow-lg hover:shadow-xl transition-all"
           >
             Add {getSelectedCount()} New Link{getSelectedCount() !== 1 ? 's' : ''}
           </Button>
         </div>
 
-        <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-purple-500/5 border-blue-500/20">
+        <Card className="p-6 bg-gradient-to-br from-brand-teal/5 to-brand-teal/10 border-brand-teal/20">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-500/10 rounded-xl">
-              <Sparkles className="w-6 h-6 text-blue-400" />
+            <div className="p-3 bg-brand-teal/10 rounded-xl">
+              <Sparkles className="w-6 h-6 text-brand-teal" />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-white mb-1">Smart Duplicate Detection</h4>

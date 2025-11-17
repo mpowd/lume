@@ -64,6 +64,7 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
           <div className="grid grid-cols-2 gap-3">
             {SOURCE_TYPES.map(type => {
               const Icon = type.icon
+              const isSelected = formData.source_type === type.id
               return (
                 <button
                   key={type.id}
@@ -71,8 +72,8 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
                   onClick={() => type.implemented && setFormData({...formData, source_type: type.id})}
                   disabled={!type.implemented}
                   className={`p-4 rounded-xl border transition-all text-left ${
-                    formData.source_type === type.id
-                      ? 'bg-blue-500/10 border-blue-500/30'
+                    isSelected
+                      ? 'bg-white/5 border-white/20'
                       : type.implemented
                       ? 'bg-slate-800/30 border-white/5 hover:border-white/10 hover:bg-slate-800/50 cursor-pointer'
                       : 'bg-slate-800/20 border-white/5 opacity-50 cursor-not-allowed'
@@ -80,10 +81,10 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <Icon className={`w-5 h-5 ${
-                      formData.source_type === type.id ? 'text-blue-400' : 'text-slate-400'
+                      isSelected ? 'text-white' : 'text-slate-400'
                     }`} />
                     <span className={`text-sm font-medium ${
-                      formData.source_type === type.id ? 'text-white' : 'text-slate-300'
+                      isSelected ? 'text-white' : 'text-slate-300'
                     }`}>
                       {type.label}
                     </span>
@@ -161,7 +162,14 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
           <Button type="button" variant="secondary" onClick={handleClose} fullWidth>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" loading={loading} fullWidth icon={Check}>
+          <Button 
+            type="submit" 
+            variant="primary" 
+            loading={loading} 
+            fullWidth 
+            icon={Check}
+            disabled={loading || !formData.collection_name.trim()}
+          >
             Create
           </Button>
         </div>

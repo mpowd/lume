@@ -35,11 +35,11 @@ export default function CrawlSettings({ onDiscover, onManualEntry, loading }) {
             hover
           >
             <div className="flex items-start gap-6">
-              <div className="p-4 bg-blue-500/10 group-hover:bg-blue-500/20 rounded-2xl transition-all">
-                <Search className="w-8 h-8 text-blue-400" />
+              <div className="p-4 bg-brand-teal/10 group-hover:bg-brand-teal/20 rounded-2xl transition-all">
+                <Search className="w-8 h-8 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-brand-teal transition-colors">
                   Automatic Discovery
                 </h3>
                 <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
@@ -55,11 +55,11 @@ export default function CrawlSettings({ onDiscover, onManualEntry, loading }) {
             hover
           >
             <div className="flex items-start gap-6">
-              <div className="p-4 bg-purple-500/10 group-hover:bg-purple-500/20 rounded-2xl transition-all">
-                <ListPlus className="w-8 h-8 text-purple-400" />
+              <div className="p-4 bg-brand-teal/10 group-hover:bg-brand-teal/20 rounded-2xl transition-all">
+                <ListPlus className="w-8 h-8 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-brand-teal transition-colors">
                   Manual Entry
                 </h3>
                 <p className="text-slate-400 group-hover:text-slate-300 transition-colors">
@@ -106,7 +106,7 @@ export default function CrawlSettings({ onDiscover, onManualEntry, loading }) {
                 id="includeExternal"
                 checked={includeExternal}
                 onChange={(e) => setIncludeExternal(e.target.checked)}
-                className="w-5 h-5 rounded-lg border-white/20 bg-slate-950 text-blue-500 focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                className="w-5 h-5 rounded-lg border-white/20 bg-slate-950 text-brand-teal focus:ring-2 focus:ring-brand-teal/50 cursor-pointer"
               />
               <label htmlFor="includeExternal" className="text-sm text-slate-300 cursor-pointer">
                 Include external domains
