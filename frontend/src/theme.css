@@ -68,7 +68,7 @@ body,
 
 /* Prevent blue flash on page load */
 body {
-  background-color: #0f0f0f !important;
+  background-color: #0f0f0f;
 }
 
 /* ============================================
@@ -157,8 +157,8 @@ select:focus-visible {
 /* Override focus styles for textarea - no focus rectangle */
 textarea:focus-visible,
 textarea:focus {
-  outline: none !important;
-  box-shadow: none !important;
+  outline: none;
+  box-shadow: none;
 }
 
 /* ============================================
