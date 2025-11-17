@@ -1,4 +1,4 @@
-import { Database, Plus, RefreshCw, ChevronRight } from 'lucide-react'
+import { Database, Plus, ChevronRight } from 'lucide-react'
 import EmptyState from '../shared/EmptyState'
 import Button from '../shared/Button'
 
@@ -6,28 +6,19 @@ export default function CollectionSidebar({
   collections, 
   activeCollection,
   onSelect, 
-  onCreate,
-  onRefresh 
+  onCreate
 }) {
   return (
     <div className="w-80 border-r border-white/5 flex flex-col">
       <div className="p-6 border-b border-white/5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">Collections</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={onRefresh}
-              className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
-            >
-              <RefreshCw className="w-4 h-4 text-brand-teal" />
-            </button>
-            <button
-              onClick={onCreate}
-              className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
-            >
-              <Plus className="w-4 h-4 text-brand-teal" />
-            </button>
-          </div>
+          <button
+            onClick={onCreate}
+            className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
+          >
+            <Plus className="w-4 h-4 text-brand-teal" />
+          </button>
         </div>
         <p className="text-sm text-text-tertiary">Your knowledge sources</p>
       </div>
