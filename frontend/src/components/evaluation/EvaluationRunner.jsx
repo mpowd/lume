@@ -216,16 +216,16 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
                 disabled={running}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   currentDataset?._id === dataset._id
-                    ? 'border-blue-500 bg-blue-500/10'
+                    ? 'border-brand-teal bg-brand-teal/10'
                     : 'border-white/10 hover:border-white/20 bg-slate-950/30'
-                } ${running ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-white">
                     {dataset.name || dataset.dataset_name}
                   </span>
                   {currentDataset?._id === dataset._id && (
-                    <Check className="w-5 h-5 text-blue-400" />
+                    <Check className="w-5 h-5 text-brand-teal" />
                   )}
                 </div>
                 <p className="text-sm text-slate-400">
@@ -279,14 +279,14 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
                     disabled={running}
                     className={`p-4 rounded-xl border-2 transition-all text-left ${
                       selectedAssistants.includes(assistantId)
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-brand-teal bg-brand-teal/10'
                         : 'border-white/10 hover:border-white/20 bg-slate-950/30'
-                    } ${running ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-white">{assistant.name}</span>
                       {selectedAssistants.includes(assistantId) && (
-                        <Check className="w-5 h-5 text-purple-400" />
+                        <Check className="w-5 h-5 text-brand-teal" />
                       )}
                     </div>
                     {assistant.description && (
@@ -315,7 +315,7 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
         {/* Evaluation LLM Selection */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-purple-400" />
+            <Sparkles className="w-4 h-4 text-brand-teal" />
             <label className="text-sm font-medium text-slate-300">
               Evaluation LLM
             </label>
@@ -332,9 +332,9 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
               disabled={running}
               className={`py-2.5 rounded-lg font-medium transition-all ${
                 evalLLMProvider === 'openai'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              } ${running ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  ? 'bg-brand-teal text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
             >
               OpenAI
             </button>
@@ -344,9 +344,9 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
               disabled={running}
               className={`py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                 evalLLMProvider === 'ollama'
-                  ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              } ${running ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  ? 'bg-white/10 text-white border border-white/20 shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
             >
               Ollama
               {loadingOllamaModels && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -364,9 +364,9 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
                   disabled={running}
                   className={`py-3 px-4 rounded-xl text-sm font-medium transition-all ${
                     evalLLMModel === model
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg ring-2 ring-emerald-400/50'
+                      ? 'bg-brand-teal text-white shadow-lg border-2 border-brand-teal'
                       : 'bg-slate-950/50 text-slate-400 border border-white/10 hover:border-white/20 hover:text-white'
-                  } ${running ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  }`}
                 >
                   {model}
                 </button>
@@ -392,9 +392,9 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
                       disabled={running}
                       className={`py-3 px-4 rounded-xl text-sm font-medium transition-all ${
                         evalLLMModel === model
-                          ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg ring-2 ring-orange-400/50'
+                          ? 'bg-white/10 text-white border-2 border-white/30 shadow-lg'
                           : 'bg-slate-950/50 text-slate-400 border border-white/10 hover:border-white/20 hover:text-white'
-                      } ${running ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      }`}
                     >
                       {model}
                     </button>
@@ -420,21 +420,17 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
 
         {/* Progress */}
         {running && (
-          <div className="mb-6 p-6 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <div className="flex items-center gap-3 mb-4">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              <div>
-                <p className="text-blue-400 font-medium">Running Evaluation...</p>
-                {progress.assistant && (
-                  <p className="text-sm text-blue-400/80">
-                    Testing {progress.assistant}: {progress.current} / {progress.total} questions
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="mb-6 p-6 rounded-xl bg-brand-teal/10 border border-brand-teal/20">
+            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <p className="text-brand-teal font-medium">Running Evaluation...</p>
+              {progress.assistant && (
+                <p className="text-sm text-brand-teal/80">
+                  Testing {progress.assistant}: {progress.current} / {progress.total} questions
+                </p>
+              )}
             <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+                className="h-full bg-brand-teal transition-all duration-300"
                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
               />
             </div>

@@ -76,8 +76,8 @@ export default function EvaluationPage() {
       <div className="border-b border-white/5 bg-background-elevated/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-[1600px] mx-auto px-8 py-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-transparent border border-white/20 flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-text-secondary" />
+            <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Evaluation</h1>

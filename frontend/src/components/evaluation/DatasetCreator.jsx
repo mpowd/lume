@@ -143,12 +143,12 @@ export default function DatasetCreator({ collections, dataset, onSuccess, onCanc
           <div className="flex items-center justify-between mb-4">
             {['Select Use Case', 'Add Data'].map((label, idx) => (
               <div key={idx} className="flex items-center flex-1">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
-                  step > idx + 1 
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' 
-                    : step === idx + 1
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                    : 'bg-slate-800 text-slate-500'
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 font-semibold transition-all ${
+                    step > idx + 1 
+                      ? 'bg-brand-teal border-brand-teal text-white' 
+                      : step === idx + 1
+                      ? 'bg-white border-white text-black'
+                      : 'bg-transparent border-white/20 text-slate-500'
                 }`}>
                   {step > idx + 1 ? '✓' : idx + 1}
                 </div>
@@ -161,7 +161,7 @@ export default function DatasetCreator({ collections, dataset, onSuccess, onCanc
                 </div>
                 {idx < 1 && (
                   <div className={`h-0.5 flex-1 mx-4 ${
-                    step > idx + 1 ? 'bg-emerald-500' : 'bg-slate-800'
+                    step > idx + 1 ? 'bg-brand-teal' : 'bg-white/20'
                   }`} />
                 )}
               </div>
@@ -186,7 +186,7 @@ export default function DatasetCreator({ collections, dataset, onSuccess, onCanc
                 disabled={!useCase.enabled}
                 className={`p-6 rounded-xl border-2 transition-all text-left ${
                   useCase.enabled
-                    ? 'border-white/10 hover:border-blue-500/50 hover:bg-slate-900/50 cursor-pointer'
+                    ? 'border-white/10 hover:border-brand-teal hover:bg-slate-900/50 cursor-pointer'
                     : 'border-white/5 opacity-40 cursor-not-allowed'
                 }`}
               >
@@ -259,7 +259,7 @@ export default function DatasetCreator({ collections, dataset, onSuccess, onCanc
               {qaData.map((pair, index) => (
                 <div
                   key={index}
-                  className="p-6 rounded-xl bg-slate-950/30 border border-white/5 space-y-4"
+                  className="p-6 rounded-xl bg-brand-teal/5 border border-brand-teal/20 space-y-4"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-medium text-slate-400">

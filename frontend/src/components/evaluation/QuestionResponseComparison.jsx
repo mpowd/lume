@@ -140,7 +140,7 @@ export default function QuestionResponseComparison({ dataset, evaluations, assis
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <MessageSquare className="w-6 h-6 text-blue-400" />
+              <MessageSquare className="w-6 h-6 text-brand-teal" />
               <div>
                 <h3 className="text-xl font-bold text-white">Question {currentQuestionIndex + 1} of {questions.length}</h3>
                 <p className="text-sm text-slate-400 mt-0.5">Compare responses from each assistant</p>
@@ -171,7 +171,7 @@ export default function QuestionResponseComparison({ dataset, evaluations, assis
           {/* Question Progress */}
           <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+              className="h-full bg-brand-teal transition-all duration-300"
               style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
             />
           </div>
@@ -338,7 +338,7 @@ export default function QuestionResponseComparison({ dataset, evaluations, assis
                 onClick={() => setCurrentQuestionIndex(idx)}
                 className={`w-10 h-10 rounded-lg font-semibold transition-all ${
                   idx === currentQuestionIndex
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg scale-110'
+                    ? 'bg-brand-teal text-white shadow-lg scale-110'
                     : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
                 }`}
               >

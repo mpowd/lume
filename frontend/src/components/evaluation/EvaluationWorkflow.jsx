@@ -102,12 +102,12 @@ export default function EvaluationWorkflow({ datasets, assistants, evaluations, 
                       isAccessible ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
                     }`}
                   >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                    <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
                       isComplete
-                        ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg'
+                        ? 'bg-brand-teal border-brand-teal text-white shadow-lg'
                         : isActive
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg scale-110'
-                        : 'bg-slate-800 text-slate-500'
+                        ? 'bg-white border-white text-black shadow-lg scale-110'
+                        : 'bg-transparent border-white/20 text-slate-500'
                     }`}>
                       {isComplete ? (
                         <Check className="w-6 h-6" />
@@ -117,7 +117,7 @@ export default function EvaluationWorkflow({ datasets, assistants, evaluations, 
                     </div>
                     <div className="text-left">
                       <div className={`font-semibold ${
-                        isActive ? 'text-white' : isComplete ? 'text-green-400' : 'text-slate-500'
+                        isActive ? 'text-white' : isComplete ? 'text-brand-teal' : 'text-slate-500'
                       }`}>
                         {step.label}
                       </div>
@@ -132,7 +132,7 @@ export default function EvaluationWorkflow({ datasets, assistants, evaluations, 
                   
                   {index < STEPS.length - 1 && (
                     <div className={`flex-1 h-1 mx-4 rounded-full transition-all ${
-                      isComplete ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-slate-800'
+                      isComplete ? 'bg-brand-teal' : 'bg-white/20'
                     }`} />
                   )}
                 </div>

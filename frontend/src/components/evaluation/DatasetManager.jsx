@@ -92,7 +92,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
           </button>
           
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
               <Database className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -148,7 +148,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                             {dataset.name || dataset.dataset_name}
                           </h3>
                           {dataset.use_case && (
-                            <Badge variant="blue">
+                            <Badge variant="gray">
                               {dataset.use_case === 'qa' ? 'Q&A' : dataset.use_case}
                             </Badge>
                           )}
@@ -202,7 +202,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                       <div className="flex gap-2 ml-4">
                         <button
                           onClick={() => handleViewDetails(dataset)}
-                          className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors text-slate-400 hover:text-blue-400"
+                          className="p-2 hover:bg-brand-teal/10 rounded-lg transition-colors text-slate-400 hover:text-brand-teal"
                           style={{cursor: 'pointer'}}
                           title="View details"
                         >
@@ -210,7 +210,7 @@ export default function DatasetManager({ datasets, onEdit, onDelete, onBack }) {
                         </button>
                         <button
                           onClick={() => onEdit(dataset)}
-                          className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors text-slate-400 hover:text-purple-400"
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
                           style={{cursor: 'pointer'}}
                           title="Edit dataset"
                         >

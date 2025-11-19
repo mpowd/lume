@@ -88,7 +88,7 @@ export default function EvaluationVisualizations({
               <div className="flex items-center gap-3 text-sm text-slate-400">
                 <button
                   onClick={onChangeDataset}
-                  className="hover:text-blue-400 transition-colors"
+                  className="hover:text-brand-teal transition-colors"
                 >
                   📊 {dataset.name}
                 </button>
@@ -115,7 +115,7 @@ export default function EvaluationVisualizations({
                   onClick={() => setActiveView(viz.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
                     isActive
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                      ? 'bg-brand-teal text-white shadow-lg'
                       : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
                   }`}
                 >

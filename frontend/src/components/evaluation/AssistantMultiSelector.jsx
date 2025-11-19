@@ -130,7 +130,7 @@ export default function AssistantMultiSelector({
 
           {/* Selection Counter */}
           <div className="mt-4 flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-blue-400" />
+            <CheckCircle2 className="w-5 h-5 text-brand-teal" />
             <span className="text-sm text-slate-300">
               <span className="font-semibold text-white">{tempSelected.length}</span> of {filteredAssistants.length} assistants selected
             </span>
@@ -162,7 +162,7 @@ export default function AssistantMultiSelector({
                 key={assistant._id}
                 className={`cursor-pointer transition-all ${
                   isSelected
-                    ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 bg-blue-500/5'
+                    ? 'ring-2 ring-brand-teal shadow-lg shadow-brand-teal/20 bg-brand-teal/5'
                     : 'hover:border-white/30 hover:shadow-lg'
                 }`}
                 onClick={() => toggleAssistant(assistant._id)}
@@ -170,18 +170,18 @@ export default function AssistantMultiSelector({
                 <div className="p-6 space-y-4">
                   {/* Header with checkbox */}
                   <div className="flex items-start justify-between">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                    <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
                       isSelected
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600'
-                        : 'bg-gradient-to-br from-slate-700 to-slate-800'
+                        ? 'bg-brand-teal border-brand-teal'
+                        : 'bg-white/10 border-white/20'
                     }`}>
                       <Bot className="w-6 h-6 text-white" />
                     </div>
-                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                      isSelected
-                        ? 'bg-blue-500 border-blue-500'
-                        : 'border-slate-600 bg-slate-800'
-                    }`}>
+                      <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                        isSelected
+                          ? 'bg-brand-teal border-brand-teal'
+                          : 'border-slate-600 bg-slate-800'
+                      }`}>
                       {isSelected && <Check className="w-4 h-4 text-white" />}
                     </div>
                   </div>
@@ -198,7 +198,7 @@ export default function AssistantMultiSelector({
                     )}
                     
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="blue">
+                      <Badge variant="gray">
                         {assistant.type || 'Assistant'}
                       </Badge>
                       {assistant.config?.llm_model && (

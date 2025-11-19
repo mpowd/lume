@@ -80,10 +80,8 @@ export default function DatasetSelector({ datasets, selectedDataset, onSelect, e
                 key={dataset._id}
                 className={`cursor-pointer transition-all ${
                   isSelected
-                    ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20'
-                    : isHovered
-                    ? 'border-white/30 shadow-lg'
-                    : ''
+                    ? 'ring-2 ring-brand-teal shadow-lg shadow-brand-teal/20'
+                    : isHovered ? 'border-white/30 shadow-lg' : ''
                 }`}
                 onMouseEnter={() => setHoveredDataset(dataset._id)}
                 onMouseLeave={() => setHoveredDataset(null)}
@@ -92,15 +90,15 @@ export default function DatasetSelector({ datasets, selectedDataset, onSelect, e
                 <div className="p-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-start justify-between">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                    <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
                       isSelected
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600'
-                        : 'bg-gradient-to-br from-slate-700 to-slate-800'
+                        ? 'bg-brand-teal border-brand-teal'
+                        : 'bg-white/10 border-white/20'
                     }`}>
                       <FileText className="w-6 h-6 text-white" />
                     </div>
                     {isSelected && (
-                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-brand-teal flex items-center justify-center">
                         <ChevronRight className="w-4 h-4 text-white" />
                       </div>
                     )}
@@ -126,8 +124,8 @@ export default function DatasetSelector({ datasets, selectedDataset, onSelect, e
                     </div>
                     <span>•</span>
                     <div className="flex items-center gap-1.5">
-                      <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="text-blue-400 font-medium">{evalCount} evaluations</span>
+                      <BarChart3 className="w-3.5 h-3.5 text-brand-teal" />
+                      <span className="text-brand-teal font-medium">{evalCount} evaluations</span>
                     </div>
                   </div>
 

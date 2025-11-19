@@ -50,13 +50,13 @@ export default function DatasetList({ datasets, onSelect, onEdit, onDelete, onRe
             className="p-6 hover:border-white/20 transition-all group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
                 <FileText className="w-5 h-5 text-white" />
               </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => onEdit(dataset)}
-                  className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors text-slate-400 hover:text-blue-400"
+                  className="p-2 hover:bg-brand-teal/10 rounded-lg transition-colors text-slate-400 hover:text-brand-teal"
                   title="Edit dataset"
                 >
                   <Edit3 className="w-4 h-4" />
@@ -72,7 +72,7 @@ export default function DatasetList({ datasets, onSelect, onEdit, onDelete, onRe
               </div>
             </div>
 
-            <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+            <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-brand-teal transition-colors">
               {dataset.name || dataset.dataset_name}
             </h3>
 
