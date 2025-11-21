@@ -222,7 +222,7 @@ export default function AssistantForm({
                       type="button"
                       onClick={() => toggleCollection(col)}
                       className={`
-                        px-4 py-2 rounded-lg text-sm font-medium transition-all 
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all   
                         flex items-center gap-1
                         ${formData.collections.includes(col)
                           ? 'border border-brand-teal/50 bg-white/5 text-white'
