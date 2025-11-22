@@ -298,7 +298,7 @@ export default function ChatPage() {
                               </div>
                             </div>
                             <p className="text-sm text-slate-400 mb-4 line-clamp-2">
-                              {bot.workflow === 'agentic' ? 'Agentic workflow with tools' : `RAG assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`}
+                              {bot.workflow === 'agentic' ? 'Agentic workflow with tools' : `Assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`}
                             </p>
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-xs">

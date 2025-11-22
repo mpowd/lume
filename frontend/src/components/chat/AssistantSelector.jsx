@@ -58,7 +58,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
             <p className="text-sm text-text-tertiary mb-4 line-clamp-2">
               {bot.workflow === 'agentic' 
                 ? 'Agentic workflow with tools' 
-                : `RAG assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
+                : `Assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
               }
             </p>
 
