@@ -3,10 +3,6 @@ export const validateAssistantForm = (formData) => {
   if (!formData.assistant_name) {
     return 'Please enter a assistant name'
   }
-  if (formData.workflow === 'linear' && formData.collections.length === 0) {
-    return 'Please select at least one knowledge source'
-  }
-  return null
 }
 
 export const validateCollectionForm = (formData) => {

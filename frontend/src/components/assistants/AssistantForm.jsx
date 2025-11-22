@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Database, Check, Lock } from 'lucide-react'
+import { Sparkles, Database, Check, Lock, Plus, ScrollText } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
 import { ollamaAPI } from '../../services/api'
 import FormInput from '../shared/FormInput'
@@ -46,11 +46,28 @@ export default function AssistantForm({
   const [ollamaModels, setOllamaModels] = useState([])
   const [loadingModels, setLoadingModels] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  
+
+  const [showForm, setShowForm] = useState(false);
+  const [newReferenceText, setNewReferenceText] = useState('');
+  const [newReferenceName, setNewReferenceName] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingReferenceIndex, setEditingReferenceIndex] = useState(null);
+
+  const openReferenceModal = (index) => {
+    const reference = formData.references[index];
+    setNewReferenceText(reference.text);
+    setNewReferenceName(reference.name);
+    setIsModalOpen(true);
+    setEditingReferenceIndex(index);
+};
+
+
+  // Initialize formData with default values
   const [formData, setFormData] = useState({
     assistant_name: '',
     workflow: 'linear',
     collections: [],
+    references: [],
     local_only: false,
     hybrid_search: true,
     hyde: false,
@@ -79,6 +96,7 @@ export default function AssistantForm({
         assistant_name: assistant.name || assistant.assistant_name,
         workflow: assistant.workflow || 'linear',
         collections: assistant.collections || [],
+        references: assistant.references || [],
         local_only: assistant.local_only || false,
         hybrid_search: assistant.hybrid_search ?? true,
         hyde: assistant.hyde ?? false,
@@ -146,6 +164,44 @@ export default function AssistantForm({
     setFormData({ ...formData, ...updates })
   }
 
+const addReference = () => {
+  if (!newReferenceText.trim() || !newReferenceName.trim()) return;
+  
+  if (editingReferenceIndex !== null) {
+    // Editing existing reference
+    const updatedReferences = [...formData.references];
+    updatedReferences[editingReferenceIndex] = {
+      text: newReferenceText,
+      name: newReferenceName
+    };
+    setFormData(prev => ({
+      ...prev,
+      references: updatedReferences
+    }));
+  } else {
+    // Adding new reference
+    setFormData(prev => ({
+      ...prev,
+      references: [...prev.references, {
+        text: newReferenceText,
+        name: newReferenceName
+      }]
+    }));
+  }
+  
+  // Reset modal
+  setIsModalOpen(false);
+  setNewReferenceText('');
+  setNewReferenceName('');
+  setEditingReferenceIndex(null);
+};
+  const deleteReference = (index) => {
+    setFormData(prevState => ({
+      ...prevState,
+      references: prevState.references.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault()
     onSubmit(formData)
@@ -208,7 +264,7 @@ export default function AssistantForm({
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary mb-3">
                 <Database className="w-4 h-4 inline mr-2" />
-                Knowledge Sources {formData.collections.length === 0 && <span className="text-danger text-xs">(Select at least one)</span>}
+                Knowledge Sources
               </label>
               {collections.length === 0 ? (
                 <div className="p-4 bg-transparent border border-white/10 rounded-xl text-center">
@@ -222,7 +278,7 @@ export default function AssistantForm({
                       type="button"
                       onClick={() => toggleCollection(col)}
                       className={`
-                        px-4 py-2 rounded-lg text-sm font-medium transition-all   
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all 
                         flex items-center gap-1
                         ${formData.collections.includes(col)
                           ? 'border border-brand-teal/50 bg-white/5 text-white'
@@ -238,6 +294,39 @@ export default function AssistantForm({
               )}
             </div>
 
+                                    <div className="space-y-2">
+                <label className="block text-sm font-medium text-text-secondary mb-3">
+                  <ScrollText className="w-4 h-4 inline mr-2" />
+                  Additional references
+                </label>
+                {formData.references.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.references.map((ref, index) => (
+                      <button
+                        key={ref.name}
+                        type="button"
+                        onClick={() => openReferenceModal(index)}
+                        className={`
+                          px-4 py-2 rounded-lg text-sm font-medium transition-all 
+                          flex items-center gap-1
+                          bg-white/5 border border-white/10 hover:border-brand-teal/50 hover:text-white
+                        `}
+                      >
+                        {ref.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setIsModalOpen(true);
+                    setEditingReferenceIndex(null);
+                  }} 
+                  className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
+                >
+                  <Plus className="w-4 h-4 text-brand-teal" />
+                </button>
+              </div>
             <div className="p-4 bg-transparent border border-white/10 rounded-xl">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-3">
@@ -281,7 +370,7 @@ export default function AssistantForm({
             variant="standout"
             fullWidth
             loading={loading}
-            disabled={!formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0)}
+            disabled={!formData.assistant_name || !formData.workflow === 'linear'}
           >
             {assistant ? 'Update Assistant' : 'Create Assistant'}
           </Button>
@@ -294,6 +383,66 @@ export default function AssistantForm({
             Cancel
           </Button>
         </div>
+
+{/* Modal for adding references */}
+        {isModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
+            <div className="bg-background-elevated rounded-xl shadow-xl w-full max-w-md border border-white/10 relative z-10">
+              <div className="p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">
+                  {editingReferenceIndex !== null ? 'Edit Reference' : 'Add Reference'}
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Reference Text</label>
+                    <textarea
+                      value={newReferenceText}
+                      onChange={(e) => setNewReferenceText(e.target.value)}
+                      placeholder="Enter reference text here"
+                      rows="4"
+                      className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Reference Name</label>
+                    <input
+                      value={newReferenceName}
+                      onChange={(e) => setNewReferenceName(e.target.value)}
+                      placeholder="Enter reference name here"
+                      className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setNewReferenceText('');
+                      setNewReferenceName('');
+                      setEditingReferenceIndex(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="standout"
+                    onClick={addReference}
+                    disabled={!newReferenceText.trim() || !newReferenceName.trim()}
+                  >
+                    {editingReferenceIndex !== null ? 'Edit Reference' : 'Add Reference'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </form>
     </Card>
   )
