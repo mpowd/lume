@@ -32,7 +32,7 @@ class QAAssistantConfig(AssistantConfig):
     top_n: Optional[int] = None
 
     # Generation settings
-    rag_prompt: Optional[str] = None
+    prompt: Optional[str] = None
     precise_citation: bool = False
     precise_citation_prompt: Optional[str] = None
 
@@ -74,7 +74,7 @@ class QAAssistant(BaseAssistant):
     async def execute(
         self, config: QAAssistantConfig, input_data: QAAssistantInput
     ) -> QAAssistantOutput:
-        """Execute QA with RAG"""
+        """Execute QA"""
 
         try:
             logger.info(f"Executing QA Assistant with question: {input_data.question}")
@@ -83,22 +83,24 @@ class QAAssistant(BaseAssistant):
             logger.info(
                 f"Retrieving documents from knowledge bases: {config.knowledge_base_ids}"
             )
-            retrieved_docs = await self.retriever.retrieve(
-                query=input_data.question,
-                knowledge_base_ids=config.knowledge_base_ids,
-                config={
-                    "hybrid_search": config.hybrid_search,
-                    "top_k": config.top_k,
-                    "use_hyde": config.use_hyde,
-                    "hyde_prompt": config.hyde_prompt,
-                    "llm_model": config.llm_model,
-                    "llm_provider": config.llm_provider,
-                    "reranking": config.reranking,
-                    "reranker_provider": config.reranker_provider,
-                    "reranker_model": config.reranker_model,
-                    "top_n": config.top_n,
-                },
-            )
+            retrieved_docs = []
+            if config.knowledge_base_ids:
+                retrieved_docs = await self.retriever.retrieve(
+                    query=input_data.question,
+                    knowledge_base_ids=config.knowledge_base_ids,
+                    config={
+                        "hybrid_search": config.hybrid_search,
+                        "top_k": config.top_k,
+                        "use_hyde": config.use_hyde,
+                        "hyde_prompt": config.hyde_prompt,
+                        "llm_model": config.llm_model,
+                        "llm_provider": config.llm_provider,
+                        "reranking": config.reranking,
+                        "reranker_provider": config.reranker_provider,
+                        "reranker_model": config.reranker_model,
+                        "top_n": config.top_n,
+                    },
+                )
 
             logger.info(f"Retrieved {len(retrieved_docs)} documents")
 
@@ -110,7 +112,7 @@ class QAAssistant(BaseAssistant):
                 config={
                     "llm_model": config.llm_model,
                     "llm_provider": config.llm_provider,
-                    "rag_prompt": config.rag_prompt,
+                    "prompt": config.prompt,
                     "precise_citation": config.precise_citation,
                     "precise_citation_prompt": config.precise_citation_prompt,
                     "reranking": config.reranking,

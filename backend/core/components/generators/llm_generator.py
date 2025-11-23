@@ -28,7 +28,7 @@ class LLMGenerator:
     """LLM-based answer generator"""
 
     # Default prompts
-    DEFAULT_RAG_PROMPT = """Answer the question using only the context provided.
+    DEFAULT_PROMPT = """Answer the question using only the context provided.
 
 Retrieved Context: {context}
 
@@ -117,16 +117,14 @@ Be precise with chunk indices!"""
     ) -> Dict[str, Any]:
         """Generate answer from query and documents"""
 
-        if not documents:
-            return {
-                "answer": "I couldn't find any relevant information to answer your question.",
-                "sources": [],
-                "contexts": [],
-            }
+        # if not documents:
+        #     return {
+        #         "answer": "I couldn't find any relevant information to answer your question.",
+        #         "sources": [],
+        #         "contexts": [],
+        #     }
 
-        llm = self._get_llm(
-            config.get("llm_model", "gpt-4o-mini"), config.get("llm_provider", "openai")
-        )
+        llm = self._get_llm(config.get("llm_model"), config.get("llm_provider"))
 
         # Check if precise citation is enabled
         if config.get("precise_citation", False):
@@ -177,10 +175,10 @@ Be precise with chunk indices!"""
         else:
             logger.info("Using standard citation mode")
 
-            # Use custom RAG prompt if provided, otherwise use default
-            rag_prompt = config.get("rag_prompt", self.DEFAULT_RAG_PROMPT)
+            # Use custom prompt if provided, otherwise use default
+            prompt = config.get("prompt", self.DEFAULT_PROMPT)
 
-            prompt = ChatPromptTemplate.from_template(rag_prompt)
+            prompt = ChatPromptTemplate.from_template(prompt)
 
             chain = (
                 {

@@ -133,10 +133,10 @@ export const getAssistantConfigSummary = (assistant) => {
     summary.push({ label: 'Precise Citation', value: config.precise_citation ? 'Yes' : 'No', icon: '📝' })
   }
   
-  // Custom RAG Prompt (show which type based on precise_citation)
+  // Custom Prompt (show which type based on precise_citation)
   if (config.precise_citation && config.precise_citation_prompt) {
     summary.push({ label: 'Precise Citation Prompt', value: 'Configured', icon: '💬' })
-  } else if (config.rag_prompt) {
+  } else if (config.prompt) {
     summary.push({ label: 'RAG Prompt', value: 'Configured', icon: '💬' })
   }
   

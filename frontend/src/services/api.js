@@ -177,7 +177,7 @@ export const createQAAssistant = async ({
   rerankerProvider = 'cohere',
   rerankerModel = 'rerank-v3.5',
   topN = null,
-  ragPrompt = null,
+  prompt = null,
   preciseCitation = false,
   preciseCitationPrompt = null  // ← ADDED
 }) => {
@@ -201,7 +201,7 @@ export const createQAAssistant = async ({
       reranker_provider: rerankerProvider,
       reranker_model: rerankerModel,
       top_n: topN,
-      rag_prompt: ragPrompt,
+      prompt: prompt,
       precise_citation: preciseCitation,
       precise_citation_prompt: preciseCitationPrompt  // ← ADDED
     },

@@ -39,7 +39,7 @@ export const useAssistants = () => {
         reranker_provider: assistant.config?.reranker_provider,
         reranker_model: assistant.config?.reranker_model,
         top_n: assistant.config?.top_n,
-        rag_prompt: assistant.config?.rag_prompt,
+        prompt: assistant.config?.prompt,
         precise_citation: assistant.config?.precise_citation,
         precise_citation_prompt: assistant.config?.precise_citation_prompt, // ← ADDED
         tools: assistant.config?.tools || [],
@@ -88,7 +88,7 @@ export const useAssistants = () => {
           reranker_provider: formData.reranker_provider,
           reranker_model: formData.reranker_model,
           top_n: formData.top_n,
-          rag_prompt: formData.rag_prompt,
+          prompt: formData.prompt,
           precise_citation: formData.precise_citation,
           precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
           local_only: formData.local_only,
@@ -150,7 +150,7 @@ export const useAssistants = () => {
           reranker_provider: formData.reranker_provider,
           reranker_model: formData.reranker_model,
           top_n: formData.top_n,
-          rag_prompt: formData.rag_prompt,
+          prompt: formData.prompt,
           precise_citation: formData.precise_citation,
           precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
           local_only: formData.local_only,
