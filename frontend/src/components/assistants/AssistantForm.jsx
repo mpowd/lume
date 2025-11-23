@@ -9,7 +9,7 @@ import ModelSelector from './ModelSelector'
 import AdvancedSettings from './AdvancedSettings'
 import { formatModelSize } from '../../utils/formatters'
 
-const DEFAULT_RAG_PROMPT = `Answer the question using only the context provided.
+const DEFAULT_PROMPT = `Answer the question using only the context provided.
 
 Retrieved Context: {context}
 
@@ -79,7 +79,7 @@ export default function AssistantForm({
     top_n: 5,
     llm: 'gpt-4o-mini',
     llm_provider: 'openai',
-    rag_prompt: DEFAULT_RAG_PROMPT,
+    prompt: DEFAULT_PROMPT,
     precise_citation_prompt: DEFAULT_PRECISE_CITATION_PROMPT,
     tools: [],
     max_steps: 4,
@@ -108,7 +108,7 @@ export default function AssistantForm({
         top_n: assistant.top_n || 5,
         llm: assistant.llm || 'gpt-4o-mini',
         llm_provider: assistant.llm_provider || 'openai',
-        rag_prompt: assistant.rag_prompt || DEFAULT_RAG_PROMPT,
+        prompt: assistant.prompt || DEFAULT_PROMPT,
         precise_citation_prompt: assistant.precise_citation_prompt || DEFAULT_PRECISE_CITATION_PROMPT,
         tools: assistant.tools || [],
         max_steps: assistant.max_steps || 4,
@@ -116,6 +116,69 @@ export default function AssistantForm({
       })
     }
   }, [assistant])
+
+// ... existing code ...
+
+  useEffect(() => {
+    const updatePrompts = () => {
+      // Skip prompt updates when loading an existing assistant
+      if (assistant) {
+        return;
+      }
+      
+      const hasCollections = formData.collections && formData.collections.length > 0;
+      const hasReferences = formData.references && formData.references.length > 0;
+      
+      let newPrompt = DEFAULT_PROMPT;
+      let newPreciseCitationPrompt = DEFAULT_PRECISE_CITATION_PROMPT;
+      
+      if (!hasCollections && !hasReferences) {
+        // Case 4: No collections, no references
+        newPrompt = `Answer the question based on the provided reference.
+        
+  User Question: {question}`;
+      } else if (hasCollections && !hasReferences) {
+        // Case 1: Collections, no references
+        newPrompt = `Answer the question using only the context provided.
+
+  Retrieved Context: {context}
+
+  User Question: {question}
+
+  Answer conversationally. User is not aware of context.`;
+      } else if (hasCollections && hasReferences) {
+        // Case 2: Collections and references
+        const refPlaceholders = formData.references.map((_, i) => `{reference${i+1}}`).join('\n');
+        newPrompt = `Answer the question using the context and references provided.
+
+  Retrieved Context: {context}
+
+  ${refPlaceholders}
+
+  User Question: {question}
+
+  Answer conversationally. User is not aware of context.`;
+      } else if (!hasCollections && hasReferences) {
+        // Case 3: No collections, references
+        const refPlaceholders = formData.references.map(ref => `${ref.name}: ${ref.text}`).join('\n');
+        newPrompt = `Answer the question based on the provided references.
+
+  ${refPlaceholders}
+
+  User Question: {question}`;
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        prompt: newPrompt,
+        precise_citation_prompt: newPreciseCitationPrompt
+      }));
+    };
+    
+    updatePrompts();
+  }, [formData.collections, formData.references]);
+
+// ... existing code ...
 
   const loadOllamaModels = async () => {
     setLoadingModels(true)
@@ -180,6 +243,11 @@ const addReference = () => {
     }));
   } else {
     // Adding new reference
+
+    const newPrompt = formData.prompt.replace(
+      '{question}',
+      `{question}\n\nReference ${formData.references.length}: {reference${formData.references.length}}`
+    );
     setFormData(prev => ({
       ...prev,
       references: [...prev.references, {
@@ -196,10 +264,19 @@ const addReference = () => {
   setEditingReferenceIndex(null);
 };
   const deleteReference = (index) => {
-    setFormData(prevState => ({
-      ...prevState,
-      references: prevState.references.filter((_, i) => i !== index)
-    }));
+    // Update prompts when deleting references
+    setFormData(prevState => {
+      const updatedReferences = prevState.references.filter((_, i) => i !== index);
+      const newPrompt = updatedReferences.reduce((prompt, ref, i) => {
+        return prompt.replace(`\n\nReference ${i+1}: {reference${i+1}}`, '');
+      }, prevState.prompt);
+      
+      return {
+        ...prevState,
+        references: updatedReferences,
+        prompt: newPrompt
+      };
+    });
   };
 
   const handleSubmit = (e) => {
@@ -264,7 +341,7 @@ const addReference = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary mb-3">
                 <Database className="w-4 h-4 inline mr-2" />
-                Knowledge Sources
+                Collection Access
               </label>
               {collections.length === 0 ? (
                 <div className="p-4 bg-transparent border border-white/10 rounded-xl text-center">
@@ -294,16 +371,16 @@ const addReference = () => {
               )}
             </div>
 
-                                    <div className="space-y-2">
-                <label className="block text-sm font-medium text-text-secondary mb-3">
-                  <ScrollText className="w-4 h-4 inline mr-2" />
-                  Additional references
-                </label>
-                {formData.references.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.references.map((ref, index) => (
+          <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary mb-3">
+                <ScrollText className="w-4 h-4 inline mr-2" />
+                Additional references
+              </label>
+              {formData.references.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.references.map((ref, index) => (
+                    <div key={ref.name} className="relative group">
                       <button
-                        key={ref.name}
                         type="button"
                         onClick={() => openReferenceModal(index)}
                         className={`
@@ -314,19 +391,30 @@ const addReference = () => {
                       >
                         {ref.name}
                       </button>
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={() => {
-                    setIsModalOpen(true);
-                    setEditingReferenceIndex(null);
-                  }} 
-                  className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
-                >
-                  <Plus className="w-4 h-4 text-brand-teal" />
-                </button>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteReference(index)}
+                        className="absolute -top-1 -right-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Delete reference"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setIsModalOpen(true);
+                  setEditingReferenceIndex(null);
+                }} 
+                className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
+              >
+                <Plus className="w-4 h-4 text-brand-teal" />
+              </button>
+            </div>
             <div className="p-4 bg-transparent border border-white/10 rounded-xl">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-3">
@@ -358,7 +446,7 @@ const addReference = () => {
               setFormData={setFormData}
               showAdvanced={showAdvanced}
               setShowAdvanced={setShowAdvanced}
-              defaultRagPrompt={DEFAULT_RAG_PROMPT}
+              defaultPrompt={DEFAULT_PROMPT}
               defaultPreciseCitationPrompt={DEFAULT_PRECISE_CITATION_PROMPT}
             />
           </>
