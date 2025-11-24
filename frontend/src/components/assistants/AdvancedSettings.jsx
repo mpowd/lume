@@ -251,11 +251,8 @@ export default function AdvancedSettings({
                       <InfoIcon className="w-5 h-5 text-info" />
                     </div>
                     <div>
-                      <p className="text-sm text-text-secondary">
-                        This prompt will use the {references.length} references you've added to your assistant.
-                      </p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        Placeholders: {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                        Placeholders: {'{question} '} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
                       </p>
                     </div>
                   </div>
@@ -284,11 +281,8 @@ export default function AdvancedSettings({
                       <InfoIcon className="w-5 h-5 text-info" />
                     </div>
                     <div>
-                      <p className="text-sm text-text-secondary">
-                        This prompt will use the {references.length} references you've added to your assistant.
-                      </p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        Placeholders: {hasCollections ? '{context}' : ''} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                        Placeholders: {'{question} '} {hasCollections ? '{context}' : ''} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
                       </p>
                     </div>
                   </div>
@@ -311,6 +305,37 @@ export default function AdvancedSettings({
                 </>
               )}
             </div>
+
+            {/* HyDE Prompt Section */}
+            {formData.hyde && (
+              <div className="pt-6 border-t border-white/10 space-y-4">
+                <h3 className="text-sm font-semibold text-text-secondary">HyDE Prompt</h3>
+                <div className="flex gap-3 p-3 bg-background-elevated border border-white/10 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <InfoIcon className="w-5 h-5 text-info" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-quaternary mt-1">
+                      This prompt is used to generate a hypothetical document for the HyDE technique.
+                    </p>
+                  </div>
+                </div>
+                <FormTextarea
+                  label="HyDE Prompt"
+                  value={formData.hyde_prompt}
+                  onChange={(e) => setFormData({...formData, hyde_prompt: e.target.value})}
+                  rows={6}
+                  className="font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, hyde_prompt: formData.hyde_prompt})}
+                  className="text-xs text-text-tertiary hover:text-white transition-colors"
+                >
+                  Reset to default HyDE prompt
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div className="space-y-4">
@@ -321,11 +346,8 @@ export default function AdvancedSettings({
                 <InfoIcon className="w-5 h-5 text-info" />
               </div>
               <div>
-                <p className="text-sm text-text-secondary">
-                  This prompt will use the {references.length} references you've added to your assistant.
-                </p>
                 <p className="text-xs text-text-quaternary mt-1">
-                  Placeholders: {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                  Placeholders: {'{question} '} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
                 </p>
               </div>
             </div>
@@ -357,6 +379,37 @@ export default function AdvancedSettings({
               cancelText="Keep Placeholder"
               variant="warning"
             />
+            
+            {/* HyDE Prompt Section */}
+            {formData.hyde && (
+              <div className="pt-6 border-t border-white/10 space-y-4">
+                <h3 className="text-sm font-semibold text-text-secondary">HyDE Prompt</h3>
+                <div className="flex gap-3 p-3 bg-background-elevated border border-white/10 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <InfoIcon className="w-5 h-5 text-info" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-quaternary mt-1">
+                      This prompt is used to generate a hypothetical document for the HyDE technique.
+                    </p>
+                  </div>
+                </div>
+                <FormTextarea
+                  label="HyDE Prompt"
+                  value={formData.hyde_prompt}
+                  onChange={(e) => setFormData({...formData, hyde_prompt: e.target.value})}
+                  rows={6}
+                  className="font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, hyde_prompt: formData.hyde_prompt})}
+                  className="text-xs text-text-tertiary hover:text-white transition-colors"
+                >
+                  Reset to default HyDE prompt
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
