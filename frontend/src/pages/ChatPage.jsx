@@ -12,7 +12,7 @@ import Button from '../components/shared/Button'
 export default function ChatPage() {
   const { assistants, loading: loadingAssistants, error: assistantsError } = useAssistants()
   const [selectedAssistant, setSelectedAssistant] = useState(null)
-  const [messages, setMessages] = useState([{ role: 'assistant', content: 'Hi! Ask me anything.' }])
+  const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
 
   const handleSelectAssistant = (bot) => {
