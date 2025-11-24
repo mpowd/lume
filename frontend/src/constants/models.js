@@ -1,5 +1,12 @@
 
-export const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+export const OPENAI_MODELS = [
+  'gpt-4o-mini',
+  'gpt-4o',
+  'gpt-4-turbo',
+  'gpt-5-mini',
+  'gpt-5.1',
+  'gpt-5-nano'
+]
 
 export const COHERE_RERANKERS = [
   'rerank-v3.5',
