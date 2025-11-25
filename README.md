@@ -321,14 +321,6 @@ docker exec -it <container> ollama list
 - Disable reranking
 - Use faster embedding models
 
-## 🤝 Contributing
-
-Contributions welcome! Focus areas:
-- New assistant types
-- Additional data sources
-- Evaluation improvements
-- UI/UX enhancements
-
 ## 📄 License
 
 MIT License
