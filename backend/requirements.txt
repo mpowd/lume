@@ -16,10 +16,10 @@ rapidfuzz==3.13.0
 cohere==5.15.0
 pydantic-ai==0.1.3
 
-arize-phoenix==8.24.2
-arize-phoenix-otel==0.9.1
-openinference-instrumentation-langchain==0.1.40
-openinference-instrumentation-smolagents==0.1.9
+arize-phoenix==12.18.0
+arize-phoenix-otel==0.14.0
+openinference-instrumentation-langchain==0.1.55
+# openinference-instrumentation-smolagents==0.1.9
 
 lightrag-hku==1.3.6
 
