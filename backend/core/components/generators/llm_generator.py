@@ -61,12 +61,12 @@ Be precise with chunk indices!"""
             return ChatOpenAI(
                 model=model_name,
                 api_key=os.environ.get("OPENAI_API_KEY"),
-                temperature=0,
+                # temperature=0,
             )
         else:  # ollama
             return ChatOllama(
                 model=model_name,
-                temperature=0,
+                # temperature=0,
                 base_url="http://host.docker.internal:11434",
             )
 
