@@ -52,8 +52,8 @@ export default function KnowledgeBasePage() {
     description: '',
     source_type: 'website',
     embedding_model: 'jina/jina-embeddings-v2-base-de',
-    chunk_size: 1000,
-    chunk_overlap: 100,
+    chunk_size: 512,
+    chunk_overlap: 20,
     distance_metric: 'Cosine similarity'
   })
 

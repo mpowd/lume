@@ -16,8 +16,8 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
     description: '',
     source_type: 'website',
     embedding_model: 'jina/jina-embeddings-v2-base-de',
-    chunk_size: 1000,
-    chunk_overlap: 100,
+    chunk_size: 512,
+    chunk_overlap: 20,
     distance_metric: 'Cosine similarity'
   })
 
@@ -32,8 +32,8 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
       description: '',
       source_type: 'website',
       embedding_model: 'jina/jina-embeddings-v2-base-de',
-      chunk_size: 1000,
-      chunk_overlap: 100,
+      chunk_size: 512,
+      chunk_overlap: 20,
       distance_metric: 'Cosine similarity'
     })
     setShowAdvanced(false)
@@ -113,13 +113,13 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Chunk Size: {formData.chunk_size} characters
+                Chunk Size: {formData.chunk_size} tokens
               </label>
               <input
                 type="range"
-                min="500"
-                max="2000"
-                step="100"
+                min="128"
+                max="2048"
+                step="128"
                 value={formData.chunk_size}
                 onChange={(e) => setFormData({...formData, chunk_size: parseInt(e.target.value)})}
                 className="w-full cursor-pointer"
@@ -132,13 +132,13 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Chunk Overlap: {formData.chunk_overlap} characters
+                Chunk Overlap: {formData.chunk_overlap} tokens
               </label>
               <input
                 type="range"
                 min="0"
-                max="500"
-                step="50"
+                max="100"
+                step="10"
                 value={formData.chunk_overlap}
                 onChange={(e) => setFormData({...formData, chunk_overlap: parseInt(e.target.value)})}
                 className="w-full cursor-pointer"
