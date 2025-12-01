@@ -14,20 +14,14 @@ export default function MessageBubble({ message }) {
     return parts.map((part, index) => {
       // If it's a code block
       if (part.startsWith('```') && part.endsWith('```')) {
-        // Extract code content, removing the language identifier (first line)
+        // Extract code content, keeping the language identifier
         const codeContent = part.slice(3, -3).trim()
-        const lines = codeContent.split('\n')
-        // Remove first line if it's a language identifier (starts with a word)
-        const processedContent = lines.length > 1 && /^[a-zA-Z]/.test(lines[0]) 
-          ? lines.slice(1).join('\n') 
-          : codeContent
-        
         return (
           <pre 
             key={index} 
             className="bg-background-elevated/50 border border-white/10 rounded-lg p-4 my-2 overflow-x-auto text-sm"
           >
-            <code>{processedContent}</code>
+            <code>{codeContent}</code>
           </pre>
         )
       }
