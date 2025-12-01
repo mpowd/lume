@@ -7,9 +7,12 @@ from langchain_core.documents import Document
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_core.runnables import RunnableLambda
 from langchain_community.document_transformers import LongContextReorder
+
+
 from qdrant_client import QdrantClient
 import logging
 import os
@@ -26,6 +29,9 @@ class HybridRetriever:
             model="jina/jina-embeddings-v2-base-de",
             base_url="http://host.docker.internal:11434",
         )
+        # self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        # logger.info(f"Retriever uses OpenAI Embedding Model")
+
         self.client = QdrantClient(url="http://qdrant:6333", timeout=10.0)
 
     def _get_llm(self, model_name: str, provider: str):
@@ -34,12 +40,12 @@ class HybridRetriever:
             return ChatOpenAI(
                 model=model_name,
                 api_key=os.environ.get("OPENAI_API_KEY"),
-                temperature=0,
+                # temperature=0,
             )
         else:  # ollama
             return ChatOllama(
                 model=model_name,
-                temperature=0,
+                # temperature=0,
                 base_url="http://host.docker.internal:11434",
             )
 
@@ -74,7 +80,8 @@ class HybridRetriever:
         )
 
         return vector_store.as_retriever(
-            search_kwargs={"k": top_k, "score_threshold": 0.1}
+            # search_kwargs={"k": top_k, "score_threshold": 0.1}
+            search_kwargs={"k": top_k}
         )
 
     def _apply_reranking(
@@ -174,6 +181,7 @@ class HybridRetriever:
         #     )
 
         # Execute retrieval
+        logger.info(f"Using query {query_to_use} to find similar chunks.")
         documents = retriever.invoke(query_to_use)
         logger.info(f"Retrieved {len(documents)} documents")
 
