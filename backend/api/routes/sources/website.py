@@ -223,6 +223,7 @@ async def upload_documents_stream(
             from langchain_text_splitters import (
                 MarkdownHeaderTextSplitter,
                 RecursiveCharacterTextSplitter,
+                CharacterTextSplitter,
             )
             from qdrant_client import QdrantClient
 
@@ -246,29 +247,50 @@ async def upload_documents_stream(
 
             # Import embedding utilities
             from langchain_ollama import OllamaEmbeddings
+            from langchain_openai import OpenAIEmbeddings
 
             # Initialize embeddings based on model
             if embedding_model == "jina/jina-embeddings-v2-base-de":
+                logger.info(
+                    f"Use OpenAI Embedding Model '{embedding_model}' for indexing website"
+                )
                 dense_embeddings = OllamaEmbeddings(
                     model="jina/jina-embeddings-v2-base-de",
                     base_url="http://host.docker.internal:11434",
                 )
+                sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+            elif embedding_model == "text-embedding-3-small":
+                logger.info(
+                    f"Use OpenAI Embedding Model '{embedding_model}' for indexing website"
+                )
+                dense_embeddings = OpenAIEmbeddings(model=embedding_model)
                 sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': f'Unsupported embedding model: {embedding_model}', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             # Configure crawler
+            # prune_filter = PruningContentFilter(
+            #     threshold=0.45,
+            #     threshold_type="dynamic",
+            #     min_word_threshold=30,
+            # )
             prune_filter = PruningContentFilter(
-                threshold=0.45,
-                threshold_type="dynamic",
-                min_word_threshold=30,
+                threshold=0.5
+                # threshold=0.5, threshold_type="dynamic", min_word_threshold=30
             )
 
-            md_generator = DefaultMarkdownGenerator(content_filter=prune_filter)
+            md_generator = DefaultMarkdownGenerator(
+                content_filter=prune_filter, options={"ignore_links": True}
+            )
+
+            # md_generator = DefaultMarkdownGenerator()
 
             crawler_config = CrawlerRunConfig(
-                only_text=True, verbose=True, markdown_generator=md_generator
+                only_text=True,
+                verbose=True,
+                markdown_generator=md_generator,
+                excluded_tags=["nav", "footer", "header"],
             )
 
             crawled_documents = []
@@ -337,15 +359,25 @@ async def upload_documents_stream(
             yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': 0, 'total': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
             await asyncio.sleep(0.1)
 
-            headers_to_split_on = [("#", "Header 1"), ("##", "Header 2")]
+            headers_to_split_on = [
+                ("#", "Header 1"),
+                ("##", "Header 2"),
+                ("###", "Header 3"),
+            ]
             markdown_splitter = MarkdownHeaderTextSplitter(
                 headers_to_split_on=headers_to_split_on, strip_headers=True
             )
 
-            text_splitter = RecursiveCharacterTextSplitter(
+            # text_splitter = RecursiveCharacterTextSplitter(
+            #     chunk_size=chunk_size,
+            #     chunk_overlap=chunk_overlap,
+            #     separators=["\n\n", "\n", ".", ";", ",", " "],
+            # )
+
+            text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+                encoding_name="cl100k_base",
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
-                separators=["\n\n", "\n", ".", ";", ",", " "],
             )
 
             all_chunks = []
@@ -366,6 +398,36 @@ async def upload_documents_stream(
 
                         chunk.metadata["source_url"] = doc_data["url"]
                         chunk.metadata["title"] = doc_data["title"]
+
+                        chunk_with_metadata = ""
+                        for metadata in chunk.metadata:
+                            match metadata:
+                                case "title":
+                                    chunk_with_metadata = (
+                                        f"# {chunk.metadata[metadata]}\n\n"
+                                        + chunk_with_metadata
+                                    )
+                                case "Header 1":
+                                    chunk_with_metadata = (
+                                        chunk_with_metadata
+                                        + f"## {chunk.metadata[metadata]}\n\n"
+                                    )
+                                case "Header 2":
+                                    chunk_with_metadata = (
+                                        chunk_with_metadata
+                                        + f"### {chunk.metadata[metadata]}\n\n"
+                                    )
+                                case "Header 3":
+                                    chunk_with_metadata = (
+                                        chunk_with_metadata
+                                        + f"#### {chunk.metadata[metadata]}\n\n"
+                                    )
+                                case _:
+                                    pass
+
+                        chunk.page_content = chunk_with_metadata + chunk.page_content
+                        if idx == 1:
+                            logger.info(chunk.page_content)
 
                         all_chunks.append(chunk)
                         all_uuids.append(str(uuid4()))

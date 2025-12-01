@@ -7,6 +7,7 @@ from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
 from qdrant_client import models
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
@@ -33,6 +34,9 @@ class QdrantClient:
         Returns:
             Dict with dense_embeddings, sparse_embeddings, and embedding_dim
         """
+
+        logger.info(f"get embedding model {embedding_model}")
+
         if embedding_model == "jina/jina-embeddings-v2-base-de":
             return {
                 "dense_embeddings": OllamaEmbeddings(
@@ -42,6 +46,9 @@ class QdrantClient:
                 "sparse_embeddings": FastEmbedSparse(model_name="Qdrant/bm25"),
                 "embedding_dim": 768,
             }
+        elif embedding_model == "text-embedding-3-small":
+            logger.info(f"Fetsching OpenAI Embedding Model '{embedding_model}' from Qdrant Client")
+            return {"dense_embeddings": OpenAIEmbeddings(model=embedding_model)}
         else:
             raise ValueError(f"Unsupported embedding model: {embedding_model}")
 

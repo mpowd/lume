@@ -21,7 +21,8 @@ export const HUGGINGFACE_RERANKERS = [
 ]
 
 export const EMBEDDING_MODELS = [
-  { value: 'jina/jina-embeddings-v2-base-de', label: 'Jina Embeddings v2 Base (768d)' }
+  { value: 'jina/jina-embeddings-v2-base-de', label: 'Jina Embeddings v2 Base (768d)' },
+  { value: 'text-embedding-3-small', label: 'OpenAI text-embeddding-3-small'}
 ]
 
 export const DISTANCE_METRICS = [

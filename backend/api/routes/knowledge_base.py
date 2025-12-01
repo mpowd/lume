@@ -6,10 +6,10 @@ from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
 from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from uuid import uuid4
-from langchain_ollama import OllamaEmbeddings
 from datetime import datetime
 from langchain_core.documents import Document
 from backend.db.mongodb import MongoDBClient
@@ -85,6 +85,7 @@ def get_embedder(embedding_model: str):
     """Get embeddings configuration for the specified model"""
     match embedding_model:
         case "jina/jina-embeddings-v2-base-de":
+            logger.info(f"Fetches Jina Embedding Model '{embedding_model}'")
             return {
                 "dense_embeddings": OllamaEmbeddings(
                     model="jina/jina-embeddings-v2-base-de",
@@ -92,6 +93,13 @@ def get_embedder(embedding_model: str):
                 ),
                 "sparse_embeddings": FastEmbedSparse(model_name="Qdrant/bm25"),
                 "embedding_dim": 768,
+            }
+        case "text-embedding-3-small":
+            logger.info(f"Fetches OpenAI Embedding Model '{embedding_model}'")
+            return {
+                "dense_embeddings": OpenAIEmbeddings(model=embedding_model),
+                "sparse_embeddings": FastEmbedSparse(model_name="Qdrant/bm25"),
+                "embedding_dim": 1536,
             }
         case _:
             return -1
