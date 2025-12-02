@@ -92,19 +92,19 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                     </span>
                   </div>
                   <span className="text-sm text-slate-400">
-                    {progress.current || 0} / {progress.total || 0} pages
+                    {progress.chunked_urls || 0} / {progress.total_urls || 0} pages
                   </span>
                 </div>
                 
                 <ProgressBar
-                  current={progress.current || 0}
-                  total={progress.total || 0}
+                  current={isEmbedding || isComplete ? progress.total_urls || 0 : progress.chunked_urls || 0}
+                  total={progress.total_urls || 0}
                   showPercentage
                   className={isScraping || isChunking ? 'progress-shimmer' : ''}
                   color={isEmbedding || isComplete ? 'teal' : 'white'}
                 />
 
-                {progress.current_url && (isScraping || isChunking) && (
+                {(isScraping || isChunking) && (
                   <div className="p-3 bg-slate-800/50 rounded-lg">
                     <div className="text-xs text-slate-500 mb-1">Currently processing:</div>
                     <div className="text-sm text-slate-300 font-mono truncate">{progress.current_url}</div>
@@ -137,28 +137,26 @@ export default function UploadProgress({ isOpen, progress, onClose }) {
                 </div>
                 
                 {(isEmbedding || isComplete) && totalChunks > 0 ? (
-                  <>
-                    <ProgressBar
-                      current={embeddedChunks}
-                      total={totalChunks}
-                      showPercentage={true}
-                      className={isEmbedding ? 'progress-shimmer' : ''}
-                      color={isComplete ? 'teal' : 'teal'}
-                    />
-                    
-                    {isEmbedding && (
-                      <div className="p-3 bg-brand-teal/10 border border-brand-teal/20 rounded-lg">
-                        <div className="text-sm text-slate-300">
-                          Generating vector embeddings and storing in database...
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <ProgressBar
+                    current={embeddedChunks}
+                    total={totalChunks}
+                    showPercentage={true}
+                    className={isEmbedding ? 'progress-shimmer' : ''}
+                    color={isComplete ? 'teal' : 'teal'}
+                  />
                 ) : (isScraping || isChunking) ? (
+                  <ProgressBar
+                    current={progress.chunked_embeddings || 0}
+                    total={progress.total_embeddings || 0}
+                    showPercentage
+                    className="progress-shimmer"
+                    color="white"
+                  />
+                ) : (
                   <div className="h-3 bg-slate-800/50 rounded-full relative overflow-hidden">
                     <div className="h-full w-0 bg-slate-700 rounded-full" />
                   </div>
-                ) : null}
+                )}
               </div>
             </div>
           )}

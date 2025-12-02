@@ -40,8 +40,8 @@ export const useUploadProgress = () => {
             setUploadProgress({
               status: 'complete',
               message: 'Upload complete!',
-              current: data.total_processed || data.total || urls.length,
-              total: data.total_processed || data.total || urls.length,
+              chunked_urls: data.chunked_urls,
+              total_urls: data.total_urls,
               processed: data.processed_urls || data.processed || [],
               failed: data.failed_urls || data.failed || [],
               total_chunks: data.total_chunks || 0,
@@ -66,8 +66,8 @@ export const useUploadProgress = () => {
             setUploadProgress({
               status: data.status,
               message: data.message,
-              current: data.current,
-              total: data.total,
+              chunked_urls: data.chunked_urls,
+              total_urls: data.total_urls,
               processed: data.processed || [],
               failed: data.failed || [],
               current_url: data.current_url,

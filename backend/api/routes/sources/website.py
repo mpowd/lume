@@ -200,16 +200,16 @@ async def upload_documents_stream(
                 logger.info(
                     f"Skipping {len(skipped_urls)} URLs that already exist in the collection"
                 )
-                yield f"data: {json.dumps({'status': 'info', 'message': f'Skipping {len(skipped_urls)} URLs that already exist', 'current': 0, 'total': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'info', 'message': f'Skipping {len(skipped_urls)} URLs that already exist', 'current': 0, 'total_urls': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 await asyncio.sleep(0.5)
 
             if not new_urls:
                 logger.info("All URLs already exist in collection, nothing to upload")
-                yield f"data: {json.dumps({'status': 'complete', 'message': 'All URLs already exist in collection', 'current': len(url_list), 'total': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'complete', 'message': 'All URLs already exist in collection', 'current': len(url_list), 'total_urls': len(url_list), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             # Send initial status
-            yield f"data: {json.dumps({'status': 'starting', 'message': f'Processing {len(new_urls)} new URLs...', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+            yield f"data: {json.dumps({'status': 'starting', 'message': f'Processing {len(new_urls)} new URLs...', 'current': 0, 'total_urls': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
             await asyncio.sleep(0.1)
 
             from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
@@ -237,7 +237,7 @@ async def upload_documents_stream(
             )
 
             if not collection_info:
-                yield f"data: {json.dumps({'status': 'error', 'message': f'Collection configuration not found for {collection_name}', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Collection configuration not found for {collection_name}', 'current': 0, 'total_urls': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             config_doc = collection_info[0]
@@ -266,7 +266,7 @@ async def upload_documents_stream(
                 dense_embeddings = OpenAIEmbeddings(model=embedding_model)
                 sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
             else:
-                yield f"data: {json.dumps({'status': 'error', 'message': f'Unsupported embedding model: {embedding_model}', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Unsupported embedding model: {embedding_model}', 'current': 0, 'total_urls': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
                 return
 
             # Configure crawler
@@ -293,18 +293,18 @@ async def upload_documents_stream(
                 excluded_tags=["nav", "footer", "header"],
             )
 
+            # Phase 1: Crawl and chunk documents
             crawled_documents = []
             failed_urls = []
             processed_urls = []
 
-            # Phase 1: Crawl and chunk documents
-            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Starting to crawl URLs...', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
+            yield f"data: {json.dumps({'status': 'crawling', 'message': 'Starting to crawl URLs...', 'current': 0, 'chunked_urls': 0, 'total_urls': len(new_urls), 'processed': [], 'failed': [], 'skipped': skipped_urls})}\n\n"
 
             async with AsyncWebCrawler() as crawler:
                 for idx, url in enumerate(new_urls, 1):
                     try:
                         logger.info(f"[{idx}/{len(new_urls)}] Crawling: {url}")
-                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Crawling URL {idx}/{len(new_urls)}...', 'current': idx, 'total': len(new_urls), 'current_url': url, 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Crawling URL {idx}/{len(new_urls)}...', 'current': idx, 'chunked_urls': idx, 'total_urls': len(new_urls), 'current_url': url, 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
                         result = await crawler.arun(url, config=crawler_config)
 
@@ -344,19 +344,19 @@ async def upload_documents_stream(
                             )
                             logger.error(f"✗ Failed to crawl {url}: {error_msg}")
                             failed_urls.append({"url": url, "error": error_msg})
-                            yield f"data: {json.dumps({'status': 'crawling', 'message': f'Failed to crawl {url}', 'current': idx, 'total': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+                            yield f"data: {json.dumps({'status': 'crawling', 'message': f'Failed to crawl {url}', 'current': idx, 'chunked_urls': idx, 'total_urls': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
                     except Exception as e:
                         logger.error(f"✗ Error crawling {url}: {str(e)}")
                         failed_urls.append({"url": url, "error": str(e)})
-                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Error crawling {url}', 'current': idx, 'total': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+                        yield f"data: {json.dumps({'status': 'crawling', 'message': f'Error crawling {url}', 'current': idx, 'chunked_urls': idx, 'total_urls': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
             if not crawled_documents:
-                yield f"data: {json.dumps({'status': 'error', 'message': 'No documents were successfully crawled', 'current': 0, 'total': len(new_urls), 'processed': [], 'failed': failed_urls, 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'error', 'message': 'No documents were successfully crawled', 'current': 0, 'chunked_urls': 0, 'total_urls': len(new_urls), 'processed': [], 'failed': failed_urls, 'skipped': skipped_urls})}\n\n"
                 return
 
             # Phase 2: Chunk documents
-            yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': 0, 'total': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+            # yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking {len(crawled_documents)} documents...', 'current': 0, 'total_urls': len(new_urls), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
             await asyncio.sleep(0.1)
 
             headers_to_split_on = [
@@ -385,7 +385,7 @@ async def upload_documents_stream(
 
             for doc_idx, doc_data in enumerate(crawled_documents, 1):
                 try:
-                    yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking document {doc_idx}/{len(crawled_documents)}...', 'current': doc_idx, 'total': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+                    yield f"data: {json.dumps({'status': 'chunking', 'message': f'Chunking document {doc_idx}/{len(crawled_documents)}...', 'current': doc_idx, 'chunked_urls': doc_idx, 'total_urls': len(crawled_documents), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
 
                     md_header_splits = markdown_splitter.split_text(
                         doc_data["markdown"]
@@ -438,7 +438,7 @@ async def upload_documents_stream(
                     logger.error(f"Error chunking document {doc_data['url']}: {str(e)}")
 
             # Phase 3: Create embeddings
-            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {len(all_chunks)} chunks...', 'current': 0, 'total': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+            yield f"data: {json.dumps({'status': 'embedding', 'message': f'Creating embeddings for {len(all_chunks)} chunks...', 'chunked_urls': len(crawled_documents), 'total_urls': len(crawled_documents), 'current': 0, 'embedded_chunks': 0, 'total_chunks': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
             await asyncio.sleep(0.1)
 
             qdrant = QdrantVectorStore(
@@ -452,7 +452,7 @@ async def upload_documents_stream(
             )
 
             # Add documents in batches with progress updates
-            batch_size = 50
+            batch_size = 1
             for i in range(0, len(all_chunks), batch_size):
                 batch_chunks = all_chunks[i : i + batch_size]
                 batch_uuids = all_uuids[i : i + batch_size]
@@ -460,14 +460,14 @@ async def upload_documents_stream(
                 qdrant.add_documents(documents=batch_chunks, ids=batch_uuids)
 
                 current = min(i + batch_size, len(all_chunks))
-                yield f"data: {json.dumps({'status': 'embedding', 'message': f'Embedding progress: {current}/{len(all_chunks)} chunks', 'current': current, 'total': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
+                yield f"data: {json.dumps({'status': 'embedding', 'message': f'Embedding progress: {current}/{len(all_chunks)} chunks', 'chunked_urls': len(crawled_documents), 'total_urls': len(crawled_documents), 'current': current, 'embedded_chunks': current, 'total_chunks': len(all_chunks), 'processed': processed_urls.copy(), 'failed': failed_urls.copy(), 'skipped': skipped_urls})}\n\n"
                 await asyncio.sleep(0.1)
 
             # Final success message
-            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully uploaded {len(crawled_documents)} documents ({len(all_chunks)} chunks)', 'current': len(all_chunks), 'total': len(all_chunks), 'processed': processed_urls, 'failed': failed_urls, 'skipped': skipped_urls, 'total_chunks': len(all_chunks)})}\n\n"
+            yield f"data: {json.dumps({'status': 'complete', 'message': f'Successfully uploaded {len(crawled_documents)} documents ({len(all_chunks)} chunks)', 'chunked_urls': len(crawled_documents), 'total_urls': len(crawled_documents), 'current': len(all_chunks), 'embedded_chunks': current, 'total_chunks': len(all_chunks), 'processed': processed_urls, 'failed': failed_urls, 'skipped': skipped_urls, 'total_chunks': len(all_chunks)})}\n\n"
 
         except Exception as e:
             logger.error(f"Error in streaming upload: {str(e)}")
-            yield f"data: {json.dumps({'status': 'error', 'message': str(e), 'current': 0, 'total': 0, 'processed': [], 'failed': [], 'skipped': []})}\n\n"
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e), 'current': 0, 'embedded_chunks': current, 'total_chunks': 0, 'processed': [], 'failed': [], 'skipped': []})}\n\n"
 
     return StreamingResponse(generate_progress(), media_type="text/event-stream")
