@@ -59,7 +59,7 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
           rows={3}
         />
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-slate-300 mb-3">Source Type</label>
           <div className="grid grid-cols-2 gap-3">
             {SOURCE_TYPES.map(type => {
@@ -96,7 +96,7 @@ export default function CollectionForm({ isOpen, onClose, onSubmit, loading }) {
               )
             })}
           </div>
-        </div>
+        </div> */}
 
         <Accordion
           title="Advanced Settings"
