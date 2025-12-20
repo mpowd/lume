@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download } from 'lucide-react'
 import mammoth from 'mammoth'
-import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
 
+// Verwende Canvas-basierte PDF-Anzeige statt react-pdf
+// um Worker-Probleme zu vermeiden
 
 export default function DocumentViewer({ url, filename, onClose }) {
   const [loading, setLoading] = useState(true)
@@ -32,13 +33,13 @@ export default function DocumentViewer({ url, filename, onClose }) {
           throw new Error(`Failed to load file: ${response.statusText}`)
         }
 
-        // PDF
+        // PDF - Zeige als eingebettetes Objekt
         if (ext === 'pdf') {
           const blob = await response.blob()
           const blobUrl = URL.createObjectURL(blob)
           setContent(blobUrl)
         }
-        // Word (.doc, .docx)
+        // Word Dokumente (.doc, .docx)
         else if (ext === 'doc' || ext === 'docx') {
           const arrayBuffer = await response.arrayBuffer()
           const result = await mammoth.convertToHtml({ arrayBuffer })
@@ -46,24 +47,43 @@ export default function DocumentViewer({ url, filename, onClose }) {
         }
         // Excel (.xlsx, .xls)
         else if (ext === 'xlsx' || ext === 'xls') {
+          const ExcelJS = await import('exceljs')
           const arrayBuffer = await response.arrayBuffer()
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+          const workbook = new ExcelJS.Workbook()
+          await workbook.xlsx.load(arrayBuffer)
           
-          // Convert sheets to HTML
-          const sheetsHtml = workbook.SheetNames.map(sheetName => {
-            const worksheet = workbook.Sheets[sheetName]
-            const html = XLSX.utils.sheet_to_html(worksheet)
-            return `<h2 style="color: #14b8a6; margin-top: 2rem; margin-bottom: 1rem; font-size: 1.5rem; font-weight: bold;">${sheetName}</h2>${html}`
-          }).join('')
+          // Konvertiere alle Sheets zu HTML
+          const sheetsHtml = []
+          workbook.eachSheet((worksheet, sheetId) => {
+            let tableHtml = `<h2 style="color: #14b8a6; margin-top: 2rem; margin-bottom: 1rem; font-size: 1.5rem; font-weight: bold;">${worksheet.name}</h2>`
+            tableHtml += '<table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">'
+            
+            worksheet.eachRow((row, rowNumber) => {
+              const isHeader = rowNumber === 1
+              tableHtml += '<tr>'
+              row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                const cellValue = cell.value || ''
+                const tag = isHeader ? 'th' : 'td'
+                const style = isHeader 
+                  ? 'border: 1px solid #ddd; padding: 8px; background: #f4f4f4; text-align: left; font-weight: bold;'
+                  : 'border: 1px solid #ddd; padding: 8px;'
+                tableHtml += `<${tag} style="${style}">${cellValue}</${tag}>`
+              })
+              tableHtml += '</tr>'
+            })
+            
+            tableHtml += '</table>'
+            sheetsHtml.push(tableHtml)
+          })
           
-          setContent(sheetsHtml)
+          setContent(sheetsHtml.join(''))
         }
         // CSV
         else if (ext === 'csv') {
           const text = await response.text()
           Papa.parse(text, {
             complete: (results) => {
-              // create HTML table from CSV
+              // Erstelle HTML Tabelle aus CSV
               const table = `
                 <table style="width: 100%; border-collapse: collapse;">
                   <thead>
@@ -87,7 +107,7 @@ export default function DocumentViewer({ url, filename, onClose }) {
             }
           })
         }
-        // PowerPoint (.ppt, .pptx)
+        // PowerPoint (.ppt, .pptx) - Anzeige als Hinweis
         else if (ext === 'ppt' || ext === 'pptx') {
           setContent(`
             <div style="text-align: center; padding: 4rem;">
@@ -100,7 +120,7 @@ export default function DocumentViewer({ url, filename, onClose }) {
             </div>
           `)
         }
-        // Text (.txt, .md, etc.)
+        // Textdateien (.txt, .md, etc.)
         else {
           const text = await response.text()
           setContent(text)
