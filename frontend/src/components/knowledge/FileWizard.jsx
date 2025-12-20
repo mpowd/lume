@@ -2,13 +2,13 @@ import { useState, useCallback } from 'react'
 import { Upload, FileText, Folder, ChevronLeft, Check } from 'lucide-react'
 import Button from '../shared/Button'
 import Card from '../shared/Card'
-import { useUploadProgress } from '../../hooks/useUploadProgress'
+import { useFileUpload } from '../../hooks/useFileUpload'
 import UploadProgress from './UploadProgress'
 
 export default function FileWizard({ collectionName, onBack, onComplete }) {
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
-  const { startUpload, uploadProgress, isUploading, closeProgress } = useUploadProgress()
+  const { startUpload, uploadProgress, isUploading, closeProgress } = useFileUpload()
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault()

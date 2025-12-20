@@ -1,11 +1,12 @@
+// hooks/useFileUpload.js
 import { useState } from 'react'
 
-export const useUploadProgress = () => {
+export const useFileUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const [taskId, setTaskId] = useState(null)
 
-  const startUpload = async (collectionName, formData, onComplete, isFileUpload = false) => {
+  const startUpload = async (collectionName, formData, onComplete) => {
     if (formData.getAll('files').length === 0) {
       return { success: false, error: 'No files to upload' }
     }
@@ -53,7 +54,7 @@ export const useUploadProgress = () => {
           
           const progressData = await progressResponse.json()
 
-          console.log('Progress update:', {
+          console.log('File upload progress:', {
             status: progressData.status,
             title: progressData.title,
             message: progressData.message,
@@ -82,11 +83,8 @@ export const useUploadProgress = () => {
           if (progressData.status !== 'complete' && progressData.status !== 'error') {
             setTimeout(pollProgress, 500) // Poll every 500ms for smooth updates
           } else {
+            console.log('File upload finished with status:', progressData.status)
             // Keep isUploading true so modal stays open showing completion stats
-            // Only set to false when user clicks "Done" button
-            console.log('Upload finished with status:', progressData.status)
-            // Don't call setIsUploading(false) here - let the user close it
-            // Don't call onComplete here either - wait for user to click Done
           }
         } catch (error) {
           console.error('Error polling progress:', error)
@@ -107,7 +105,7 @@ export const useUploadProgress = () => {
       
       return { success: true, taskId: newTaskId }
     } catch (error) {
-      console.error('Error starting upload:', error)
+      console.error('Error starting file upload:', error)
       setUploadProgress({
         status: 'error',
         title: 'Upload Failed',
