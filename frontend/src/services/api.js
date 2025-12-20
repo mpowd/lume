@@ -389,8 +389,16 @@ export const fileAPI = {
   }
 }
 
+// Only showing the updated websiteAPI section - add this to your existing api.js
+
 // Website/Crawling API
 export const websiteAPI = {
+  /**
+   * Get links from a website
+   * @param {string} baseUrl - Base URL to crawl
+   * @param {boolean} includeExternal - Include external domains
+   * @param {string|null} collectionName - Collection name to check for existing URLs
+   */
   getLinks: async (baseUrl, includeExternal = false, collectionName = null) => {
     try {
       const params = {
@@ -410,17 +418,11 @@ export const websiteAPI = {
     }
   },
 
-  createUploadStream: (collectionName, urls) => {
-    const params = new URLSearchParams({
-      collection_name: collectionName,
-      urls: JSON.stringify(urls),
-    })
-
-    return new EventSource(
-      `${API_BASE_URL}/website/upload-documents-stream?${params}`
-    )
-  },
-
+  /**
+   * Upload website documents (task-based, not streaming)
+   * @param {string} collectionName - Collection name
+   * @param {string[]} urls - URLs to upload
+   */
   uploadDocuments: async (collectionName, urls) => {
     try {
       const response = await api.post('/website/upload-documents', {
@@ -433,6 +435,20 @@ export const websiteAPI = {
       throw error
     }
   },
+
+  /**
+   * Get upload progress for a website upload task
+   * @param {string} taskId - Task ID
+   */
+  getUploadProgress: async (taskId) => {
+    try {
+      const response = await api.get(`/website/upload-progress/${taskId}`)
+      return response.data
+    } catch (error) {
+      console.error('Get Upload Progress Error:', error)
+      throw error
+    }
+  }
 }
 
 // Ollama API

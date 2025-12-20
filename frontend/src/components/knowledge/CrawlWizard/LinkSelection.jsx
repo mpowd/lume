@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Globe, Check, X, ChevronLeft, Database, Sparkles, ExternalLink, Archive, AlertCircle } from 'lucide-react'
-import { useUploadProgress } from '../../../hooks/useUploadProgress'
+import { useWebsiteUpload } from '../../../hooks/useWebsiteUpload'
 import Card from '../../shared/Card'
 import Button from '../../shared/Button'
 import SearchInput from '../../shared/SearchInput'
@@ -20,7 +20,7 @@ export default function LinkSelection({
   onComplete 
 }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const { uploadProgress, isUploading, startUpload, closeProgress } = useUploadProgress()
+  const { uploadProgress, isUploading, startUpload, closeProgress } = useWebsiteUpload()
 
   // Separate new and existing URLs
   const newUrls = discoveredUrls.filter(item => !item.exists_in_collection)

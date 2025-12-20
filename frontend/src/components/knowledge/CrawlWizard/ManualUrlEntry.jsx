@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, X, Globe, ChevronLeft, Database, Trash2, ExternalLink } from 'lucide-react'
-import { useUploadProgress } from '../../../hooks/useUploadProgress'
+import { useWebsiteUpload } from '../../../hooks/useWebsiteUpload'
 import Card from '../../shared/Card'
 import Button from '../../shared/Button'
 import FormInput from '../../shared/FormInput'
@@ -10,7 +10,7 @@ import UploadProgress from '../UploadProgress'
 export default function ManualUrlEntry({ collectionName, onBack, onComplete }) {
   const [urls, setUrls] = useState([''])
   const [urlErrors, setUrlErrors] = useState({})
-  const { uploadProgress, isUploading, startUpload, closeProgress } = useUploadProgress()
+  const { uploadProgress, isUploading, startUpload, closeProgress } = useWebsiteUpload()
 
   const validateUrl = (url) => {
     if (!url.trim()) return null
