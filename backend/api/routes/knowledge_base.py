@@ -20,7 +20,8 @@ from langchain_text_splitters import (
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 import json
 from bson import json_util
-
+import os
+import shutil
 
 logging.basicConfig(level=logging.INFO)
 
@@ -810,6 +811,21 @@ async def delete_collection(collection_name: str):
     2. The MongoDB document collection
     3. The MongoDB configuration document
     """
+
+    # Delete collection directory
+    try:
+        collection_path = os.path.join("/data", "files", collection_name)
+        if os.path.isdir(collection_path):
+            shutil.rmtree(collection_path)
+    except Exception as e:
+        logger.error(
+            f"Error deleting directory of collection {collection_name}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete directory of collection {collection_name}: {str(e)}",
+        )
+
     # Delete from Qdrant
     try:
         qdrant_client.delete_collection(collection_name=collection_name)
