@@ -398,6 +398,8 @@ async def upload_documents_stream(
 
                         chunk.metadata["source_url"] = doc_data["url"]
                         chunk.metadata["title"] = doc_data["title"]
+                        chunk.metadata["source_category"] = "website"
+                        chunk.metadata["collection_name"] = collection_name
 
                         chunk_with_metadata = ""
                         for metadata in chunk.metadata:

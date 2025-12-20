@@ -19,6 +19,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./data/huggingface_cache:/root/.cache/huggingface
+      - ./data:/data
     depends_on:
       - qdrant
       - mongodb

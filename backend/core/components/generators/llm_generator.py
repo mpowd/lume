@@ -99,16 +99,23 @@ Be precise with chunk indices!"""
             )
 
             score = doc.metadata.get("relevance_score")
+            collection_name = doc.metadata.get("collection_name")
 
             if score is not None:
                 sources.append(
                     {
                         "url": source if source else "Unknown source",
                         "score": float(score),
+                        "metadata": {"collection_name": collection_name},
                     }
                 )
             elif include_without_scores:
-                sources.append({"url": source if source else "Unknown source"})
+                sources.append(
+                    {
+                        "url": source if source else "Unknown source",
+                        "metadata": {"collection_name": collection_name},
+                    }
+                )
 
         return sources
 

@@ -370,6 +370,25 @@ export const knowledgeBaseAPI = {
     }
 }
 
+// ==================== FILE API ====================
+
+export const fileAPI = {
+  /**
+   * Get file from collection
+   * @param {string} collectionName - Collection name
+   * @param {string} filename - File name
+   */
+  getFile: async (collectionName, filename) => {
+    try {
+      const response = await api.get(`/file/files/${collectionName}/${filename}`)
+      return response.data
+    } catch (error) {
+      console.error('Get File Error:', error)
+      throw error
+    }
+  }
+}
+
 // Website/Crawling API
 export const websiteAPI = {
   getLinks: async (baseUrl, includeExternal = false, collectionName = null) => {

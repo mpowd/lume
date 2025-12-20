@@ -11,6 +11,9 @@ from uuid import uuid4
 from typing import Dict, Any, List, Optional
 import tempfile
 from llama_parse import LlamaParse
+from fastapi.responses import FileResponse
+import mimetypes
+
 
 from langchain_text_splitters import (
     CharacterTextSplitter,
@@ -100,6 +103,10 @@ async def save_files_to_mongodb(
         config_doc = collection_info[0]
         mongodb_documents = []
 
+        data_dir = "/data"
+        collection_dir = os.path.join(data_dir, "files", collection_name)
+        os.makedirs(collection_dir, exist_ok=True)
+
         for idx, file_data in enumerate(file_data_list):
             filename = file_data["filename"]
 
@@ -108,14 +115,9 @@ async def save_files_to_mongodb(
                 upload_tasks[task_id]["stages"][0]["current_item"] = filename
                 upload_tasks[task_id]["message"] = f"Saving {filename} to MongoDB..."
 
-                await asyncio.sleep(0.1)
-
-                # Create temporary file
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=os.path.splitext(filename)[1]
-                ) as tmp_file:
-                    tmp_file.write(file_data["content"])
-                    tmp_file_path = tmp_file.name
+                file_path = os.path.join(collection_dir, filename)
+                with open(file_path, "wb") as f:
+                    f.write(file_data["content"])
 
                 parser = LlamaParse(
                     result_type="markdown",  # "markdown" and "text" are available
@@ -123,11 +125,11 @@ async def save_files_to_mongodb(
                     split_by_page=False,
                 )
 
-                file_name = tmp_file_path
+                file_name = file_path
                 logger.error(file_name)
                 extra_info = {"file_name": file_name}
 
-                with open(tmp_file_path, "rb") as f:
+                with open(file_path, "rb") as f:
                     documents = parser.load_data(f, extra_info=extra_info)
 
                 content = ""
@@ -137,6 +139,7 @@ async def save_files_to_mongodb(
                 # Prepare document for MongoDB
                 document = {
                     "filename": filename,
+                    "filepath": file_path,
                     "content": content,
                     "size": len(content),
                     "upload_date": datetime.now(),
@@ -152,7 +155,6 @@ async def save_files_to_mongodb(
 
                 saved_files.append(filename)
                 logger.info(f"Saved {filename} to MongoDB")
-                os.unlink(tmp_file_path)
 
             except Exception as e:
                 logger.error(f"Error saving {filename} to MongoDB: {str(e)}")
@@ -222,6 +224,7 @@ async def chunk_files(
                             "chunk_index": chunk_idx,
                             "total_chunks": len(chunks),
                             "collection_name": collection_name,
+                            "source_category": "file",
                             "chunk_id": str(uuid4()),
                         }
                     )
@@ -466,4 +469,38 @@ async def get_upload_progress(task_id: str):
             "stats": task.get("stats", []),
             "failed": task.get("failed", []),
         }
+    )
+
+
+@router.get("/files/{collection_name}/{filename}")
+async def get_file(collection_name: str, filename: str):
+    """
+    Serve uploaded files from the data directory
+    """
+    file_path = os.path.join("/data", "files", collection_name, filename)
+
+    logger.info(f"Frontend asked for file {filename} from collection {collection_name}")
+
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"error": "File not found"}, status_code=404)
+
+    mime_type, _ = mimetypes.guess_type(filename)
+
+    if mime_type is None:
+        if filename.lower().endswith(".pdf"):
+            mime_type = "application/pdf"
+        elif filename.lower().endswith((".doc", ".docx")):
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif filename.lower().endswith(".txt"):
+            mime_type = "text/plain"
+        else:
+            mime_type = "application/octet-stream"
+
+    return FileResponse(
+        file_path,
+        media_type=mime_type,
+        filename=filename,
+        headers={
+            "Content-Disposition": f"inline; filename={filename}",
+        },
     )
