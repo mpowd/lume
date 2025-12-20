@@ -1,18 +1,21 @@
+// frontend/src/components/knowledge/CrawlWizard.jsx
 import { useState } from 'react'
 import { useWebCrawl } from '../../../hooks/useWebCrawl'
 import CrawlSettings from './CrawlSettings'
 import LinkDiscovery from './LinkDiscovery'
 import LinkSelection from './LinkSelection'
 import ManualUrlEntry from './ManualUrlEntry'
+import UploadProgress from '../UploadProgress'
 import Button from '../../shared/Button'
 import { ChevronLeft } from 'lucide-react'
 
 export default function CrawlWizard({ collectionName, onBack, onComplete }) {
-  const [step, setStep] = useState('settings') // 'settings', 'discovering', 'selection', 'manual'
+  const [step, setStep] = useState('settings')
   const {
     discoveredUrls,
     selectedUrls,
     crawling,
+    crawlProgress,
     error,
     crawl,
     toggleUrlSelection,
@@ -20,12 +23,12 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
     getSelectedCount,
     getNewUrlsCount,
     getExistingUrlsCount,
-    reset
+    reset,
+    closeCrawlProgress
   } = useWebCrawl()
 
   const handleDiscover = async (baseUrl, includeExternal) => {
     setStep('discovering')
-    // Pass collection name to check for existing URLs
     const result = await crawl(baseUrl, includeExternal, collectionName)
     
     if (result.success) {
@@ -48,6 +51,10 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
     setStep('settings')
   }
 
+  const handleCloseProgress = () => {
+    closeCrawlProgress(onComplete)
+  }
+
   if (error) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -62,48 +69,57 @@ export default function CrawlWizard({ collectionName, onBack, onComplete }) {
   }
 
   return (
-    <div className="w-full">
-      {step !== 'settings' && step !== 'manual' && (
-        <Button variant="ghost" onClick={onBack} icon={ChevronLeft} className="mb-8">
-          Back to sources
-        </Button>
-      )}
+    <>
+      <div className="w-full">
+        {step !== 'settings' && step !== 'manual' && (
+          <Button variant="ghost" onClick={onBack} icon={ChevronLeft} className="mb-8">
+            Back to sources
+          </Button>
+        )}
 
-      {step === 'settings' && (
-        <CrawlSettings 
-          collectionName={collectionName}
-          onDiscover={handleDiscover}
-          onManualEntry={handleManualEntry}
-          loading={crawling}
-        />
-      )}
-
-      {step === 'discovering' && <LinkDiscovery />}
-
-      {step === 'selection' && (
-        <div className="max-w-6xl mx-auto">
-          <LinkSelection
+        {step === 'settings' && (
+          <CrawlSettings 
             collectionName={collectionName}
-            discoveredUrls={discoveredUrls}
-            selectedUrls={selectedUrls}
-            onToggle={toggleUrlSelection}
-            onSelectAll={selectAll}
-            getSelectedCount={getSelectedCount}
-            getNewUrlsCount={getNewUrlsCount}
-            getExistingUrlsCount={getExistingUrlsCount}
-            onReset={handleReset}
+            onDiscover={handleDiscover}
+            onManualEntry={handleManualEntry}
+            loading={crawling}
+          />
+        )}
+
+        {step === 'discovering' && <LinkDiscovery />}
+
+        {step === 'selection' && (
+          <div className="max-w-6xl mx-auto">
+            <LinkSelection
+              collectionName={collectionName}
+              discoveredUrls={discoveredUrls}
+              selectedUrls={selectedUrls}
+              onToggle={toggleUrlSelection}
+              onSelectAll={selectAll}
+              getSelectedCount={getSelectedCount}
+              getNewUrlsCount={getNewUrlsCount}
+              getExistingUrlsCount={getExistingUrlsCount}
+              onReset={handleReset}
+              onComplete={onComplete}
+            />
+          </div>
+        )}
+
+        {step === 'manual' && (
+          <ManualUrlEntry
+            collectionName={collectionName}
+            onBack={handleBackFromManual}
             onComplete={onComplete}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      {step === 'manual' && (
-        <ManualUrlEntry
-          collectionName={collectionName}
-          onBack={handleBackFromManual}
-          onComplete={onComplete}
-        />
-      )}
-    </div>
+      {/* Reuse the same UploadProgress component for web crawling */}
+      <UploadProgress
+        isOpen={crawling || (crawlProgress && crawlProgress.status === 'complete')}
+        progress={crawlProgress}
+        onClose={handleCloseProgress}
+      />
+    </>
   )
 }

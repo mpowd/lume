@@ -14,7 +14,7 @@ export const SOURCE_TYPES = [
     label: 'Files', 
     icon: FolderOpen, 
     description: 'Upload documents',
-    implemented: false,
+    implemented: true,
     color: 'purple'
   },
   { 

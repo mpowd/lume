@@ -35,27 +35,33 @@ const SmartTooltip = ({ source, context, index, getSourceUrl, getSourceScore, ge
   const score = getSourceScore(source)
   const hasScore = score !== null && score !== undefined
 
+  const displayText = getSourceDomain(source)
+  const isFileUrl = url && (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.txt') || url.endsWith('.md'))
+
+  const fileName = isFileUrl ? url.split('/').pop() : displayText
+
+
   return (
     <div ref={sourceRef} className="group relative">
-      <a 
-        href={url} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="block px-2.5 py-1 bg-transparent border border-white/5 hover:border-brand-teal/30 rounded-lg transition-all cursor-pointer" 
-      >
-        <div className="flex items-center gap-1.5">
-          <div className={`w-1.5 h-1.5 rounded-full ${getDotColor(score)}`} />
-          <span className="text-[11px] text-text-tertiary font-medium">{getSourceDomain(source)}</span>
-          {hasScore && (
-            <span className="text-[10px] text-text-quaternary">
-              {(score * 100).toFixed(0)}%
-            </span>
-          )}
-          <svg className="w-2.5 h-2.5 text-text-quaternary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </div>
-      </a>
+    <a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="block px-2.5 py-1 bg-transparent border border-white/5 hover:border-brand-teal/30 rounded-lg transition-all cursor-pointer" 
+    >
+      <div className="flex items-center gap-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full ${getDotColor(score)}`} />
+        <span className="text-[11px] text-text-tertiary font-medium">{fileName}</span>
+        {hasScore && (
+          <span className="text-[10px] text-text-quaternary">
+            {(score * 100).toFixed(0)}%
+          </span>
+        )}
+        <svg className="w-2.5 h-2.5 text-text-quaternary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </div>
+    </a>
       
       {context && (
         <div 

@@ -18,6 +18,7 @@ from backend.api.routes import (
     ollama,
 )
 from backend.api.routes.sources import website
+from backend.api.routes.sources import file
 
 from phoenix.otel import register
 
@@ -63,6 +64,7 @@ app.include_router(
     knowledge_base.router, prefix="/knowledge_base", tags=["knowledge_base"]
 )
 app.include_router(website.router, prefix="/website", tags=["website"])
+app.include_router(file.router, prefix="/file", tags=["file"])
 app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 

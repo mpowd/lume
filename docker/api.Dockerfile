@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon0 \
     libxrandr2 \
     xdg-utils \
+    poppler-utils \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .

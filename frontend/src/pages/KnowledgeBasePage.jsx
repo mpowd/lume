@@ -5,6 +5,7 @@ import CollectionSidebar from '../components/knowledge/CollectionSidebar'
 import CollectionForm from '../components/knowledge/CollectionForm'
 import SourceTypeSelector from '../components/knowledge/SourceTypeSelector'
 import CrawlWizard from '../components/knowledge/CrawlWizard'
+import FileWizard from '../components/knowledge/FileWizard' 
 import Button from '../components/shared/Button'
 import Card from '../components/shared/Card'
 import EmptyState from '../components/shared/EmptyState'
@@ -48,10 +49,15 @@ export default function KnowledgeBasePage() {
 
   const handleSelectSourceType = (type) => {
     setSelectedSourceType(type)
-    setView('crawl')
+    setView(type)
   }
 
   const handleCrawlComplete = () => {
+    setView('menu')
+    setSelectedSourceType(null)
+  }
+
+  const handleFileWizardComplete = () => {
     setView('menu')
     setSelectedSourceType(null)
   }
@@ -206,8 +212,14 @@ export default function KnowledgeBasePage() {
               </a>
             </div>
           </div>
-        ) : view === 'crawl' && selectedSourceType === 'website' ? (
+        ) : view === 'website' ?(
           <CrawlWizard
+            collectionName={activeCollection}
+            onBack={() => setView('add')}
+            onComplete={handleCrawlComplete}
+          />
+        ) : view === 'filesystem' ? (
+          <FileWizard
             collectionName={activeCollection}
             onBack={() => setView('add')}
             onComplete={handleCrawlComplete}

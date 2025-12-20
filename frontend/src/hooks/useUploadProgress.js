@@ -3,124 +3,120 @@ import { useState } from 'react'
 export const useUploadProgress = () => {
   const [uploadProgress, setUploadProgress] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [taskId, setTaskId] = useState(null)
 
-  const startUpload = async (collectionName, urls, onComplete) => {
-    if (urls.length === 0) {
-      return { success: false, error: 'No URLs to upload' }
+  const startUpload = async (collectionName, formData, onComplete, isFileUpload = false) => {
+    if (formData.getAll('files').length === 0) {
+      return { success: false, error: 'No files to upload' }
     }
 
     setIsUploading(true)
     setUploadProgress({
       status: 'starting',
-      message: 'Initializing upload...',
-      current: 0,
-      total: urls.length,
-      processed: [],
-      failed: [],
-      total_chunks: 0,
-      embedded_chunks: 0
+      title: 'Starting Upload',
+      message: 'Preparing files...',
+      stages: [],
+      stats: [],
+      failed: []
     })
-
-    let eventSource = null
-    let hasReceivedComplete = false
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       
-      eventSource = new EventSource(
-        `${API_BASE_URL}/website/upload-documents-stream?collection_name=${encodeURIComponent(collectionName)}&urls=${encodeURIComponent(JSON.stringify(urls))}`
-      )
+      // Start the upload task
+      const uploadResponse = await fetch(`${API_BASE_URL}/file/upload-files`, {
+        method: 'POST',
+        body: formData
+      })
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          
-          if (data.status === 'complete') {
-            hasReceivedComplete = true
-            setUploadProgress({
-              status: 'complete',
-              message: 'Upload complete!',
-              chunked_urls: data.chunked_urls,
-              total_urls: data.total_urls,
-              processed: data.processed_urls || data.processed || [],
-              failed: data.failed_urls || data.failed || [],
-              total_chunks: data.total_chunks || 0,
-              embedded_chunks: data.total_chunks || 0
-            })
-            eventSource.close()
-          } else if (data.status === 'error') {
-            hasReceivedComplete = true
-            setUploadProgress({
-              status: 'error',
-              message: data.message || 'An error occurred',
-              current: data.current || 0,
-              total: urls.length,
-              processed: data.processed || [],
-              failed: data.failed || [],
-              total_chunks: data.total_chunks || 0,
-              embedded_chunks: data.embedded_chunks || 0
-            })
-            eventSource.close()
-          } else {
-            // Update progress with all fields including embedding progress
-            setUploadProgress({
-              status: data.status,
-              message: data.message,
-              chunked_urls: data.chunked_urls,
-              total_urls: data.total_urls,
-              processed: data.processed || [],
-              failed: data.failed || [],
-              current_url: data.current_url,
-              total_chunks: data.total_chunks || 0,
-              embedded_chunks: data.embedded_chunks || 0
-            })
-          }
-        } catch (parseError) {
-          console.error('Error parsing SSE data:', parseError, event.data)
-        }
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`)
       }
 
-      eventSource.onerror = (error) => {
-        console.error('EventSource error:', error)
-        
-        // Only show error if we haven't received a complete message
-        // Sometimes the connection closes naturally after completion
-        if (!hasReceivedComplete) {
+      const uploadData = await uploadResponse.json()
+      const newTaskId = uploadData.task_id
+      
+      if (!newTaskId) {
+        throw new Error('No task ID returned from server')
+      }
+      
+      setTaskId(newTaskId)
+      
+      // Poll for progress updates
+      const pollProgress = async () => {
+        try {
+          const progressResponse = await fetch(`${API_BASE_URL}/file/upload-progress/${newTaskId}`)
+          
+          if (!progressResponse.ok) {
+            throw new Error(`Progress check failed: ${progressResponse.statusText}`)
+          }
+          
+          const progressData = await progressResponse.json()
+
+          console.log('Progress update:', {
+            status: progressData.status,
+            title: progressData.title,
+            message: progressData.message,
+            hasStats: !!progressData.stats,
+            statsLength: progressData.stats?.length || 0,
+            stats: progressData.stats,
+            stages: progressData.stages?.map(s => ({
+              label: s.label,
+              current: s.current,
+              total: s.total,
+              is_current: s.is_current
+            }))
+          })
+          
+          // Update state with the new progress data
+          setUploadProgress({
+            status: progressData.status,
+            title: progressData.title,
+            message: progressData.message,
+            stages: progressData.stages || [],
+            stats: progressData.stats || [],
+            failed: progressData.failed || []
+          })
+          
+          // Continue polling if not complete or error
+          if (progressData.status !== 'complete' && progressData.status !== 'error') {
+            setTimeout(pollProgress, 500) // Poll every 500ms for smooth updates
+          } else {
+            // Keep isUploading true so modal stays open showing completion stats
+            // Only set to false when user clicks "Done" button
+            console.log('Upload finished with status:', progressData.status)
+            // Don't call setIsUploading(false) here - let the user close it
+            // Don't call onComplete here either - wait for user to click Done
+          }
+        } catch (error) {
+          console.error('Error polling progress:', error)
           setUploadProgress({
             status: 'error',
-            message: 'Connection error. Please check if the backend is running.',
-            current: 0,
-            total: urls.length,
-            processed: [],
-            failed: [],
-            total_chunks: 0,
-            embedded_chunks: 0
+            title: 'Progress Check Failed',
+            message: error.message || 'Failed to get upload progress',
+            stages: [],
+            stats: [],
+            failed: []
           })
-        }
-        
-        if (eventSource) {
-          eventSource.close()
+          setIsUploading(false)
         }
       }
-
-      return { success: true }
+      
+      // Start polling immediately
+      pollProgress()
+      
+      return { success: true, taskId: newTaskId }
     } catch (error) {
-      console.error('Error uploading documents:', error)
+      console.error('Error starting upload:', error)
       setUploadProgress({
         status: 'error',
-        message: error.message || 'Upload failed',
-        current: 0,
-        total: urls.length,
-        processed: [],
-        failed: [],
-        total_chunks: 0,
-        embedded_chunks: 0
+        title: 'Upload Failed',
+        message: error.message || 'Failed to start upload',
+        stages: [],
+        stats: [],
+        failed: []
       })
-      
-      if (eventSource) {
-        eventSource.close()
-      }
-      
+      setIsUploading(false)
       return { success: false, error: error.message }
     }
   }
@@ -128,6 +124,7 @@ export const useUploadProgress = () => {
   const closeProgress = (onComplete) => {
     setIsUploading(false)
     setUploadProgress(null)
+    setTaskId(null)
     // Call onComplete when user manually closes
     if (onComplete) onComplete()
   }
@@ -135,6 +132,7 @@ export const useUploadProgress = () => {
   const reset = () => {
     setUploadProgress(null)
     setIsUploading(false)
+    setTaskId(null)
   }
 
   return {
@@ -142,6 +140,7 @@ export const useUploadProgress = () => {
     isUploading,
     startUpload,
     closeProgress,
-    reset
+    reset,
+    taskId
   }
 }

@@ -347,21 +347,27 @@ export const knowledgeBaseAPI = {
     }
   },
   
-  uploadDocuments: async (collectionName, documents) => {
-    try {
-      const response = await api.post('/knowledge_base/upload_documents', {
-        collection_name: collectionName,
-        documents: documents.map(doc => ({
-          url: doc.url,
-          custom_payload: doc.custom_payload || null,
-        }))
-      })
-      return response.data
-    } catch (error) {
-      console.error('Upload Documents Error:', error)
-      throw error
+  uploadFilesStream: async (collectionName, files) => {
+      try {
+        const formData = new FormData();
+        formData.append('collection_name', collectionName);
+        
+        files.forEach((file, index) => {
+          formData.append('files', file);
+        });
+        
+        const response = await api.post('/file/upload-files-stream', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        return response.data;
+      } catch (error) {
+        console.error('Upload Files Error:', error);
+        throw error;
+      }
     }
-  }
 }
 
 // Website/Crawling API
