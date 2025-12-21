@@ -175,6 +175,38 @@ async def update_evaluation_dataset(dataset_id: str, update_data: dict):
         )
 
 
+@router.delete("/datasets/{dataset_id}")
+async def delete_dataset(dataset_id: str):
+    """
+    Delete an evaluation dataset.
+
+    - dataset_id: ID of the dataset to delete
+    """
+    try:
+        from bson.objectid import ObjectId
+
+        mongodb_client = MongoDBClient.get_instance()
+        evaluation_collection = mongodb_client.get_collection("evaluation_datasets")
+
+        result = evaluation_collection.delete_one({"_id": ObjectId(dataset_id)})
+
+        if result.deleted_count == 0:
+            raise HTTPException(
+                status_code=404, detail=f"Dataset with ID {dataset_id} not found"
+            )
+
+        return {
+            "status": "success",
+            "message": f"Dataset {dataset_id} deleted successfully",
+            "deleted_count": result.deleted_count,
+        }
+    except Exception as e:
+        logger.error(f"Error deleting evaluation dataset: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting evaluation dataset: {str(e)}"
+        )
+
+
 class RagasDatasetGenerationRequest(BaseModel):
     collection_name: str
     dataset_name: str
