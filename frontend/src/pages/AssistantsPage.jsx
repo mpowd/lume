@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { Bot, Plus, X } from 'lucide-react'
+import { Bot, Plus } from 'lucide-react'
 import { useAssistants } from '../hooks/useAssistants'
-import PageHeader from '../components/shared/PageHeader'
 import LoadingSpinner from '../components/shared/LoadingSpinner'
 import ErrorAlert from '../components/shared/ErrorAlert'
-import AssistantGrid from '../components/assistants/AssistantGrid'
 import AssistantForm from '../components/assistants/AssistantForm'
 import ConfirmDialog from '../components/shared/ConfirmDialog'
 import { validateAssistantForm } from '../utils/validators'
@@ -16,7 +14,6 @@ export default function AssistantsPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState(null)
   
-  // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     assistantId: null,
@@ -87,23 +84,11 @@ export default function AssistantsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader
-        icon={Bot}
-        title="Assistants"
-        subtitle={`${assistants.length} active assistant${assistants.length !== 1 ? 's' : ''}`}
-        actionLabel={showForm ? 'Cancel' : 'New Assistant'}
-        actionIcon={showForm ? X : Plus}
-        onAction={() => {
-          setShowForm(!showForm)
-          if (showForm) resetForm()
-        }}
-      />
-
       <div className="max-w-7xl mx-auto px-6 py-8">
         {error && <ErrorAlert message={error} onClose={() => {}} className="mb-6" />}
         {formError && <ErrorAlert message={formError} onClose={() => setFormError(null)} className="mb-6" />}
 
-        {showForm && (
+        {showForm ? (
           <div className="mb-8">
             <AssistantForm
               assistant={editingAssistant}
@@ -112,15 +97,62 @@ export default function AssistantsPage() {
               loading={saving}
             />
           </div>
-        )}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Create New Assistant Card */}
+            <button
+              onClick={() => {
+                setEditingAssistant(null)
+                setShowForm(true)
+              }}
+              className="group relative overflow-hidden bg-transparent border-2 border-dashed border-border-default hover:border-border-brand-hover rounded-2xl p-8 transition-all duration-300 hover:bg-background-elevated min-h-[200px] flex flex-col items-center justify-center"
+            >
+              <div className="mb-4 p-4 rounded-2xl bg-transparent border border-border-brand">
+                <Plus className="w-8 h-8 text-brand-teal" strokeWidth={2.5} />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Create Assistant</h3>
+              <p className="text-sm text-text-tertiary text-center">
+                Add a new AI assistant to your workspace
+              </p>
+            </button>
 
-        {/* Only show the grid when not showing the form */}
-        {!showForm && (
-          <AssistantGrid
-            assistants={assistants}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+            {/* Existing Assistants */}
+            {assistants.map((assistant) => (
+              <div 
+                key={assistant.id} 
+                className="bg-background-elevated border border-border-default rounded-2xl p-6 hover:border-border-brand transition-all duration-300 min-h-[200px] flex flex-col"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-transparent border border-border-default">
+                      <Bot className="w-5 h-5 text-brand-teal" />
+                    </div>
+                    <h3 className="font-semibold text-text-primary">{assistant.name}</h3>
+                  </div>
+                </div>
+                <p className="text-sm text-text-tertiary mb-4 flex-1">
+                  {assistant.workflow === 'agentic' 
+                    ? 'Agentic workflow with tools' 
+                    : `Assistant with ${assistant.collections?.length || 0} knowledge source${assistant.collections?.length !== 1 ? 's' : ''}`
+                  }
+                </p>
+                <div className="flex gap-2 mt-auto">
+                  <button 
+                    onClick={() => handleEdit(assistant)} 
+                    className="flex-1 px-3 py-2 bg-transparent border border-border-default hover:border-border-brand hover:bg-background text-text-primary text-sm rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(assistant.id, assistant.name)} 
+                    className="px-3 py-2 bg-danger-bg border border-danger-border hover:bg-danger text-danger hover:text-white text-sm rounded-lg transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

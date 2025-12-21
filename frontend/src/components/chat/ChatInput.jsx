@@ -26,7 +26,7 @@ export default function ChatInput({ onSend, disabled, loading }) {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-10 p-6">
+    <div className="fixed bottom-0 left-0 right-0 lg:left-80 z-10 p-6">
       <style>{`
         .chat-textarea {
           outline: none !important;
@@ -45,7 +45,7 @@ export default function ChatInput({ onSend, disabled, loading }) {
         }
       `}</style>
       <div className="max-w-4xl mx-auto">
-        <div className="relative bg-transparent border border-white/10 hover:border-brand-teal/30 rounded-3xl transition-all">
+        <div className="relative bg-transparent border border-border-default hover:border-border-brand rounded-3xl transition-all">
           <div className="flex items-center gap-3 px-5 py-3">
             <textarea
               ref={textareaRef}
@@ -55,7 +55,7 @@ export default function ChatInput({ onSend, disabled, loading }) {
               placeholder={disabled ? "Select an assistant to start..." : "Ask me anything..."}
               disabled={disabled || loading}
               rows={1}
-              className="chat-textarea flex-1 bg-transparent text-white placeholder:text-text-quaternary resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-text-disabled"
+              className="chat-textarea flex-1 bg-transparent text-text-primary placeholder:text-text-quaternary resize-none text-[15px] leading-relaxed max-h-32 disabled:cursor-not-allowed disabled:text-text-disabled"
               style={{ 
                 scrollbarWidth: 'thin', 
                 scrollbarColor: 'rgba(255,255,255,0.1) transparent',
@@ -68,7 +68,7 @@ export default function ChatInput({ onSend, disabled, loading }) {
             <button
               onClick={handleSend}
               disabled={!input.trim() || disabled || loading}
-              className="flex-shrink-0 w-10 h-10 rounded-2xl bg-transparent border border-brand-teal/40 hover:border-brand-teal/60 hover:bg-white/5 disabled:border-white/5 disabled:bg-transparent transition-all duration-200 flex items-center justify-center disabled:cursor-not-allowed"
+              className="flex-shrink-0 w-10 h-10 rounded-2xl bg-transparent border border-border-brand hover:border-border-brand-hover hover:bg-border-subtle disabled:border-border-subtle disabled:bg-transparent transition-all duration-200 flex items-center justify-center disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 text-text-quaternary animate-spin" />

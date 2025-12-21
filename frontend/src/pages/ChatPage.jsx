@@ -82,19 +82,19 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen bg-background">
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="fixed top-0 left-0 right-0 z-10 border-b border-white/5 bg-background-elevated/95 backdrop-blur-xl">
+        {/* Header - UPDATED WITH lg:left-80 */}
+        <div className="fixed top-0 left-0 right-0 lg:left-80 z-10 border-b border-border-subtle bg-background-elevated/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
               {!selectedAssistant ? (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-transparent border border-brand-teal/30 rounded-2xl">
+                      <div className="p-2.5 bg-transparent border border-border-brand rounded-2xl">
                         <MessageSquare className="w-6 h-6 text-brand-teal" />
                       </div>
                       <div>
-                        <h1 className="text-xl font-semibold text-white">Chat</h1>
+                        <h1 className="text-xl font-semibold text-text-primary">Chat</h1>
                         <p className="text-sm text-text-tertiary">Select an assistant to start</p>
                       </div>
                     </div>
@@ -113,11 +113,11 @@ export default function ChatPage() {
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-transparent border border-brand-teal/30 rounded-2xl">
+                    <div className="p-2 bg-transparent border border-border-brand rounded-2xl">
                       <Bot className="w-5 h-5 text-brand-teal" />
                     </div>
                     <div>
-                      <h1 className="text-lg font-semibold text-white">{selectedAssistant.name}</h1>
+                      <h1 className="text-lg font-semibold text-text-primary">{selectedAssistant.name}</h1>
                       <div className="flex items-center gap-3 text-xs text-text-tertiary">
                         <span className="flex items-center gap-1">
                           <Database className="w-3 h-3" />

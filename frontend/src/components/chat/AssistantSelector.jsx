@@ -18,18 +18,20 @@ export default function AssistantSelector({ assistants, onSelect }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative -mx-6 px-6 py-2">
       <style>{`
         .carousel-container { scrollbar-width: none; -ms-overflow-style: none; }
         .carousel-container::-webkit-scrollbar { display: none; }
         .assistant-card { transition: all 0.3s ease; }
-        .assistant-card:hover { transform: translateY(-2px); }
+        .assistant-card:hover { 
+          transform: translateY(-2px); 
+        }
       `}</style>
 
       {carouselScroll > 0 && (
         <button 
           onClick={() => scrollCarousel('left')} 
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-white/5 border border-white/10 rounded-2xl transition-all shadow-lg"
+          className="absolute left-6 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-border-subtle border border-border-default rounded-2xl transition-all shadow-lg"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
@@ -44,14 +46,14 @@ export default function AssistantSelector({ assistants, onSelect }) {
           <div 
             key={bot.id} 
             onClick={() => onSelect(bot)} 
-            className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-transparent border-white/10 hover:border-brand-teal/30 hover:bg-white/[0.02]"
+            className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-transparent border-border-default hover:border-border-brand hover:bg-background-elevated shadow-sm hover:shadow-brand"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-transparent border border-white/10">
+                <div className="p-2 rounded-xl bg-transparent border border-border-default">
                   <Bot className="w-5 h-5 text-brand-teal" />
                 </div>
-                <h3 className="font-semibold text-white text-base">{bot.name}</h3>
+                <h3 className="font-semibold text-text-primary text-base">{bot.name}</h3>
               </div>
             </div>
 
@@ -64,7 +66,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs">
-                <div className="p-1.5 bg-transparent border border-white/10 rounded-lg">
+                <div className="p-1.5 bg-transparent border border-border-default rounded-lg">
                   <Database className="w-3.5 h-3.5 text-brand-teal" />
                 </div>
                 <span className="text-text-tertiary">Knowledge:</span>
@@ -78,7 +80,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
               </div>
 
               <div className="flex items-center gap-2 text-xs">
-                <div className="p-1.5 bg-transparent border border-white/10 rounded-lg">
+                <div className="p-1.5 bg-transparent border border-border-default rounded-lg">
                   <Cpu className="w-3.5 h-3.5 text-brand-teal" />
                 </div>
                 <span className="text-text-tertiary">Model:</span>
@@ -92,7 +94,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
       {carouselRef.current && carouselScroll < (carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10) && (
         <button 
           onClick={() => scrollCarousel('right')} 
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-white/5 border border-white/10 rounded-2xl transition-all shadow-lg"
+          className="absolute right-6 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-border-subtle border border-border-default rounded-2xl transition-all shadow-lg"
         >
           <ChevronRight className="w-5 h-5 text-white" />
         </button>

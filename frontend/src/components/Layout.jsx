@@ -18,74 +18,93 @@ export default function Layout({ children }) {
       {/* Sidebar Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/80 z-40 lg:hidden cursor-pointer"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)} 
         />
       )}
       
+      {/* Unified Minimalistic Header */}
+      <div className="fixed top-0 left-0 right-0 z-30 h-16 bg-background-elevated/95 backdrop-blur-xl border-b border-border-subtle">
+        <div className="flex items-center justify-between h-full px-4 lg:px-6">
+          {/* Left: Menu Button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-border-subtle rounded-lg transition-colors active:scale-95"
+          >
+            <Menu className="w-5 h-5 text-text-tertiary" />
+          </button>
+          
+          {/* Center: Logo */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            {/* <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-teal to-brand-teal-dark flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" strokeWidth={2.5} />
+            </div> */}
+          </div>
+          
+          {/* Right: Spacer for balance */}
+          <div className="w-9" />
+        </div>
+      </div>
+      
       {/* Sidebar */}
       <div className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-80 bg-background-elevated border-r border-white/5
-        transform transition-all duration-300 ease-out
+        w-80 bg-background-elevated border-r border-border-subtle
+        transform transition-transform duration-300 ease-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Logo */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-teal to-brand-teal-dark flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" strokeWidth={2.5} />
-            </div>
-            <span className="text-white font-semibold text-lg tracking-tight">Lume</span>
+        <div className="flex flex-col h-full pt-16">
+          {/* Close button for mobile (in sidebar) */}
+          <div className="lg:hidden absolute top-4 right-4">
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-text-tertiary" />
+            </button>
           </div>
-          <button 
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5 text-text-tertiary" />
-          </button>
-        </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-2">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  w-full group relative overflow-hidden px-4 py-3 rounded-xl
-                  flex items-center gap-3
-                  transition-all cursor-pointer
-                  ${isActive 
-                    ? 'bg-white border border-white/30' 
-                    : 'hover:bg-white/5 border border-transparent hover:border-white/10'
-                  }
-                `}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-brand-teal' : 'text-text-tertiary'}`} />
-                <span className={`text-sm font-medium ${isActive ? 'text-black' : 'text-text-tertiary'}`}>
-                  {item.name}
-                </span>
-              </Link>
-            )
-          })}
-        </nav>
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-2">
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`
+                    w-full group relative overflow-hidden px-4 py-3 rounded-xl
+                    flex items-center gap-3
+                    transition-all cursor-pointer
+                    ${isActive 
+                      ? 'bg-white border border-border-strong' 
+                      : 'hover:bg-border-subtle border border-transparent hover:border-border-default'
+                    }
+                  `}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-brand-teal' : 'text-text-tertiary'}`} />
+                  <span className={`text-sm font-medium ${isActive ? 'text-black' : 'text-text-tertiary'}`}>
+                    {item.name}
+                  </span>
+                </Link>
+              )
+            })}
+          </nav>
 
-        {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/5">
-          <div className="text-[11px] text-text-quaternary space-y-0.5">
-            <div>Lume v2.0</div>
-            <div>Assistant Platform</div>
+          {/* Footer */}
+          <div className="p-6 border-t border-border-subtle">
+            <div className="text-[11px] text-text-quaternary space-y-0.5">
+              <div>Lume v2.0</div>
+              <div>Assistant Platform</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pt-16">
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto">
           {children}
