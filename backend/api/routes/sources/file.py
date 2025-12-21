@@ -139,12 +139,14 @@ async def save_files_to_mongodb(
                 # Prepare document for MongoDB
                 document = {
                     "filename": filename,
-                    "filepath": file_path,
+                    "url": file_path,
                     "content": content,
+                    "source_category": "file",
                     "size": len(content),
-                    "upload_date": datetime.now(),
+                    "upload_date": datetime.now().isoformat(),
                     "collection_name": collection_name,
-                    "file_id": str(uuid4()),
+                    "_id": str(uuid4()),
+                    "hash": hash(content),
                 }
 
                 mongodb_client.persist_docs(
