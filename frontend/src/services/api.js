@@ -389,9 +389,9 @@ export const fileAPI = {
   }
 }
 
-// Only showing the updated websiteAPI section - add this to your existing api.js
 
 // Website/Crawling API
+
 export const websiteAPI = {
   /**
    * Get links from a website
@@ -448,8 +448,24 @@ export const websiteAPI = {
       console.error('Get Upload Progress Error:', error)
       throw error
     }
+  },
+
+  /**
+   * Watch URLs in a collection for changes
+   * @param {string} collectionName - Collection name
+   */
+  watchUrls: async (collectionName) => {
+    try {
+      const response = await api.get(`/website/watch_urls/${collectionName}`)
+      return response.data
+    } catch (error) {
+      console.error('Watch URLs Error:', error)
+      throw error
+    }
   }
 }
+
+
 
 // Ollama API
 export const ollamaAPI = {

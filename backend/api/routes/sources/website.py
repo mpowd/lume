@@ -6,6 +6,23 @@ import logging
 from datetime import datetime
 from uuid import uuid4
 import asyncio
+from backend.db.mongodb import MongoDBClient
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LinkPreviewConfig
+from crawl4ai.content_filter_strategy import PruningContentFilter
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from langchain_qdrant import (
+    QdrantVectorStore,
+    RetrievalMode,
+    FastEmbedSparse,
+)
+from langchain_text_splitters import (
+    MarkdownHeaderTextSplitter,
+    CharacterTextSplitter,
+)
+from qdrant_client import QdrantClient
+from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
+import hashlib
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,8 +50,6 @@ async def get_links(
     logger.info(
         f"Get links request: {base_url}, collection={collection_name}, include_external={include_external_domains}"
     )
-
-    from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LinkPreviewConfig
 
     # Configure link preview with basic options
     link_preview_config = LinkPreviewConfig(
@@ -156,6 +171,258 @@ class UploadDocumentsRequest(BaseModel):
     urls: List[str]
 
 
+async def get_markdown_from_urls(urls: List[str]):
+    pass
+
+
+async def calculate_hash(content: str):
+    pass
+
+
+def remove_duplicate_urls(task_id, urls, existing_urls):
+    new_urls = [url for url in urls if url not in existing_urls]
+    skipped_urls = [url for url in urls if url in existing_urls]
+
+    if skipped_urls:
+        logger.info(
+            f"Skipping {len(skipped_urls)} URLs that already exist in the collection"
+        )
+
+    if not new_urls:
+        logger.info("All URLs already exist in collection")
+        website_upload_tasks[task_id]["status"] = "complete"
+        website_upload_tasks[task_id]["title"] = "Already Exists"
+        website_upload_tasks[task_id][
+            "message"
+        ] = "All URLs already exist in collection"
+        website_upload_tasks[task_id]["stats"] = [
+            {
+                "label": "Skipped (Already Exist)",
+                "value": len(skipped_urls),
+                "variant": "warning",
+            }
+        ]
+        return new_urls, skipped_urls
+    return new_urls, skipped_urls
+
+
+def get_embedding_model(name: str):
+
+    sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+
+    if name == "jina/jina-embeddings-v2-base-de":
+        dense_embeddings = OllamaEmbeddings(
+            model="jina/jina-embeddings-v2-base-de",
+            base_url="http://host.docker.internal:11434",
+        )
+        sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+    elif name == "text-embedding-3-small":
+        dense_embeddings = OpenAIEmbeddings(model=name)
+    else:
+        raise Exception(f"Unsupported embedding model: {name}")
+
+    return sparse_embeddings, dense_embeddings
+
+
+def get_markdown_crawler_config():
+    prune_filter = PruningContentFilter(threshold=0.5)
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=prune_filter, options={"ignore_links": True}
+    )
+
+    crawler_config = CrawlerRunConfig(
+        only_text=True,
+        verbose=True,
+        markdown_generator=md_generator,
+        excluded_tags=["nav", "footer", "header"],
+    )
+    return crawler_config
+
+
+async def calculate_hash(content: str):
+    """Calculate a consistent hash for content"""
+    return hashlib.md5(content.encode("utf-8")).hexdigest()
+
+
+async def scrape_urls(crawler_config, urls, collection_name, task_id=None):
+    scraped_documents = []
+    failed_urls = []
+    processed_urls = []
+
+    async with AsyncWebCrawler() as crawler:
+        for idx, url in enumerate(urls, 1):
+            try:
+                logger.info(f"[{idx}/{len(urls)}] Crawling: {url}")
+                if task_id:
+                    website_upload_tasks[task_id]["stages"][0]["current"] = idx
+                    website_upload_tasks[task_id]["stages"][0]["current_item"] = url
+                    website_upload_tasks[task_id][
+                        "message"
+                    ] = f"Crawling {idx}/{len(urls)}..."
+
+                result = await crawler.arun(url, config=crawler_config)
+
+                if result.success and result.markdown:
+                    markdown_content = result.markdown.fit_markdown
+                    content_hash = await calculate_hash(markdown_content)
+                    doc = {
+                        "url": url,
+                        "markdown": markdown_content,
+                        "title": result.metadata.get("title", "Untitled"),
+                        "description": result.metadata.get("description", ""),
+                        "source_category": "website",
+                        "collection_name": collection_name,
+                        "timestamp": datetime.now().isoformat(),
+                        "hash": content_hash,
+                        "collection_name"
+                        "metadata": {
+                            "status_code": result.status_code,
+                            "content_type": result.metadata.get(
+                                "content_type", "text/html"
+                            ),
+                        },
+                    }
+
+                    scraped_documents.append(doc)
+                    processed_urls.append(url)
+                    logger.info(f"✓ Successfully crawled: {url}")
+
+                else:
+                    error_msg = getattr(result, "error_message", "Unknown error")
+                    logger.error(f"✗ Failed to crawl {url}: {error_msg}")
+                    failed_urls.append({"url": url, "error": error_msg})
+
+            except Exception as e:
+                logger.error(f"✗ Error crawling {url}: {str(e)}")
+                failed_urls.append({"url": url, "error": str(e)})
+
+            await asyncio.sleep(0.1)
+
+    if not scraped_documents:
+        raise Exception("No documents were successfully crawled")
+
+    if task_id:
+        website_upload_tasks[task_id]["stages"][0]["is_current"] = False
+        website_upload_tasks[task_id]["stages"][1]["is_current"] = True
+        website_upload_tasks[task_id]["stages"][1]["total"] = len(scraped_documents)
+
+    return scraped_documents, processed_urls, failed_urls
+
+
+def save_documents_to_mongodb(mongodb_client, documents, collection_name):
+    """
+    Save scraped websites to Mongo DB
+    """
+    mongodb_client.persist_docs(docs=documents, collection_name=collection_name)
+    return
+
+
+async def chunk_documents(documents, collection_config, task_id=None):
+    chunk_size = collection_config.get("chunk_size", 1000)
+    chunk_overlap = collection_config.get("chunk_overlap", 100)
+    embedding_model = collection_config.get("dense_embedding_model")
+    collection_name = collection_config.get("collection_name")
+
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+    markdown_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=headers_to_split_on, strip_headers=True
+    )
+
+    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+        encoding_name="cl100k_base",
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+    all_chunks = []
+    all_uuids = []
+
+    for doc_idx, doc_data in enumerate(documents, 1):
+        try:
+            if task_id:
+                website_upload_tasks[task_id]["stages"][1]["current"] = doc_idx
+                website_upload_tasks[task_id]["stages"][1]["current_item"] = doc_data[
+                    "url"
+                ]
+                website_upload_tasks[task_id][
+                    "message"
+                ] = f"Chunking document {doc_idx}/{len(documents)}..."
+
+            md_header_splits = markdown_splitter.split_text(doc_data["markdown"])
+            chunks = text_splitter.split_documents(md_header_splits)
+
+            for chunk in chunks:
+                if not chunk.metadata:
+                    chunk.metadata = {}
+
+                chunk.metadata["source_url"] = doc_data["url"]
+                chunk.metadata["title"] = doc_data["title"]
+                chunk.metadata["source_category"] = "website"
+                chunk.metadata["collection_name"] = collection_name
+
+                chunk_with_metadata = f"# {doc_data['title']}\n\n"
+                for key, value in chunk.metadata.items():
+                    if key == "Header 1":
+                        chunk_with_metadata += f"## {value}\n\n"
+                    elif key == "Header 2":
+                        chunk_with_metadata += f"### {value}\n\n"
+                    elif key == "Header 3":
+                        chunk_with_metadata += f"#### {value}\n\n"
+
+                chunk.page_content = chunk_with_metadata + chunk.page_content
+                all_chunks.append(chunk)
+                all_uuids.append(str(uuid4()))
+
+            logger.info(f"Created {len(chunks)} chunks from {doc_data['url']}")
+
+        except Exception as e:
+            logger.error(f"Error chunking document {doc_data['url']}: {str(e)}")
+
+        await asyncio.sleep(0.1)
+
+    if task_id:
+        website_upload_tasks[task_id]["stages"][1]["is_current"] = False
+        website_upload_tasks[task_id]["stages"][2]["is_current"] = True
+        website_upload_tasks[task_id]["stages"][2]["total"] = len(all_chunks)
+
+    return all_chunks, all_uuids
+
+
+async def calculate_embeddings_and_save_to_qdrant(
+    chunks, ids, dense_embeddings, sparse_embeddings, collection_name, task_id=None
+):
+    qdrant_client = QdrantClient(url="http://qdrant:6333")
+    qdrant = QdrantVectorStore(
+        client=qdrant_client,
+        collection_name=collection_name,
+        embedding=dense_embeddings,
+        sparse_embedding=sparse_embeddings,
+        retrieval_mode=RetrievalMode.HYBRID,
+        vector_name="dense",
+        sparse_vector_name="sparse",
+    )
+
+    batch_size = 10
+    for i in range(0, len(chunks), batch_size):
+        batch_chunks = chunks[i : i + batch_size]
+        batch_ids = ids[i : i + batch_size]
+
+        qdrant.add_documents(documents=batch_chunks, ids=batch_ids)
+
+        current = min(i + batch_size, len(chunks))
+        if task_id:
+            website_upload_tasks[task_id]["stages"][2]["current"] = current
+            website_upload_tasks[task_id][
+                "message"
+            ] = f"Embedding {current}/{len(chunks)} chunks..."
+
+        await asyncio.sleep(0.1)
+
+
 async def process_websites_background(
     task_id: str, collection_name: str, urls: List[str]
 ):
@@ -163,51 +430,25 @@ async def process_websites_background(
     Background task to process website URLs
     """
     try:
-        from backend.db.mongodb import MongoDBClient
-        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
-        from crawl4ai.content_filter_strategy import PruningContentFilter
-        from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-        from langchain_qdrant import (
-            QdrantVectorStore,
-            RetrievalMode,
-            FastEmbedSparse,
-        )
-        from langchain_text_splitters import (
-            MarkdownHeaderTextSplitter,
-            CharacterTextSplitter,
-        )
-        from qdrant_client import QdrantClient
 
         # Check for existing URLs
         mongodb_client = MongoDBClient.get_instance()
         existing_docs = mongodb_client.get_docs(
             filter={}, collection_name=collection_name, projection={"url": 1}
         )
+        collection_info = mongodb_client.get_docs(
+            filter={"collection_name": collection_name},
+            collection_name="configurations",
+        )
+
+        if not collection_info:
+            raise Exception(f"Collection configuration not found for {collection_name}")
+
         existing_urls = {doc.get("url") for doc in existing_docs if doc.get("url")}
 
         # Filter out existing URLs
-        new_urls = [url for url in urls if url not in existing_urls]
-        skipped_urls = [url for url in urls if url in existing_urls]
-
-        if skipped_urls:
-            logger.info(
-                f"Skipping {len(skipped_urls)} URLs that already exist in the collection"
-            )
-
+        new_urls, skipped_urls = remove_duplicate_urls(task_id, urls, existing_urls)
         if not new_urls:
-            logger.info("All URLs already exist in collection")
-            website_upload_tasks[task_id]["status"] = "complete"
-            website_upload_tasks[task_id]["title"] = "Already Exists"
-            website_upload_tasks[task_id][
-                "message"
-            ] = "All URLs already exist in collection"
-            website_upload_tasks[task_id]["stats"] = [
-                {
-                    "label": "Skipped (Already Exist)",
-                    "value": len(skipped_urls),
-                    "variant": "warning",
-                }
-            ]
             return
 
         # Update task status
@@ -223,196 +464,30 @@ async def process_websites_background(
         if not collection_info:
             raise Exception(f"Collection configuration not found for {collection_name}")
 
-        config_doc = collection_info[0]
-        chunk_size = config_doc.get("chunk_size", 1000)
-        chunk_overlap = config_doc.get("chunk_overlap", 100)
-        embedding_model = config_doc.get("dense_embedding_model")
+        collection_config = collection_info[0]
+        embedding_model = collection_config.get("dense_embedding_model")
 
-        # Initialize embeddings
-        from langchain_ollama import OllamaEmbeddings
-        from langchain_openai import OpenAIEmbeddings
+        # get embedding models
+        sparse_embeddings, dense_embeddings = get_embedding_model(embedding_model)
 
-        if embedding_model == "jina/jina-embeddings-v2-base-de":
-            dense_embeddings = OllamaEmbeddings(
-                model="jina/jina-embeddings-v2-base-de",
-                base_url="http://host.docker.internal:11434",
-            )
-            sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
-        elif embedding_model == "text-embedding-3-small":
-            dense_embeddings = OpenAIEmbeddings(model=embedding_model)
-            sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
-        else:
-            raise Exception(f"Unsupported embedding model: {embedding_model}")
-
-        # Configure crawler
-        prune_filter = PruningContentFilter(threshold=0.5)
-        md_generator = DefaultMarkdownGenerator(
-            content_filter=prune_filter, options={"ignore_links": True}
-        )
-
-        crawler_config = CrawlerRunConfig(
-            only_text=True,
-            verbose=True,
-            markdown_generator=md_generator,
-            excluded_tags=["nav", "footer", "header"],
-        )
+        # get markdown crawler config
+        crawler_config = get_markdown_crawler_config()
 
         # Phase 1: Crawl and save to MongoDB
-        crawled_documents = []
-        failed_urls = []
-        processed_urls = []
-
-        async with AsyncWebCrawler() as crawler:
-            for idx, url in enumerate(new_urls, 1):
-                try:
-                    logger.info(f"[{idx}/{len(new_urls)}] Crawling: {url}")
-
-                    website_upload_tasks[task_id]["stages"][0]["current"] = idx
-                    website_upload_tasks[task_id]["stages"][0]["current_item"] = url
-                    website_upload_tasks[task_id][
-                        "message"
-                    ] = f"Crawling {idx}/{len(new_urls)}..."
-
-                    result = await crawler.arun(url, config=crawler_config)
-
-                    if result.success and result.markdown:
-                        doc = {
-                            "url": url,
-                            "markdown": result.markdown.fit_markdown,
-                            "title": result.metadata.get("title", "Untitled"),
-                            "description": result.metadata.get("description", ""),
-                            "timestamp": datetime.now().isoformat(),
-                            "metadata": {
-                                "status_code": result.status_code,
-                                "content_type": result.metadata.get(
-                                    "content_type", "text/html"
-                                ),
-                            },
-                        }
-
-                        mongodb_client.persist_docs(
-                            docs=[doc], collection_name=collection_name
-                        )
-
-                        crawled_documents.append(
-                            {
-                                "url": url,
-                                "markdown": result.markdown.fit_markdown,
-                                "title": doc["title"],
-                            }
-                        )
-                        processed_urls.append(url)
-                        logger.info(f"✓ Successfully crawled: {url}")
-
-                    else:
-                        error_msg = getattr(result, "error_message", "Unknown error")
-                        logger.error(f"✗ Failed to crawl {url}: {error_msg}")
-                        failed_urls.append({"url": url, "error": error_msg})
-
-                except Exception as e:
-                    logger.error(f"✗ Error crawling {url}: {str(e)}")
-                    failed_urls.append({"url": url, "error": str(e)})
-
-                await asyncio.sleep(0.1)
-
-        if not crawled_documents:
-            raise Exception("No documents were successfully crawled")
-
-        website_upload_tasks[task_id]["stages"][0]["is_current"] = False
-        website_upload_tasks[task_id]["stages"][1]["is_current"] = True
-        website_upload_tasks[task_id]["stages"][1]["total"] = len(crawled_documents)
+        scraped_documents, processed_urls, failed_urls = await scrape_urls(
+            crawler_config, new_urls, task_id
+        )
+        save_documents_to_mongodb(mongodb_client, scraped_documents, collection_name)
 
         # Phase 2: Chunk documents
-        headers_to_split_on = [
-            ("#", "Header 1"),
-            ("##", "Header 2"),
-            ("###", "Header 3"),
-        ]
-        markdown_splitter = MarkdownHeaderTextSplitter(
-            headers_to_split_on=headers_to_split_on, strip_headers=True
+        chunks, ids = await chunk_documents(
+            scraped_documents, collection_config, task_id
         )
-
-        text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
-            encoding_name="cl100k_base",
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-        )
-
-        all_chunks = []
-        all_uuids = []
-
-        for doc_idx, doc_data in enumerate(crawled_documents, 1):
-            try:
-                website_upload_tasks[task_id]["stages"][1]["current"] = doc_idx
-                website_upload_tasks[task_id]["stages"][1]["current_item"] = doc_data[
-                    "url"
-                ]
-                website_upload_tasks[task_id][
-                    "message"
-                ] = f"Chunking document {doc_idx}/{len(crawled_documents)}..."
-
-                md_header_splits = markdown_splitter.split_text(doc_data["markdown"])
-                chunks = text_splitter.split_documents(md_header_splits)
-
-                for chunk in chunks:
-                    if not chunk.metadata:
-                        chunk.metadata = {}
-
-                    chunk.metadata["source_url"] = doc_data["url"]
-                    chunk.metadata["title"] = doc_data["title"]
-                    chunk.metadata["source_category"] = "website"
-                    chunk.metadata["collection_name"] = collection_name
-
-                    chunk_with_metadata = f"# {doc_data['title']}\n\n"
-                    for key, value in chunk.metadata.items():
-                        if key == "Header 1":
-                            chunk_with_metadata += f"## {value}\n\n"
-                        elif key == "Header 2":
-                            chunk_with_metadata += f"### {value}\n\n"
-                        elif key == "Header 3":
-                            chunk_with_metadata += f"#### {value}\n\n"
-
-                    chunk.page_content = chunk_with_metadata + chunk.page_content
-                    all_chunks.append(chunk)
-                    all_uuids.append(str(uuid4()))
-
-                logger.info(f"Created {len(chunks)} chunks from {doc_data['url']}")
-
-            except Exception as e:
-                logger.error(f"Error chunking document {doc_data['url']}: {str(e)}")
-
-            await asyncio.sleep(0.1)
-
-        website_upload_tasks[task_id]["stages"][1]["is_current"] = False
-        website_upload_tasks[task_id]["stages"][2]["is_current"] = True
-        website_upload_tasks[task_id]["stages"][2]["total"] = len(all_chunks)
 
         # Phase 3: Create embeddings and save to Qdrant
-        qdrant_client = QdrantClient(url="http://qdrant:6333")
-        qdrant = QdrantVectorStore(
-            client=qdrant_client,
-            collection_name=collection_name,
-            embedding=dense_embeddings,
-            sparse_embedding=sparse_embeddings,
-            retrieval_mode=RetrievalMode.HYBRID,
-            vector_name="dense",
-            sparse_vector_name="sparse",
+        await calculate_embeddings_and_save_to_qdrant(
+            chunks, ids, dense_embeddings, sparse_embeddings, collection_name, task_id
         )
-
-        batch_size = 10
-        for i in range(0, len(all_chunks), batch_size):
-            batch_chunks = all_chunks[i : i + batch_size]
-            batch_uuids = all_uuids[i : i + batch_size]
-
-            qdrant.add_documents(documents=batch_chunks, ids=batch_uuids)
-
-            current = min(i + batch_size, len(all_chunks))
-            website_upload_tasks[task_id]["stages"][2]["current"] = current
-            website_upload_tasks[task_id][
-                "message"
-            ] = f"Embedding {current}/{len(all_chunks)} chunks..."
-
-            await asyncio.sleep(0.1)
 
         # Complete
         website_upload_tasks[task_id]["status"] = "complete"
@@ -429,7 +504,7 @@ async def process_websites_background(
                 "value": len(processed_urls),
                 "variant": "success",
             },
-            {"label": "Chunks Created", "value": len(all_chunks), "variant": "info"},
+            {"label": "Chunks Created", "value": len(chunks), "variant": "info"},
         ]
 
         if skipped_urls:
@@ -470,7 +545,7 @@ async def upload_documents(request: UploadDocumentsRequest):
         "message": f"Preparing to process {len(request.urls)} URLs...",
         "stages": [
             {
-                "label": "Crawling Websites",
+                "label": "Scraping Websites",
                 "current": 0,
                 "total": len(request.urls),
                 "unit": "pages",
@@ -536,3 +611,56 @@ async def get_website_upload_progress(task_id: str):
             "failed": task.get("failed", []),
         }
     )
+
+
+@router.get("/watch_urls/{collection_name}")
+async def watch_urls(collection_name: str):
+    """
+    Check if website contents have changed
+    """
+    mongodb_client = MongoDBClient.get_instance()
+    existing_docs = mongodb_client.get_docs(
+        filter={},
+        collection_name=collection_name,
+        projection={"url": 1, "hash": 1, "source_category": 1},
+    )
+
+    # Filter only website documents
+    website_docs = [
+        doc for doc in existing_docs if doc.get("source_category") == "website"
+    ]
+
+    if not website_docs:
+        return {"message": "No website documents found in collection"}
+
+    # Extract URLs and existing hashes
+    existing_urls = [doc["url"] for doc in website_docs]
+    existing_hashes = [doc["hash"] for doc in website_docs]
+
+    # Scrape current content for all URLs
+    scraped_docs, _, _ = await scrape_urls(
+        get_markdown_crawler_config(), existing_urls, collection_name
+    )
+
+    # Create a mapping of URL to scraped content hash
+    scraped_url_to_hash = {doc["url"]: doc["hash"] for doc in scraped_docs}
+
+    # Compare hashes
+    changed_urls = []
+    unchanged_urls = []
+
+    for url, existing_hash in zip(existing_urls, existing_hashes):
+        if url in scraped_url_to_hash:
+            scraped_hash = scraped_url_to_hash[url]
+            if existing_hash != scraped_hash:
+                changed_urls.append(url)
+            else:
+                unchanged_urls.append(url)
+
+    return {
+        "total_urls": len(existing_urls),
+        "changed_urls": changed_urls,
+        "unchanged_urls": unchanged_urls,
+        "changed_count": len(changed_urls),
+        "unchanged_count": len(unchanged_urls),
+    }

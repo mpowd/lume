@@ -6,23 +6,23 @@ import CollectionForm from '../components/knowledge/CollectionForm'
 import SourceTypeSelector from '../components/knowledge/SourceTypeSelector'
 import CrawlWizard from '../components/knowledge/CrawlWizard'
 import FileWizard from '../components/knowledge/FileWizard' 
+import WatchWebsiteKnowledge from '../components/knowledge/WatchWebsiteKnowledge'
 import Button from '../components/shared/Button'
 import Card from '../components/shared/Card'
 import EmptyState from '../components/shared/EmptyState'
 import LoadingSpinner from '../components/shared/LoadingSpinner'
 import ErrorAlert from '../components/shared/ErrorAlert'
-import ConfirmDialog from '../components/shared/ConfirmDialog' // Import ConfirmDialog
+import ConfirmDialog from '../components/shared/ConfirmDialog'
 
 export default function KnowledgeBasePage() {
   const { collections, loading, error, createCollection, deleteCollection, reload } = useCollections()
   const [activeCollection, setActiveCollection] = useState(null)
-  const [view, setView] = useState('menu') // 'menu', 'add', 'view', 'crawl'
+  const [view, setView] = useState('menu') // 'menu', 'add', 'view', 'crawl', 'watch'
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedSourceType, setSelectedSourceType] = useState(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState(null)
   
-  // Add confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     collectionName: ''
@@ -50,7 +50,6 @@ export default function KnowledgeBasePage() {
     setView('menu')
   }
 
-  // Handle delete with confirmation
   const handleDeleteCollection = (collectionName) => {
     setConfirmDialog({
       isOpen: true,
@@ -124,7 +123,6 @@ export default function KnowledgeBasePage() {
 
         {view === 'menu' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Create New Collection Card */}
             <button
               onClick={() => setShowCreateModal(true)}
               className="group relative overflow-hidden bg-transparent border-2 border-dashed border-border-default hover:border-border-brand-hover rounded-2xl p-8 transition-all duration-300 hover:bg-background-elevated min-h-[200px] flex flex-col items-center justify-center"
@@ -138,7 +136,6 @@ export default function KnowledgeBasePage() {
               </p>
             </button>
 
-            {/* Existing Collections */}
             {collections.map((collection) => (
               <div 
                 key={collection} 
@@ -152,12 +149,6 @@ export default function KnowledgeBasePage() {
                     <h3 className="font-semibold text-text-primary">{collection}</h3>
                   </div>
                 </div>
-                <p className="text-sm text-text-tertiary mb-4 flex-1">
-                  {collection === 'default' 
-                    ? 'Default collection with basic knowledge' 
-                    : 'Custom collection with specialized knowledge'
-                  }
-                </p>
                 <div className="flex gap-2 mt-auto">
                   <button 
                     onClick={() => handleAddKnowledge(collection)} 
@@ -174,7 +165,7 @@ export default function KnowledgeBasePage() {
                     View
                   </button>
                   <button
-                    onClick={() => handleDeleteCollection(collection)} // Use confirm dialog
+                    onClick={() => handleDeleteCollection(collection)}
                     className="flex-1 px-3 py-2 bg-transparent border border-border-default hover:border-border-brand hover:bg-background text-text-primary text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -259,9 +250,17 @@ export default function KnowledgeBasePage() {
                       </div>
                     </Card>
                   </a>
+                  
+                  <Button 
+                    onClick={() => setView('watch')}
+                    className="w-full py-6 bg-transparent border border-border-default hover:border-border-brand hover:bg-background text-text-primary text-lg rounded-xl transition-colors flex items-center justify-center gap-3"
+                  >
+                    <Eye className="w-5 h-5" />
+                    Watch Website Knowledge
+                  </Button>
                 </div>
               </div>
-            ) : view === 'website' ?(
+            ) : view === 'website' ? (
               <CrawlWizard
                 collectionName={activeCollection}
                 onBack={() => setView('add')}
@@ -272,6 +271,11 @@ export default function KnowledgeBasePage() {
                 collectionName={activeCollection}
                 onBack={() => setView('add')}
                 onComplete={handleCrawlComplete}
+              />
+            ) : view === 'watch' ? (
+              <WatchWebsiteKnowledge
+                collectionName={activeCollection}
+                onBack={() => setView('view')}
               />
             ) : null}
           </div>
@@ -286,7 +290,6 @@ export default function KnowledgeBasePage() {
         error={formError}
       />
 
-      {/* Confirm Dialog for Collection Deletion */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={closeConfirmDialog}
