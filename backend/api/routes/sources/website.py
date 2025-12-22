@@ -23,6 +23,9 @@ from qdrant_client import QdrantClient
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 import hashlib
+from qdrant_client import models
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -436,6 +439,8 @@ async def process_websites_background(
         existing_docs = mongodb_client.get_docs(
             filter={}, collection_name=collection_name, projection={"url": 1}
         )
+
+        # Get collection configuration
         collection_info = mongodb_client.get_docs(
             filter={"collection_name": collection_name},
             collection_name="configurations",
@@ -455,12 +460,6 @@ async def process_websites_background(
         website_upload_tasks[task_id]["stages"][0]["total"] = len(new_urls)
         website_upload_tasks[task_id]["stages"][0]["is_current"] = True
 
-        # Get collection configuration
-        collection_info = mongodb_client.get_docs(
-            filter={"collection_name": collection_name},
-            collection_name="configurations",
-        )
-
         if not collection_info:
             raise Exception(f"Collection configuration not found for {collection_name}")
 
@@ -475,7 +474,7 @@ async def process_websites_background(
 
         # Phase 1: Crawl and save to MongoDB
         scraped_documents, processed_urls, failed_urls = await scrape_urls(
-            crawler_config, new_urls, task_id
+            crawler_config, new_urls, collection_name, task_id
         )
         save_documents_to_mongodb(mongodb_client, scraped_documents, collection_name)
 
@@ -664,3 +663,72 @@ async def watch_urls(collection_name: str):
         "changed_count": len(changed_urls),
         "unchanged_count": len(unchanged_urls),
     }
+
+
+def delete_qdrant_docs(client, collection_name, urls):
+    for url in urls:
+        client.delete(
+            collection_name=collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="metadata.source_url",
+                            match=models.MatchValue(value=url),
+                        ),
+                    ],
+                )
+            ),
+        )
+
+
+def delete_mongodb_docs(client, collection_name, urls):
+    for url in urls:
+        client.delete_documents(
+            filter_query={"url": url},
+            collection_name=collection_name,
+        )
+
+
+@router.post("/reindex")
+async def reindex(request: UploadDocumentsRequest):
+
+    collection_name = request.collection_name
+    urls = request.urls
+
+    # Phase 1: Delete url knowledge from mongodb and qdrant
+    qdrant_client = QdrantClient(url="http://qdrant:6333")
+    delete_qdrant_docs(qdrant_client, collection_name, urls)
+
+    mongodb_client = MongoDBClient.get_instance()
+    delete_mongodb_docs(mongodb_client, collection_name, urls)
+
+    collection_info = mongodb_client.get_docs(
+        filter={"collection_name": collection_name},
+        collection_name="configurations",
+    )
+
+    collection_config = collection_info[0]
+    embedding_model = collection_config.get("dense_embedding_model")
+
+    # get embedding models
+    sparse_embeddings, dense_embeddings = get_embedding_model(embedding_model)
+
+    # get markdown crawler config
+    crawler_config = get_markdown_crawler_config()
+
+    # Phase 3: Scrape urls and save to MongoDB
+    scraped_documents, processed_urls, failed_urls = await scrape_urls(
+        crawler_config, urls, collection_name
+    )
+    save_documents_to_mongodb(mongodb_client, scraped_documents, collection_name)
+
+    # Phase 4: Chunk documents
+    chunks, ids = await chunk_documents(scraped_documents, collection_config)
+
+    # Phase 5: Create embeddings and save to Qdrant
+    await calculate_embeddings_and_save_to_qdrant(
+        chunks, ids, dense_embeddings, sparse_embeddings, collection_name
+    )
+
+    return "reindex"

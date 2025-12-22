@@ -462,6 +462,25 @@ export const websiteAPI = {
       console.error('Watch URLs Error:', error)
       throw error
     }
+  },
+
+
+  /**
+   * Reindex URLs in a collection
+   * @param {string} collectionName - Collection name
+   * @param {string[]} urls - URLs to reindex
+   */
+  reindex: async (collectionName, urls) => {
+    try {
+      const response = await api.post(`/website/reindex/`, {
+        collection_name: collectionName,
+        urls: urls
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Reindex Error:', error);
+      throw error;
+    }
   }
 }
 
