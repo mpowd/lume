@@ -59,8 +59,7 @@ export default function AssistantForm({
     setNewReferenceName(reference.name);
     setIsModalOpen(true);
     setEditingReferenceIndex(index);
-};
-
+  };
 
   // Initialize formData with default values
   const [formData, setFormData] = useState({
@@ -83,7 +82,8 @@ export default function AssistantForm({
     precise_citation_prompt: DEFAULT_PRECISE_CITATION_PROMPT,
     tools: [],
     max_steps: 4,
-    precise_citation: false
+    precise_citation: false,
+    system_prompt: 'Search Tavily for the given query and return the results.'
   })
 
   useEffect(() => {
@@ -112,12 +112,11 @@ export default function AssistantForm({
         precise_citation_prompt: assistant.precise_citation_prompt || DEFAULT_PRECISE_CITATION_PROMPT,
         tools: assistant.tools || [],
         max_steps: assistant.max_steps || 4,
-        precise_citation: assistant.precise_citation ?? false
+        precise_citation: assistant.precise_citation ?? false,
+        system_prompt: assistant.system_prompt || 'Search Tavily for the given query and return the results.'
       })
     }
   }, [assistant])
-
-// ... existing code ...
 
   useEffect(() => {
     const updatePrompts = () => {
@@ -178,8 +177,6 @@ export default function AssistantForm({
     updatePrompts();
   }, [formData.collections, formData.references]);
 
-// ... existing code ...
-
   const loadOllamaModels = async () => {
     setLoadingModels(true)
     try {
@@ -209,6 +206,20 @@ export default function AssistantForm({
     }
   }
 
+  const toggleTool = (tool) => {
+    if (formData.tools.includes(tool)) {
+      setFormData({
+        ...formData,
+        tools: formData.tools.filter(t => t !== tool)
+      })
+    } else {
+      setFormData({
+        ...formData,
+        tools: [...formData.tools, tool]
+      })
+    }
+  }
+
   const handleLocalOnlyToggle = (checked) => {
     const updates = { local_only: checked }
     
@@ -227,42 +238,42 @@ export default function AssistantForm({
     setFormData({ ...formData, ...updates })
   }
 
-const addReference = () => {
-  if (!newReferenceText.trim() || !newReferenceName.trim()) return;
-  
-  if (editingReferenceIndex !== null) {
-    // Editing existing reference
-    const updatedReferences = [...formData.references];
-    updatedReferences[editingReferenceIndex] = {
-      text: newReferenceText,
-      name: newReferenceName
-    };
-    setFormData(prev => ({
-      ...prev,
-      references: updatedReferences
-    }));
-  } else {
-    // Adding new reference
-
-    const newPrompt = formData.prompt.replace(
-      '{question}',
-      `{question}\n\nReference ${formData.references.length}: {reference${formData.references.length}}`
-    );
-    setFormData(prev => ({
-      ...prev,
-      references: [...prev.references, {
+  const addReference = () => {
+    if (!newReferenceText.trim() || !newReferenceName.trim()) return;
+    
+    if (editingReferenceIndex !== null) {
+      // Editing existing reference
+      const updatedReferences = [...formData.references];
+      updatedReferences[editingReferenceIndex] = {
         text: newReferenceText,
         name: newReferenceName
-      }]
-    }));
-  }
-  
-  // Reset modal
-  setIsModalOpen(false);
-  setNewReferenceText('');
-  setNewReferenceName('');
-  setEditingReferenceIndex(null);
-};
+      };
+      setFormData(prev => ({
+        ...prev,
+        references: updatedReferences
+      }));
+    } else {
+      // Adding new reference
+      const newPrompt = formData.prompt.replace(
+        '{question}',
+        `{question}\n\nReference ${formData.references.length}: {reference${formData.references.length}}`
+      );
+      setFormData(prev => ({
+        ...prev,
+        references: [...prev.references, {
+          text: newReferenceText,
+          name: newReferenceName
+        }]
+      }));
+    }
+    
+    // Reset modal
+    setIsModalOpen(false);
+    setNewReferenceText('');
+    setNewReferenceName('');
+    setEditingReferenceIndex(null);
+  };
+
   const deleteReference = (index) => {
     // Update prompts when deleting references
     setFormData(prevState => {
@@ -371,7 +382,7 @@ const addReference = () => {
               )}
             </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary mb-3">
                 <ScrollText className="w-4 h-4 inline mr-2" />
                 Additional references
@@ -406,6 +417,7 @@ const addReference = () => {
                 </div>
               )}
               <button
+                type="button"
                 onClick={() => {
                   setIsModalOpen(true);
                   setEditingReferenceIndex(null);
@@ -415,6 +427,7 @@ const addReference = () => {
                 <Plus className="w-4 h-4 text-brand-teal" />
               </button>
             </div>
+
             <div className="p-4 bg-transparent border border-white/10 rounded-xl">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-3">
@@ -452,13 +465,81 @@ const addReference = () => {
           </>
         )}
 
+        {formData.workflow === 'agentic' && (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary mb-3">
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                Tool Selection
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['tavily_search', 'wikipedia', 'calculator', 'web_scraper'].map(tool => (
+                  <button
+                    key={tool}
+                    type="button"
+                    onClick={() => toggleTool(tool)}
+                    className={`
+                      px-4 py-2 rounded-lg text-sm font-medium transition-all 
+                      flex items-center gap-1
+                      ${formData.tools.includes(tool)
+                        ? 'border border-brand-teal/50 bg-white/5 text-white'
+                        : 'bg-transparent text-text-tertiary border border-white/10 hover:border-brand-teal/30 hover:text-white'
+                      }
+                    `}
+                  >
+                    {formData.tools.includes(tool) && <Check className="w-3 h-3" />}
+                    {tool.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                System Prompt
+              </label>
+              <textarea
+                value={formData.system_prompt}
+                onChange={(e) => setFormData({...formData, system_prompt: e.target.value})}
+                placeholder="Enter system prompt for the agent..."
+                rows="4"
+                className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white font-mono text-sm"
+                required
+              />
+            </div>
+
+            <ModelSelector
+              formData={formData}
+              setFormData={setFormData}
+              ollamaModels={ollamaModels}
+              loadingModels={loadingModels}
+              formatModelSize={formatModelSize}
+            />
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Max Steps
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={formData.max_steps}
+                onChange={(e) => setFormData({...formData, max_steps: parseInt(e.target.value)})}
+                className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
+              />
+              <p className="text-xs text-text-quaternary mt-1">Maximum number of reasoning steps the agent can take</p>
+            </div>
+          </>
+        )}
+
         <div className="flex gap-3 pt-4">
           <Button
             type="submit"
             variant="standout"
             fullWidth
             loading={loading}
-            disabled={!formData.assistant_name || !formData.workflow === 'linear'}
+            disabled={!formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0 && formData.references.length === 0) || (formData.workflow === 'agentic' && formData.tools.length === 0)}
           >
             {assistant ? 'Update Assistant' : 'Create Assistant'}
           </Button>
@@ -472,7 +553,7 @@ const addReference = () => {
           </Button>
         </div>
 
-{/* Modal for adding references */}
+        {/* Modal for adding references */}
         {isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
@@ -530,7 +611,6 @@ const addReference = () => {
             </div>
           </div>
         )}
-
       </form>
     </Card>
   )

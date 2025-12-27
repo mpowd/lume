@@ -179,7 +179,11 @@ export const createQAAssistant = async ({
   topN = null,
   prompt = null,
   preciseCitation = false,
-  preciseCitationPrompt = null  // ← ADDED
+  preciseCitationPrompt = null,
+  workflow = 'linear',
+  systemPrompt = 'Search Tavily for the given query and return the results.',
+  tools,
+  maxSteps = 4
 }) => {
   return assistantsAPI.create({
     name,
@@ -203,7 +207,11 @@ export const createQAAssistant = async ({
       top_n: topN,
       prompt: prompt,
       precise_citation: preciseCitation,
-      precise_citation_prompt: preciseCitationPrompt  // ← ADDED
+      precise_citation_prompt: preciseCitationPrompt,
+      workflow: workflow,
+      system_prompt: systemPrompt,
+      tools: tools,
+      max_steps: maxSteps
     },
     created_by: 'user'
   })

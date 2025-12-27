@@ -93,7 +93,8 @@ export const useAssistants = () => {
           precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
           local_only: formData.local_only,
           tools: formData.tools || [],
-          max_steps: formData.max_steps
+          max_steps: formData.max_steps,
+          workflow: formData.workflow
         },
         created_by: 'user'
       }
