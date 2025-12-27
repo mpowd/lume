@@ -27,14 +27,16 @@ class QAAssistantConfig(AssistantConfig):
 
     # Reranking settings
     reranking: bool = False
-    reranker_provider: Optional[str]  # cohere or huggingface
-    reranker_model: Optional[str]
+    reranker_provider: Optional[str] = None  # cohere or huggingface
+    reranker_model: Optional[str] = None
     top_n: Optional[int] = None
 
     # Generation settings
-    prompt: Optional[str] = None
+    system_prompt: Optional[str] = None
+    user_prompt: Optional[str] = None
     precise_citation: bool = False
-    precise_citation_prompt: Optional[str] = None
+    precise_citation_system_prompt: Optional[str] = None
+    precise_citation_user_prompt: Optional[str] = None
 
 
 class QAAssistantInput(AssistantInput):
@@ -112,9 +114,11 @@ class QAAssistant(BaseAssistant):
                 config={
                     "llm_model": config.llm_model,
                     "llm_provider": config.llm_provider,
-                    "prompt": config.prompt,
+                    "system_prompt": config.system_prompt,
+                    "user_prompt": config.user_prompt,
                     "precise_citation": config.precise_citation,
-                    "precise_citation_prompt": config.precise_citation_prompt,
+                    "precise_citation_system_prompt": config.precise_citation_system_prompt,
+                    "precise_citation_user_prompt": config.precise_citation_user_prompt,
                     "reranking": config.reranking,
                 },
             )

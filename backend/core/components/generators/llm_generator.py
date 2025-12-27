@@ -1,7 +1,3 @@
-"""
-LLM Generator for answer generation with RAG
-"""
-
 from typing import List, Dict, Any
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
@@ -27,33 +23,29 @@ class CitedAnswer(BaseModel):
 class LLMGenerator:
     """LLM-based answer generator"""
 
-    # Default prompts
-    DEFAULT_PROMPT = """Answer the question using only the context provided.
+    DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant that answers questions using only the provided context.
+Answer conversationally without mentioning the context or chunks to the user."""
 
-Retrieved Context: {context}
+    DEFAULT_USER_PROMPT = """Context:
+{context}
 
-User Question: {question}
+Question: {question}"""
 
-Answer conversationally. User is not aware of context."""
-
-    DEFAULT_PRECISE_CITATION_PROMPT = """You are answering a question using provided context chunks.
+    DEFAULT_PRECISE_CITATION_SYSTEM = """You are answering questions using provided context chunks.
 Each chunk is numbered starting from 0. Track which chunks you use.
 
-Retrieved Context Chunks:
-{context_with_indices}
-
-User Question: {question}
-
 Instructions:
-1. Answer using ONLY information from the chunks above
+1. Answer using ONLY information from the chunks
 2. Track which chunk numbers you actually used
 3. Only include chunk indices you directly referenced
-4. If you didn't use a chunk, don't include its index
-5. Do not include the used chunks in the answer directly
+4. Do not include the used chunks in the answer
 
-{format_instructions}
+{format_instructions}"""
 
-Be precise with chunk indices!"""
+    DEFAULT_PRECISE_CITATION_USER = """Context Chunks:
+{context_with_indices}
+
+Question: {question}"""
 
     def _get_llm(self, model_name: str, provider: str):
         """Get LLM instance"""
@@ -124,13 +116,6 @@ Be precise with chunk indices!"""
     ) -> Dict[str, Any]:
         """Generate answer from query and documents"""
 
-        # if not documents:
-        #     return {
-        #         "answer": "I couldn't find any relevant information to answer your question.",
-        #         "sources": [],
-        #         "contexts": [],
-        #     }
-
         llm = self._get_llm(config.get("llm_model"), config.get("llm_provider"))
 
         # Check if precise citation is enabled
@@ -139,12 +124,16 @@ Be precise with chunk indices!"""
 
             parser = PydanticOutputParser(pydantic_object=CitedAnswer)
 
-            # Use custom precise citation prompt if provided, otherwise use default
-            precise_citation_prompt = config.get(
-                "precise_citation_prompt", self.DEFAULT_PRECISE_CITATION_PROMPT
+            system_prompt = config.get(
+                "precise_citation_system_prompt", self.DEFAULT_PRECISE_CITATION_SYSTEM
+            )
+            user_prompt = config.get(
+                "precise_citation_user_prompt", self.DEFAULT_PRECISE_CITATION_USER
             )
 
-            prompt = ChatPromptTemplate.from_template(precise_citation_prompt)
+            prompt = ChatPromptTemplate.from_messages(
+                [("system", system_prompt), ("user", user_prompt)]
+            )
 
             chain = (
                 {
@@ -182,10 +171,12 @@ Be precise with chunk indices!"""
         else:
             logger.info("Using standard citation mode")
 
-            # Use custom prompt if provided, otherwise use default
-            prompt = config.get("prompt", self.DEFAULT_PROMPT)
+            system_prompt = config.get("system_prompt", self.DEFAULT_SYSTEM_PROMPT)
+            user_prompt = config.get("user_prompt", self.DEFAULT_USER_PROMPT)
 
-            prompt = ChatPromptTemplate.from_template(prompt)
+            prompt = ChatPromptTemplate.from_messages(
+                [("system", system_prompt), ("user", user_prompt)]
+            )
 
             chain = (
                 {

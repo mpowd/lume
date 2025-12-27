@@ -12,8 +12,10 @@ export default function AdvancedSettings({
   setFormData, 
   showAdvanced, 
   setShowAdvanced,
-  defaultPrompt,
-  defaultPreciseCitationPrompt 
+  defaultSystemPrompt,
+  defaultUserPrompt,
+  defaultPreciseCitationSystem,
+  defaultPreciseCitationUser
 }) {
   // Check if at least one collection is selected
   const hasCollections = formData.collections && formData.collections.length > 0;
@@ -21,15 +23,13 @@ export default function AdvancedSettings({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubstitution, setPendingSubstitution] = useState(null);
 
-
   // Get reference count for display
-  // const referenceCount = formData.references ? formData.references.length : 0;
   const references = formData.references
   
   // Function to find and replace reference placeholders
-  const handlePromptChange = (e) => {
+  const handleUserPromptChange = (e) => {
     const newPrompt = e.target.value;
-    setFormData({...formData, prompt: newPrompt});
+    setFormData({...formData, user_prompt: newPrompt});
     
     // Check if any reference name is in curly brackets
     if (references && references.length > 0) {
@@ -56,11 +56,11 @@ export default function AdvancedSettings({
   // Function to perform the substitution
   const handleSubstitution = () => {
     if (pendingSubstitution) {
-      const newPrompt = formData.prompt.replace(
+      const newPrompt = formData.user_prompt.replace(
         pendingSubstitution.placeholder,
         pendingSubstitution.referenceText
       );
-      setFormData({...formData, prompt: newPrompt});
+      setFormData({...formData, user_prompt: newPrompt});
       setShowConfirmDialog(false);
       setPendingSubstitution(null);
     }
@@ -242,7 +242,7 @@ export default function AdvancedSettings({
                 )}
               </div>
 
-              {/* Show the appropriate prompt based on precise_citation setting */}
+              {/* Show the appropriate prompts based on precise_citation setting */}
               {formData.precise_citation ? (
                 <>
                   {/* Info box explaining precise citation mode */}
@@ -251,26 +251,41 @@ export default function AdvancedSettings({
                       <InfoIcon className="w-5 h-5 text-info" />
                     </div>
                     <div>
+                      <p className="text-xs text-text-secondary">Precise citation tracks which chunks are used</p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        Placeholders: {'{question} '} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                        User prompt placeholders: {'{context_with_indices}'} {'{question}'}
                       </p>
                     </div>
                   </div>
 
                   <FormTextarea
-                    label="Precise Citation Prompt"
-                    value={formData.precise_citation_prompt}
-                    onChange={(e) => setFormData({...formData, precise_citation_prompt: e.target.value})}
-                    rows={10}
+                    label="System Prompt"
+                    value={formData.precise_citation_system_prompt}
+                    onChange={(e) => setFormData({...formData, precise_citation_system_prompt: e.target.value})}
+                    rows={8}
                     className="font-mono text-sm"
+                    placeholder="Instructions for the assistant on how to behave..."
+                  />
+
+                  <FormTextarea
+                    label="User Prompt"
+                    value={formData.precise_citation_user_prompt}
+                    onChange={(e) => setFormData({...formData, precise_citation_user_prompt: e.target.value})}
+                    rows={6}
+                    className="font-mono text-sm"
+                    placeholder="Template for user messages with context..."
                   />
                   
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, precise_citation_prompt: defaultPreciseCitationPrompt})}
+                    onClick={() => setFormData({
+                      ...formData, 
+                      precise_citation_system_prompt: defaultPreciseCitationSystem,
+                      precise_citation_user_prompt: defaultPreciseCitationUser
+                    })}
                     className="text-xs text-text-tertiary hover:text-white transition-colors"
                   >
-                    Reset to default precise citation prompt
+                    Reset to default precise citation prompts
                   </button>
                 </>
               ) : (
@@ -281,26 +296,41 @@ export default function AdvancedSettings({
                       <InfoIcon className="w-5 h-5 text-info" />
                     </div>
                     <div>
+                      <p className="text-xs text-text-secondary">Separate system and user prompts for better model performance</p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        Placeholders: {'{question} '} {hasCollections ? '{context}' : ''} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                        User prompt placeholders: {'{context}'} {'{question}'} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(' ') : ''}
                       </p>
                     </div>
                   </div>
 
                   <FormTextarea
-                    label="Prompt Template"
-                    value={formData.prompt}
-                    onChange={(e) => setFormData({...formData, prompt: e.target.value})}
+                    label="System Prompt"
+                    value={formData.system_prompt}
+                    onChange={(e) => setFormData({...formData, system_prompt: e.target.value})}
+                    rows={4}
+                    className="font-mono text-sm"
+                    placeholder="Instructions for the assistant on how to behave..."
+                  />
+
+                  <FormTextarea
+                    label="User Prompt"
+                    value={formData.user_prompt}
+                    onChange={(e) => setFormData({...formData, user_prompt: e.target.value})}
                     rows={6}
                     className="font-mono text-sm"
+                    placeholder="Template for user messages with context..."
                   />
                   
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, prompt: defaultPrompt})}
+                    onClick={() => setFormData({
+                      ...formData, 
+                      system_prompt: defaultSystemPrompt,
+                      user_prompt: defaultUserPrompt
+                    })}
                     className="text-xs text-text-tertiary hover:text-white transition-colors"
                   >
-                    Reset to default prompt
+                    Reset to default prompts
                   </button>
                 </>
               )}
@@ -329,7 +359,7 @@ export default function AdvancedSettings({
                 />
                 <button
                   type="button"
-                  onClick={() => setFormData({...formData, hyde_prompt: formData.hyde_prompt})}
+                  onClick={() => setFormData({...formData, hyde_prompt: 'Given a question, generate a paragraph of text that answers the question.\n\nQuestion: {question}\n\nParagraph: '})}
                   className="text-xs text-text-tertiary hover:text-white transition-colors"
                 >
                   Reset to default HyDE prompt
@@ -346,26 +376,41 @@ export default function AdvancedSettings({
                 <InfoIcon className="w-5 h-5 text-info" />
               </div>
               <div>
+                <p className="text-xs text-text-secondary">Configure prompts for the assistant</p>
                 <p className="text-xs text-text-quaternary mt-1">
-                  Placeholders: {'{question} '} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(', ') : ''}
+                  User prompt placeholders: {'{question}'} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(' ') : ''}
                 </p>
               </div>
             </div>
             
             <FormTextarea
-              label="Assistant Prompt"
-              value={formData.prompt}
-              onChange={handlePromptChange}
-              rows={8}
+              label="System Prompt"
+              value={formData.system_prompt}
+              onChange={(e) => setFormData({...formData, system_prompt: e.target.value})}
+              rows={4}
               className="font-mono text-sm"
+              placeholder="Instructions for the assistant on how to behave..."
+            />
+
+            <FormTextarea
+              label="User Prompt"
+              value={formData.user_prompt}
+              onChange={handleUserPromptChange}
+              rows={6}
+              className="font-mono text-sm"
+              placeholder="Template for user messages..."
             />
             
             <button
               type="button"
-              onClick={() => setFormData({...formData, prompt: defaultPrompt})}
+              onClick={() => setFormData({
+                ...formData, 
+                system_prompt: defaultSystemPrompt,
+                user_prompt: defaultUserPrompt
+              })}
               className="text-xs text-text-tertiary hover:text-white transition-colors"
             >
-              Reset to default prompt
+              Reset to default prompts
             </button>
             
             {/* Confirm Dialog */}
@@ -403,7 +448,7 @@ export default function AdvancedSettings({
                 />
                 <button
                   type="button"
-                  onClick={() => setFormData({...formData, hyde_prompt: formData.hyde_prompt})}
+                  onClick={() => setFormData({...formData, hyde_prompt: 'Given a question, generate a paragraph of text that answers the question.\n\nQuestion: {question}\n\nParagraph: '})}
                   className="text-xs text-text-tertiary hover:text-white transition-colors"
                 >
                   Reset to default HyDE prompt

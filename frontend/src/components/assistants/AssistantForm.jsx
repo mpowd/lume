@@ -9,32 +9,29 @@ import ModelSelector from './ModelSelector'
 import AdvancedSettings from './AdvancedSettings'
 import { formatModelSize } from '../../utils/formatters'
 
-const DEFAULT_PROMPT = `Answer the question using only the context provided.
+const DEFAULT_SYSTEM_PROMPT = `You are a helpful assistant that answers questions using only the provided context.
+Answer conversationally without mentioning the context or chunks to the user.`
 
-Retrieved Context: {context}
+const DEFAULT_USER_PROMPT = `Context:
+{context}
 
-User Question: {question}
+Question: {question}`
 
-Answer conversationally. User is not aware of context.`
-
-const DEFAULT_PRECISE_CITATION_PROMPT = `You are answering a question using provided context chunks.
+const DEFAULT_PRECISE_CITATION_SYSTEM = `You are answering questions using provided context chunks.
 Each chunk is numbered starting from 0. Track which chunks you use.
 
-Retrieved Context Chunks:
-{context_with_indices}
-
-User Question: {question}
-
 Instructions:
-1. Answer using ONLY information from the chunks above
+1. Answer using ONLY information from the chunks
 2. Track which chunk numbers you actually used
 3. Only include chunk indices you directly referenced
-4. If you didn't use a chunk, don't include its index
-5. Do not include the used chunks in the answer directly
+4. Do not include the used chunks in the answer
 
-{format_instructions}
+{format_instructions}`
 
-Be precise with chunk indices!`
+const DEFAULT_PRECISE_CITATION_USER = `Context Chunks:
+{context_with_indices}
+
+Question: {question}`
 
 export default function AssistantForm({ 
   assistant, 
@@ -61,7 +58,6 @@ export default function AssistantForm({
     setEditingReferenceIndex(index);
   };
 
-  // Initialize formData with default values
   const [formData, setFormData] = useState({
     assistant_name: '',
     workflow: 'linear',
@@ -78,12 +74,14 @@ export default function AssistantForm({
     top_n: 5,
     llm: 'gpt-4o-mini',
     llm_provider: 'openai',
-    prompt: DEFAULT_PROMPT,
-    precise_citation_prompt: DEFAULT_PRECISE_CITATION_PROMPT,
+    system_prompt: DEFAULT_SYSTEM_PROMPT,
+    user_prompt: DEFAULT_USER_PROMPT,
+    precise_citation_system_prompt: DEFAULT_PRECISE_CITATION_SYSTEM,
+    precise_citation_user_prompt: DEFAULT_PRECISE_CITATION_USER,
     tools: [],
     max_steps: 4,
     precise_citation: false,
-    system_prompt: 'Search Tavily for the given query and return the results.'
+    agentic_system_prompt: 'Search Tavily for the given query and return the results.'
   })
 
   useEffect(() => {
@@ -108,12 +106,14 @@ export default function AssistantForm({
         top_n: assistant.top_n || 5,
         llm: assistant.llm || 'gpt-4o-mini',
         llm_provider: assistant.llm_provider || 'openai',
-        prompt: assistant.prompt || DEFAULT_PROMPT,
-        precise_citation_prompt: assistant.precise_citation_prompt || DEFAULT_PRECISE_CITATION_PROMPT,
+        system_prompt: assistant.system_prompt || DEFAULT_SYSTEM_PROMPT,
+        user_prompt: assistant.user_prompt || DEFAULT_USER_PROMPT,
+        precise_citation_system_prompt: assistant.precise_citation_system_prompt || DEFAULT_PRECISE_CITATION_SYSTEM,
+        precise_citation_user_prompt: assistant.precise_citation_user_prompt || DEFAULT_PRECISE_CITATION_USER,
         tools: assistant.tools || [],
         max_steps: assistant.max_steps || 4,
         precise_citation: assistant.precise_citation ?? false,
-        system_prompt: assistant.system_prompt || 'Search Tavily for the given query and return the results.'
+        agentic_system_prompt: assistant.agentic_system_prompt || 'Search Tavily for the given query and return the results.'
       })
     }
   }, [assistant])
@@ -128,49 +128,43 @@ export default function AssistantForm({
       const hasCollections = formData.collections && formData.collections.length > 0;
       const hasReferences = formData.references && formData.references.length > 0;
       
-      let newPrompt = DEFAULT_PROMPT;
-      let newPreciseCitationPrompt = DEFAULT_PRECISE_CITATION_PROMPT;
+      let newSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+      let newUserPrompt = DEFAULT_USER_PROMPT;
       
       if (!hasCollections && !hasReferences) {
         // Case 4: No collections, no references
-        newPrompt = `Answer the question based on the provided reference.
-        
-  User Question: {question}`;
+        newSystemPrompt = `You are a helpful assistant that answers questions based on your knowledge.`;
+        newUserPrompt = `Question: {question}`;
       } else if (hasCollections && !hasReferences) {
-        // Case 1: Collections, no references
-        newPrompt = `Answer the question using only the context provided.
-
-  Retrieved Context: {context}
-
-  User Question: {question}
-
-  Answer conversationally. User is not aware of context.`;
+        // Case 1: Collections, no references (keep defaults)
+        newSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+        newUserPrompt = DEFAULT_USER_PROMPT;
       } else if (hasCollections && hasReferences) {
         // Case 2: Collections and references
         const refPlaceholders = formData.references.map((_, i) => `{reference${i+1}}`).join('\n');
-        newPrompt = `Answer the question using the context and references provided.
+        newSystemPrompt = `You are a helpful assistant that answers questions using the provided context and reference materials.
+Answer conversationally without mentioning the context or chunks to the user.`;
+        newUserPrompt = `Context:
+{context}
 
-  Retrieved Context: {context}
+References:
+${refPlaceholders}
 
-  ${refPlaceholders}
-
-  User Question: {question}
-
-  Answer conversationally. User is not aware of context.`;
+Question: {question}`;
       } else if (!hasCollections && hasReferences) {
-        // Case 3: No collections, references
+        // Case 3: No collections, references only
         const refPlaceholders = formData.references.map(ref => `${ref.name}: ${ref.text}`).join('\n');
-        newPrompt = `Answer the question based on the provided references.
+        newSystemPrompt = `You are a helpful assistant that answers questions based on the provided reference materials.`;
+        newUserPrompt = `References:
+${refPlaceholders}
 
-  ${refPlaceholders}
-
-  User Question: {question}`;
+Question: {question}`;
       }
       
       setFormData(prev => ({
         ...prev,
-        prompt: newPrompt,
-        precise_citation_prompt: newPreciseCitationPrompt
+        system_prompt: newSystemPrompt,
+        user_prompt: newUserPrompt
       }));
     };
     
@@ -254,10 +248,6 @@ export default function AssistantForm({
       }));
     } else {
       // Adding new reference
-      const newPrompt = formData.prompt.replace(
-        '{question}',
-        `{question}\n\nReference ${formData.references.length}: {reference${formData.references.length}}`
-      );
       setFormData(prev => ({
         ...prev,
         references: [...prev.references, {
@@ -275,19 +265,10 @@ export default function AssistantForm({
   };
 
   const deleteReference = (index) => {
-    // Update prompts when deleting references
-    setFormData(prevState => {
-      const updatedReferences = prevState.references.filter((_, i) => i !== index);
-      const newPrompt = updatedReferences.reduce((prompt, ref, i) => {
-        return prompt.replace(`\n\nReference ${i+1}: {reference${i+1}}`, '');
-      }, prevState.prompt);
-      
-      return {
-        ...prevState,
-        references: updatedReferences,
-        prompt: newPrompt
-      };
-    });
+    setFormData(prevState => ({
+      ...prevState,
+      references: prevState.references.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -459,8 +440,10 @@ export default function AssistantForm({
               setFormData={setFormData}
               showAdvanced={showAdvanced}
               setShowAdvanced={setShowAdvanced}
-              defaultPrompt={DEFAULT_PROMPT}
-              defaultPreciseCitationPrompt={DEFAULT_PRECISE_CITATION_PROMPT}
+              defaultSystemPrompt={DEFAULT_SYSTEM_PROMPT}
+              defaultUserPrompt={DEFAULT_USER_PROMPT}
+              defaultPreciseCitationSystem={DEFAULT_PRECISE_CITATION_SYSTEM}
+              defaultPreciseCitationUser={DEFAULT_PRECISE_CITATION_USER}
             />
           </>
         )}
@@ -499,8 +482,8 @@ export default function AssistantForm({
                 System Prompt
               </label>
               <textarea
-                value={formData.system_prompt}
-                onChange={(e) => setFormData({...formData, system_prompt: e.target.value})}
+                value={formData.agentic_system_prompt}
+                onChange={(e) => setFormData({...formData, agentic_system_prompt: e.target.value})}
                 placeholder="Enter system prompt for the agent..."
                 rows="4"
                 className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white font-mono text-sm"

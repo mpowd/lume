@@ -10,21 +10,17 @@ export const useAssistants = () => {
     setLoading(true)
     setError(null)
     try {
-      // Get all QA assistants (don't filter by is_active to get all)
       const data = await assistantsAPI.getAll('qa', null)
       
-      console.log('Loaded assistants from API:', data) // Debug log
+      console.log('Loaded assistants from API:', data)
       
-      // Map from assistant format to component format
-      // IMPORTANT: Preserve original fields needed by EvaluationRunner
       const mappedAssistants = data.map(assistant => ({
-        // Use BOTH id and _id for compatibility
         id: assistant.id,
-        _id: assistant.id, // Add _id field for EvaluationRunner
+        _id: assistant.id,
         name: assistant.name,
         description: assistant.description || '',
-        type: assistant.type || 'qa', // Preserve type field
-        is_active: assistant.is_active !== false, // Default to true if not specified
+        type: assistant.type || 'qa',
+        is_active: assistant.is_active !== false,
         workflow: 'linear',
         llm: assistant.config?.llm_model || null,
         llm_provider: assistant.config?.llm_provider || null,
@@ -39,19 +35,19 @@ export const useAssistants = () => {
         reranker_provider: assistant.config?.reranker_provider,
         reranker_model: assistant.config?.reranker_model,
         top_n: assistant.config?.top_n,
-        prompt: assistant.config?.prompt,
+        system_prompt: assistant.config?.system_prompt,
+        user_prompt: assistant.config?.user_prompt,
         precise_citation: assistant.config?.precise_citation,
-        precise_citation_prompt: assistant.config?.precise_citation_prompt, // ← ADDED
+        precise_citation_system_prompt: assistant.config?.precise_citation_system_prompt,
+        precise_citation_user_prompt: assistant.config?.precise_citation_user_prompt,
         tools: assistant.config?.tools || [],
         max_steps: assistant.config?.max_steps,
+        agentic_system_prompt: assistant.config?.agentic_system_prompt,
         created_at: assistant.created_at,
         created_by: assistant.created_by || 'user'
       }))
       
-      console.log('Mapped assistants:', mappedAssistants) // Debug log
-      console.log('Assistants for evaluation (type=qa, is_active=true):', 
-        mappedAssistants.filter(a => a.type === 'qa' && a.is_active)
-      ) // Debug log
+      console.log('Mapped assistants:', mappedAssistants)
       
       setAssistants(mappedAssistants)
     } catch (err) {
@@ -64,13 +60,11 @@ export const useAssistants = () => {
 
   const createAssistant = async (formData) => {
     try {
-      // Transform to assistant format
-      // Only send fields that are provided, let backend handle defaults
       const assistantData = {
         name: formData.assistant_name,
         description: formData.description || '',
         type: 'qa',
-        is_active: true, // Set active by default when creating
+        is_active: true,
         config: {
           type: 'qa',
           name: formData.assistant_name,
@@ -88,30 +82,31 @@ export const useAssistants = () => {
           reranker_provider: formData.reranker_provider,
           reranker_model: formData.reranker_model,
           top_n: formData.top_n,
-          prompt: formData.prompt,
+          system_prompt: formData.system_prompt,
+          user_prompt: formData.user_prompt,
           precise_citation: formData.precise_citation,
-          precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
+          precise_citation_system_prompt: formData.precise_citation_system_prompt,
+          precise_citation_user_prompt: formData.precise_citation_user_prompt,
           local_only: formData.local_only,
           tools: formData.tools || [],
           max_steps: formData.max_steps,
-          workflow: formData.workflow
+          workflow: formData.workflow,
+          agentic_system_prompt: formData.agentic_system_prompt
         },
         created_by: 'user'
       }
       
-      console.log('Creating assistant with data:', assistantData) // Debug log
+      console.log('Creating assistant with data:', assistantData)
       await assistantsAPI.create(assistantData)
       await loadAssistants()
       return { success: true }
     } catch (err) {
       console.error('Error creating assistant:', err)
       
-      // Handle Pydantic validation errors properly
       let errorMessage = 'Failed to create assistant'
       
       if (err.response?.data?.detail) {
         if (Array.isArray(err.response.data.detail)) {
-          // Pydantic validation errors - format them nicely
           errorMessage = err.response.data.detail
             .map(e => `${e.loc.join('.')}: ${e.msg}`)
             .join(', ')
@@ -133,7 +128,7 @@ export const useAssistants = () => {
         name: formData.assistant_name,
         description: '',
         type: 'qa',
-        is_active: true, // Keep active when updating
+        is_active: true,
         config: {
           type: 'qa',
           name: formData.assistant_name,
@@ -151,16 +146,19 @@ export const useAssistants = () => {
           reranker_provider: formData.reranker_provider,
           reranker_model: formData.reranker_model,
           top_n: formData.top_n,
-          prompt: formData.prompt,
+          system_prompt: formData.system_prompt,
+          user_prompt: formData.user_prompt,
           precise_citation: formData.precise_citation,
-          precise_citation_prompt: formData.precise_citation_prompt, // ← ADDED
+          precise_citation_system_prompt: formData.precise_citation_system_prompt,
+          precise_citation_user_prompt: formData.precise_citation_user_prompt,
           local_only: formData.local_only,
           tools: formData.tools || [],
-          max_steps: formData.max_steps
+          max_steps: formData.max_steps,
+          agentic_system_prompt: formData.agentic_system_prompt
         }
       }
       
-      console.log('Updating assistant with data:', updateData) // Debug log
+      console.log('Updating assistant with data:', updateData)
       await assistantsAPI.update(id, updateData)
       await loadAssistants()
       return { success: true }
