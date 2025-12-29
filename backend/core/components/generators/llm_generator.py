@@ -7,6 +7,7 @@ from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -197,3 +198,34 @@ Question: {question}"""
                 ),
                 "contexts": [doc.page_content for doc in documents],
             }
+
+    async def generate_stream(
+        self, query: str, documents: List[Document], config: Dict[str, Any]
+    ):
+        llm = self._get_llm(config.get("llm_model"), config.get("llm_provider"))
+
+        if config.get("precise_citation", False):
+
+            response_dict = await self.generate(query, documents, config)
+            yield response_dict
+        else:
+            system_prompt = config.get("system_prompt", self.DEFAULT_SYSTEM_PROMPT)
+            user_prompt = config.get("user_prompt", self.DEFAULT_USER_PROMPT)
+
+            prompt = ChatPromptTemplate.from_messages(
+                [("system", system_prompt), ("user", user_prompt)]
+            )
+
+            chain = (
+                {
+                    "context": lambda x: self._format_context(x["documents"]),
+                    "question": lambda x: x["question"],
+                }
+                | prompt
+                | llm
+                | StrOutputParser()
+            )
+
+            for token in chain.stream({"documents": documents, "question": query}):
+                # logger.info(f"llm_generator token stream: {token}")
+                yield (token)

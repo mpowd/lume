@@ -237,23 +237,95 @@ export const updateQAAssistant = async (assistantId, updates) => {
   })
 }
 
-// ==================== CHAT API (Using new execution API) ====================
+// ==================== CHAT API ====================
 
 export const chatAPI = {
   /**
-   * Send a message to an assistant (QA assistant)
+   * Send a message to an assistant with streaming support
    * @param {string} assistantId - Assistant ID
    * @param {string} message - User message
+   * @param {Function} onChunk - Callback for each chunk
+   * @param {Function} onComplete - Callback when streaming is complete
+   * @param {Function} onError - Callback for errors
+   */
+  sendMessageStream: async (assistantId, message, onChunk, onComplete, onError) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/execute/qa-stream?assistant_id=${assistantId}&question=${encodeURIComponent(message)}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'text/event-stream',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullResponse = ''
+      let contexts = []
+      let sourceUrls = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          onComplete({
+            response: fullResponse,
+            contexts,
+            source_urls: sourceUrls
+          })
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.token) {
+                // Stream token
+                fullResponse += data.token
+                onChunk(data.token)
+              } else if (data.contexts) {
+                // Metadata at the end
+                contexts = data.contexts
+                sourceUrls = data.source_urls || []
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Chat Streaming Error:', error)
+      onError(error)
+    }
+  },
+
+  /**
+   * Legacy non-streaming method for backwards compatibility
    */
   sendMessage: async (assistantId, message) => {
     try {
-      const response = await executionAPI.executeQA(assistantId, message)
+      const response = await api.post('/execute/qa', null, {
+        params: {
+          assistant_id: assistantId,
+          question: message
+        }
+      })
       
-      // Transform to match old response format for backwards compatibility
       return {
-        response: response.response,
-        contexts: response.contexts || [],
-        source_urls: response.source_urls || []
+        response: response.data.response,
+        contexts: response.data.contexts || [],
+        source_urls: response.data.source_urls || []
       }
     } catch (error) {
       console.error('Chat API Error:', error)

@@ -14,6 +14,7 @@ export default function ChatPage() {
   const [selectedAssistant, setSelectedAssistant] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
+  const [streamingMessageIndex, setStreamingMessageIndex] = useState(null)
 
   const handleSelectAssistant = (bot) => {
     setSelectedAssistant(bot)
@@ -28,42 +29,75 @@ export default function ChatPage() {
     setMessages(prev => [...prev, userMessage])
     setLoading(true)
     
-    try {
-      const response = await chatAPI.sendMessage(
-        selectedAssistant.id,
-        input,
-        messages
-      )
-      
-      let sortedSources = response.source_urls || []
-      let sortedContexts = response.contexts || []
-      
-      if (sortedSources.length > 0) {
-        const sourceIndices = sortedSources.map((source, index) => ({
-          index,
-          score: typeof source === 'string' ? 0.5 : (source.score || 0.5)
-        }))
+    // Add empty assistant message that will be filled during streaming
+    const assistantMessageIndex = messages.length + 1
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: '',
+      isStreaming: true
+    }])
+    setStreamingMessageIndex(assistantMessageIndex)
+    
+    chatAPI.sendMessageStream(
+      selectedAssistant.id,
+      input,
+      // onChunk - called for each token
+      (token) => {
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            content: newMessages[assistantMessageIndex].content + token
+          }
+          return newMessages
+        })
+      },
+      // onComplete - called when streaming finishes
+      (result) => {
+        let sortedSources = result.source_urls || []
+        let sortedContexts = result.contexts || []
         
-        sourceIndices.sort((a, b) => b.score - a.score)
-        sortedSources = sourceIndices.map(item => sortedSources[item.index])
-        sortedContexts = sourceIndices.map(item => sortedContexts[item.index] || '')
+        if (sortedSources.length > 0) {
+          const sourceIndices = sortedSources.map((source, index) => ({
+            index,
+            score: typeof source === 'string' ? 0.5 : (source.score || 0.5)
+          }))
+          
+          sourceIndices.sort((a, b) => b.score - a.score)
+          sortedSources = sourceIndices.map(item => sortedSources[item.index])
+          sortedContexts = sourceIndices.map(item => sortedContexts[item.index] || '')
+        }
+        
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[assistantMessageIndex] = {
+            role: 'assistant',
+            content: result.response || newMessages[assistantMessageIndex].content,
+            sources: sortedSources,
+            contexts: sortedContexts,
+            isStreaming: false
+          }
+          return newMessages
+        })
+        setLoading(false)
+        setStreamingMessageIndex(null)
+      },
+      // onError - called on error
+      (err) => {
+        console.error('Error sending message:', err)
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[assistantMessageIndex] = {
+            role: 'assistant',
+            content: '❌ Error: ' + (err.message || 'Could not send message'),
+            isStreaming: false
+          }
+          return newMessages
+        })
+        setLoading(false)
+        setStreamingMessageIndex(null)
       }
-      
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: response.response || response.message || 'No response received',
-        sources: sortedSources,
-        contexts: sortedContexts
-      }])
-    } catch (err) {
-      console.error('Error sending message:', err)
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '❌ Error: ' + (err.response?.data?.detail || err.message || 'Could not send message')
-      }])
-    } finally {
-      setLoading(false)
-    }
+    )
   }
 
   const handleNewChat = () => {
@@ -82,7 +116,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen bg-background">
       <div className="flex-1 flex flex-col">
-        {/* Header - UPDATED WITH lg:left-80 */}
+        {/* Header */}
         <div className="fixed top-0 left-0 right-0 lg:left-80 z-10 border-b border-border-subtle bg-background-elevated/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
@@ -155,7 +189,11 @@ export default function ChatPage() {
             marginBottom: '120px' 
           }}
         >
-          <MessageList messages={messages} loading={loading} />
+          <MessageList 
+            messages={messages} 
+            loading={loading && streamingMessageIndex === null}
+            streamingIndex={streamingMessageIndex}
+          />
         </div>
 
         {/* Input */}

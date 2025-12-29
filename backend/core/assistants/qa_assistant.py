@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from .base import BaseAssistant, AssistantConfig, AssistantInput, AssistantOutput
 from .registry import AssistantRegistry
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,73 @@ class QAAssistant(BaseAssistant):
                     "llm_model": config.llm_model,
                 },
             )
+
+        except Exception as e:
+            logger.error(f"Error executing QA Assistant: {str(e)}", exc_info=True)
+            raise
+
+    async def execute_stream(
+        self, config: QAAssistantConfig, input_data: QAAssistantInput
+    ):
+
+        try:
+            logger.info(
+                f"Executing QA Assistant in streaming mode with question: {input_data.question}"
+            )
+
+            # Step 1: Retrieve relevant documents
+            logger.info(
+                f"Retrieving documents from knowledge bases: {config.knowledge_base_ids}"
+            )
+            retrieved_docs = []
+            if config.knowledge_base_ids:
+                retrieved_docs = await self.retriever.retrieve(
+                    query=input_data.question,
+                    knowledge_base_ids=config.knowledge_base_ids,
+                    config={
+                        "hybrid_search": config.hybrid_search,
+                        "top_k": config.top_k,
+                        "use_hyde": config.use_hyde,
+                        "hyde_prompt": config.hyde_prompt,
+                        "llm_model": config.llm_model,
+                        "llm_provider": config.llm_provider,
+                        "reranking": config.reranking,
+                        "reranker_provider": config.reranker_provider,
+                        "reranker_model": config.reranker_model,
+                        "top_n": config.top_n,
+                    },
+                )
+
+            logger.info(f"Retrieved {len(retrieved_docs)} documents")
+
+            urls = [doc.metadata.get("source_url") for doc in retrieved_docs]
+            contexts = [doc.page_content for doc in retrieved_docs]
+
+            async for chunk in self.generator.generate_stream(
+                query=input_data.question,
+                documents=retrieved_docs,
+                config={
+                    "llm_model": config.llm_model,
+                    "llm_provider": config.llm_provider,
+                    "system_prompt": config.system_prompt,
+                    "user_prompt": config.user_prompt,
+                    "precise_citation": config.precise_citation,
+                    "precise_citation_system_prompt": config.precise_citation_system_prompt,
+                    "precise_citation_user_prompt": config.precise_citation_user_prompt,
+                    "reranking": config.reranking,
+                },
+            ):
+                if isinstance(chunk, str):
+                    yield chunk
+                else:
+                    urls = chunk.get("sources")
+                    contexts = chunk.get("contexts")
+                    yield chunk.get("answer")
+
+            yield {
+                "source_urls": urls,
+                "contexts": contexts,
+            }
 
         except Exception as e:
             logger.error(f"Error executing QA Assistant: {str(e)}", exc_info=True)

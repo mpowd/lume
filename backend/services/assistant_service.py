@@ -183,6 +183,33 @@ class AssistantService:
                 "error": str(e),
             }
 
+    async def execute_assistant_stream(self, assistant_id, input_data):
+        try:
+
+            assistant_data = self.repository.get_by_id(assistant_id)
+
+            if not assistant_data:
+                raise ValueError(f"Assistant {assistant_id} not found")
+
+            if not assistant_data.get("is_active", True):
+                raise ValueError(f"ASsistant {assistant_id} is not active")
+
+            instance = self.get_assistant_instance(assistant_id)
+            input_schema = instance.get_input_schema()
+            try:
+                validated_input = input_schema(**input_data)
+            except Exception as e:
+                raise ValueError(f"Invalid Input: {str(e)}")
+
+            config_schema = instance.get_config_schema()
+            config = config_schema(**assistant_data["config"])
+
+            async for chunk in instance.execute_stream(config, validated_input):
+                yield chunk
+
+        except Exception as e:
+            logger.error(f"Error executing assistant: {str(e)}", exc_info=True)
+
     def get_assistant_schemas(self, assistant_type: str) -> Dict[str, Any]:
         """Get schemas for an assistant type"""
         return AssistantRegistry.get_schemas(assistant_type)

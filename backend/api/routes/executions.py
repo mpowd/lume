@@ -3,9 +3,11 @@ API routes for assistant execution
 """
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from backend.schemas.assistant import ExecutionRequest, ExecutionResponse
 from backend.services.assistant_service import get_assistant_service
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -76,3 +78,25 @@ async def execute_qa_assistant(assistant_id: str, question: str):
     except Exception as e:
         logger.error(f"Error in QA execution: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/qa-stream")
+async def execute_qa_assistant_stream(assistant_id: str, question: str):
+    """
+    Execute QA assistant in a streaming manner
+    """
+
+    async def event_generator():
+        service = get_assistant_service()
+
+        async for chunk in service.execute_assistant_stream(
+            assistant_id, {"question": question}
+        ):
+            if isinstance(chunk, str):
+                # It's a token
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            else:
+                # It's metadata (contexts, sources)
+                yield f"data: {json.dumps(chunk)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
