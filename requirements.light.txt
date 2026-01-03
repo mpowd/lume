@@ -1,11 +1,13 @@
-torch
-torchvision
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.9.1+cpu
+torchvision==0.24.1+cpu
 
 fastapi==0.115.12
 uvicorn==0.34.0
 qdrant-client==1.13.3
 httpx==0.28.1
 langchain-qdrant==0.2.0
+langchain-ollama
 langchain_community==0.3.20
 pymongo==4.11.3
 langchain_openai==0.3.11
