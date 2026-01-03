@@ -17,4 +17,5 @@ start "API Logs" cmd /c "docker compose -f docker-compose.light.yml logs -f api"
 
 echo Starting frontend...
 cd frontend
+npm install
 npm run dev
