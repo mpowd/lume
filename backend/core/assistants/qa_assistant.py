@@ -19,6 +19,7 @@ class QAAssistantConfig(AssistantConfig):
     knowledge_base_ids: List[str]
     llm_model: str
     llm_provider: str  # openai or ollama
+    references: List[dict]
 
     # Retrieval settings
     hybrid_search: bool = True
@@ -190,6 +191,7 @@ class QAAssistant(BaseAssistant):
                     "precise_citation_system_prompt": config.precise_citation_system_prompt,
                     "precise_citation_user_prompt": config.precise_citation_user_prompt,
                     "reranking": config.reranking,
+                    "references": config.references,
                 },
             ):
                 if isinstance(chunk, str):

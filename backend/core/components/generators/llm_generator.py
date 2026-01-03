@@ -216,15 +216,20 @@ Question: {question}"""
                 [("system", system_prompt), ("user", user_prompt)]
             )
 
-            chain = (
-                {
-                    "context": lambda x: self._format_context(x["documents"]),
-                    "question": lambda x: x["question"],
-                }
-                | prompt
-                | llm
-                | StrOutputParser()
-            )
+            chain_input = {
+                "context": lambda x: self._format_context(x["documents"]),
+                "question": lambda x: x["question"],
+            }
+
+            references = config.get("references", [])
+            if references:
+                for ref in references:
+                    ref_name = ref.get("name")
+                    ref_text = ref.get("text")
+                    if ref_name and ref_text:
+                        chain_input[ref_name] = (lambda text: lambda x: text)(ref_text)
+
+            chain = chain_input | prompt | llm | StrOutputParser()
 
             for token in chain.stream({"documents": documents, "question": query}):
                 # logger.info(f"llm_generator token stream: {token}")

@@ -1,11 +1,9 @@
-import { Settings, Target, Lock, AlertCircle, Info as InfoIcon } from 'lucide-react'
-import { useState } from 'react'
+import { Settings, Target, Lock, Info as InfoIcon, FileText } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 import { COHERE_RERANKERS, HUGGINGFACE_RERANKERS } from '../../constants/models'
 import FormInput from '../shared/FormInput'
 import FormTextarea from '../shared/FormTextarea'
 import Accordion from '../shared/Accordion'
-import ConfirmDialog from '../shared/ConfirmDialog'
-
 
 export default function AdvancedSettings({ 
   formData, 
@@ -18,53 +16,62 @@ export default function AdvancedSettings({
   defaultPreciseCitationUser
 }) {
   // Check if at least one collection is selected
-  const hasCollections = formData.collections && formData.collections.length > 0;
+  const hasCollections = formData.collections && formData.collections.length > 0
+  const references = formData.references || []
 
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingSubstitution, setPendingSubstitution] = useState(null);
+  // Render the user prompt with styled placeholders
+  const renderStyledPrompt = (promptText) => {
+    const parts = []
+    let lastIndex = 0
+    const regex = /\{([\w_]+)\}/g
+    let match
 
-  // Get reference count for display
-  const references = formData.references
-  
-  // Function to find and replace reference placeholders
-  const handleUserPromptChange = (e) => {
-    const newPrompt = e.target.value;
-    setFormData({...formData, user_prompt: newPrompt});
-    
-    // Check if any reference name is in curly brackets
-    if (references && references.length > 0) {
-      const referenceNames = references.map(ref => ref.name);
-      const regex = new RegExp(`{(${referenceNames.join('|')})}`, 'g');
-      const matches = newPrompt.match(regex);
-      
-      if (matches && matches.length > 0) {
-        // Get the first matching reference name
-        const matchedRefName = matches[0].replace(/[{}]/g, '');
-        const reference = references.find(ref => ref.name === matchedRefName);
-        
-        if (reference) {
-          setPendingSubstitution({
-            placeholder: matches[0],
-            referenceText: reference.text
-          });
-          setShowConfirmDialog(true);
-        }
+    while ((match = regex.exec(promptText)) !== null) {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={`text-${lastIndex}`}>
+            {promptText.substring(lastIndex, match.index)}
+          </span>
+        )
       }
-    }
-  };
 
-  // Function to perform the substitution
-  const handleSubstitution = () => {
-    if (pendingSubstitution) {
-      const newPrompt = formData.user_prompt.replace(
-        pendingSubstitution.placeholder,
-        pendingSubstitution.referenceText
-      );
-      setFormData({...formData, user_prompt: newPrompt});
-      setShowConfirmDialog(false);
-      setPendingSubstitution(null);
+      const placeholderName = match[1]
+      const reference = references.find(r => r.name === placeholderName)
+      
+      // Style the placeholder
+      const isStandardPlaceholder = ['context', 'question', 'context_with_indices', 'format_instructions'].includes(placeholderName)
+      
+      parts.push(
+        <span
+          key={`placeholder-${match.index}`}
+          className={`inline-flex items-center px-2 py-0.5 rounded border font-semibold font-mono ${
+            reference 
+              ? reference.color 
+              : isStandardPlaceholder
+              ? 'bg-teal-500/20 border-teal-500/50 text-teal-300'
+              : 'bg-gray-500/20 border-gray-500/50 text-gray-300'
+          }`}
+          title={reference ? reference.text : placeholderName}
+        >
+          {`{${placeholderName}}`}
+        </span>
+      )
+
+      lastIndex = match.index + match[0].length
     }
-  };
+
+    // Add remaining text
+    if (lastIndex < promptText.length) {
+      parts.push(
+        <span key={`text-${lastIndex}`}>
+          {promptText.substring(lastIndex)}
+        </span>
+      )
+    }
+
+    return <pre className="whitespace-pre-wrap font-mono text-sm text-text-secondary">{parts}</pre>
+  }
 
   return (
     <Accordion
@@ -253,7 +260,7 @@ export default function AdvancedSettings({
                     <div>
                       <p className="text-xs text-text-secondary">Precise citation tracks which chunks are used</p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        User prompt placeholders: {'{context_with_indices}'} {'{question}'}
+                        User prompt placeholders: <code className="px-1 py-0.5 bg-white/5 rounded font-mono text-teal-300">{'{context_with_indices}'}</code> <code className="px-1 py-0.5 bg-white/5 rounded font-mono text-teal-300">{'{question}'}</code>
                       </p>
                     </div>
                   </div>
@@ -267,8 +274,15 @@ export default function AdvancedSettings({
                     placeholder="Instructions for the assistant on how to behave..."
                   />
 
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-text-secondary">User Prompt (Preview)</label>
+                    <div className="w-full border border-white/10 rounded-lg px-3 py-2 bg-background-elevated min-h-[120px]">
+                      {renderStyledPrompt(formData.precise_citation_user_prompt)}
+                    </div>
+                  </div>
+
                   <FormTextarea
-                    label="User Prompt"
+                    label="User Prompt (Editable)"
                     value={formData.precise_citation_user_prompt}
                     onChange={(e) => setFormData({...formData, precise_citation_user_prompt: e.target.value})}
                     rows={6}
@@ -296,9 +310,12 @@ export default function AdvancedSettings({
                       <InfoIcon className="w-5 h-5 text-info" />
                     </div>
                     <div>
-                      <p className="text-xs text-text-secondary">Separate system and user prompts for better model performance</p>
+                      <p className="text-xs text-text-secondary">Placeholders are replaced with actual content at runtime</p>
                       <p className="text-xs text-text-quaternary mt-1">
-                        User prompt placeholders: {'{context}'} {'{question}'} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(' ') : ''}
+                        Available placeholders: <code className="px-1 py-0.5 bg-white/5 rounded font-mono text-teal-300">{'{context}'}</code> <code className="px-1 py-0.5 bg-white/5 rounded font-mono text-teal-300">{'{question}'}</code>
+                        {references.length > 0 && references.map(ref => (
+                          <code key={ref.name} className={`px-1 py-0.5 rounded font-mono ml-1 ${ref.color}`}>{` {${ref.name}}`}</code>
+                        ))}
                       </p>
                     </div>
                   </div>
@@ -312,8 +329,18 @@ export default function AdvancedSettings({
                     placeholder="Instructions for the assistant on how to behave..."
                   />
 
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-text-secondary">User Prompt (Preview)</label>
+                    <div className="w-full border border-white/10 rounded-lg px-3 py-2 bg-background-elevated min-h-[120px]">
+                      {renderStyledPrompt(formData.user_prompt)}
+                    </div>
+                    <p className="text-xs text-text-quaternary">
+                      Colored badges show placeholders that will be replaced with actual content at runtime
+                    </p>
+                  </div>
+
                   <FormTextarea
-                    label="User Prompt"
+                    label="User Prompt (Editable)"
                     value={formData.user_prompt}
                     onChange={(e) => setFormData({...formData, user_prompt: e.target.value})}
                     rows={6}
@@ -369,16 +396,18 @@ export default function AdvancedSettings({
           </>
         ) : (
           <div className="space-y-4">
-            
             {/* Info box for no collections case */}
             <div className="flex gap-3 p-3 bg-background-elevated border border-white/10 rounded-lg">
               <div className="flex-shrink-0">
                 <InfoIcon className="w-5 h-5 text-info" />
               </div>
               <div>
-                <p className="text-xs text-text-secondary">Configure prompts for the assistant</p>
+                <p className="text-xs text-text-secondary">Placeholders are replaced with actual content at runtime</p>
                 <p className="text-xs text-text-quaternary mt-1">
-                  User prompt placeholders: {'{question}'} {references.length > 0 ? references.map(ref => `{${ref.name}}`).join(' ') : ''}
+                  Available placeholders: <code className="px-1 py-0.5 bg-white/5 rounded font-mono text-teal-300">{'{question}'}</code>
+                  {references.length > 0 && references.map(ref => (
+                    <code key={ref.name} className={`px-1 py-0.5 rounded font-mono ml-1 ${ref.color}`}>{` {${ref.name}}`}</code>
+                  ))}
                 </p>
               </div>
             </div>
@@ -392,10 +421,20 @@ export default function AdvancedSettings({
               placeholder="Instructions for the assistant on how to behave..."
             />
 
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary">User Prompt (Preview)</label>
+              <div className="w-full border border-white/10 rounded-lg px-3 py-2 bg-background-elevated min-h-[120px]">
+                {renderStyledPrompt(formData.user_prompt)}
+              </div>
+              <p className="text-xs text-text-quaternary">
+                Colored badges show placeholders that will be replaced with actual content at runtime
+              </p>
+            </div>
+
             <FormTextarea
-              label="User Prompt"
+              label="User Prompt (Editable)"
               value={formData.user_prompt}
-              onChange={handleUserPromptChange}
+              onChange={(e) => setFormData({...formData, user_prompt: e.target.value})}
               rows={6}
               className="font-mono text-sm"
               placeholder="Template for user messages..."
@@ -412,18 +451,6 @@ export default function AdvancedSettings({
             >
               Reset to default prompts
             </button>
-            
-            {/* Confirm Dialog */}
-            <ConfirmDialog
-              isOpen={showConfirmDialog}
-              onClose={() => setShowConfirmDialog(false)}
-              onConfirm={handleSubstitution}
-              title="Placeholder Detected"
-              message={`A placeholder reference was detected in the prompt. Would you like to substitute it with the reference text?`}
-              confirmText="Substitute"
-              cancelText="Keep Placeholder"
-              variant="warning"
-            />
             
             {/* HyDE Prompt Section */}
             {formData.hyde && (

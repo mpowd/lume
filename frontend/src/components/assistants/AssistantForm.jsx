@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Database, Check, Lock, Plus, ScrollText } from 'lucide-react'
+import { Sparkles, Database, Check, Lock, Plus, ScrollText, X, Edit2 } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
 import { ollamaAPI } from '../../services/api'
 import FormInput from '../shared/FormInput'
@@ -33,6 +33,18 @@ const DEFAULT_PRECISE_CITATION_USER = `Context Chunks:
 
 Question: {question}`
 
+// Color palette for reference badges
+const REFERENCE_COLORS = [
+  'bg-blue-500/20 border-blue-500/50 text-blue-300',
+  'bg-purple-500/20 border-purple-500/50 text-purple-300',
+  'bg-pink-500/20 border-pink-500/50 text-pink-300',
+  'bg-orange-500/20 border-orange-500/50 text-orange-300',
+  'bg-green-500/20 border-green-500/50 text-green-300',
+  'bg-yellow-500/20 border-yellow-500/50 text-yellow-300',
+  'bg-cyan-500/20 border-cyan-500/50 text-cyan-300',
+  'bg-red-500/20 border-red-500/50 text-red-300'
+]
+
 export default function AssistantForm({ 
   assistant, 
   onSubmit, 
@@ -44,19 +56,10 @@ export default function AssistantForm({
   const [loadingModels, setLoadingModels] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const [showForm, setShowForm] = useState(false);
-  const [newReferenceText, setNewReferenceText] = useState('');
-  const [newReferenceName, setNewReferenceName] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingReferenceIndex, setEditingReferenceIndex] = useState(null);
-
-  const openReferenceModal = (index) => {
-    const reference = formData.references[index];
-    setNewReferenceText(reference.text);
-    setNewReferenceName(reference.name);
-    setIsModalOpen(true);
-    setEditingReferenceIndex(index);
-  };
+  const [newReferenceText, setNewReferenceText] = useState('')
+  const [newReferenceName, setNewReferenceName] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingReferenceIndex, setEditingReferenceIndex] = useState(null)
 
   const [formData, setFormData] = useState({
     assistant_name: '',
@@ -90,11 +93,17 @@ export default function AssistantForm({
 
   useEffect(() => {
     if (assistant) {
+      // Assign colors to references if they don't have them
+      const referencesWithColors = (assistant.references || []).map((ref, index) => ({
+        ...ref,
+        color: ref.color || REFERENCE_COLORS[index % REFERENCE_COLORS.length]
+      }))
+
       setFormData({
         assistant_name: assistant.name || assistant.assistant_name,
         workflow: assistant.workflow || 'linear',
         collections: assistant.collections || [],
-        references: assistant.references || [],
+        references: referencesWithColors,
         local_only: assistant.local_only || false,
         hybrid_search: assistant.hybrid_search ?? true,
         hyde: assistant.hyde ?? false,
@@ -122,54 +131,54 @@ export default function AssistantForm({
     const updatePrompts = () => {
       // Skip prompt updates when loading an existing assistant
       if (assistant) {
-        return;
+        return
       }
       
-      const hasCollections = formData.collections && formData.collections.length > 0;
-      const hasReferences = formData.references && formData.references.length > 0;
+      const hasCollections = formData.collections && formData.collections.length > 0
+      const hasReferences = formData.references && formData.references.length > 0
       
-      let newSystemPrompt = DEFAULT_SYSTEM_PROMPT;
-      let newUserPrompt = DEFAULT_USER_PROMPT;
+      let newSystemPrompt = DEFAULT_SYSTEM_PROMPT
+      let newUserPrompt = DEFAULT_USER_PROMPT
       
       if (!hasCollections && !hasReferences) {
         // Case 4: No collections, no references
-        newSystemPrompt = `You are a helpful assistant that answers questions based on your knowledge.`;
-        newUserPrompt = `Question: {question}`;
+        newSystemPrompt = `You are a helpful assistant that answers questions based on your knowledge.`
+        newUserPrompt = `Question: {question}`
       } else if (hasCollections && !hasReferences) {
         // Case 1: Collections, no references (keep defaults)
-        newSystemPrompt = DEFAULT_SYSTEM_PROMPT;
-        newUserPrompt = DEFAULT_USER_PROMPT;
+        newSystemPrompt = DEFAULT_SYSTEM_PROMPT
+        newUserPrompt = DEFAULT_USER_PROMPT
       } else if (hasCollections && hasReferences) {
-        // Case 2: Collections and references
-        const refPlaceholders = formData.references.map((_, i) => `{reference${i+1}}`).join('\n');
+        // Case 2: Collections and references - use placeholders
+        const refPlaceholders = formData.references.map(ref => `{${ref.name}}`).join('\n')
         newSystemPrompt = `You are a helpful assistant that answers questions using the provided context and reference materials.
-Answer conversationally without mentioning the context or chunks to the user.`;
+Answer conversationally without mentioning the context or chunks to the user.`
         newUserPrompt = `Context:
 {context}
 
 References:
 ${refPlaceholders}
 
-Question: {question}`;
+Question: {question}`
       } else if (!hasCollections && hasReferences) {
-        // Case 3: No collections, references only
-        const refPlaceholders = formData.references.map(ref => `${ref.name}: ${ref.text}`).join('\n');
-        newSystemPrompt = `You are a helpful assistant that answers questions based on the provided reference materials.`;
+        // Case 3: No collections, references only - use placeholders
+        const refPlaceholders = formData.references.map(ref => `{${ref.name}}`).join('\n')
+        newSystemPrompt = `You are a helpful assistant that answers questions based on the provided reference materials.`
         newUserPrompt = `References:
 ${refPlaceholders}
 
-Question: {question}`;
+Question: {question}`
       }
       
       setFormData(prev => ({
         ...prev,
         system_prompt: newSystemPrompt,
         user_prompt: newUserPrompt
-      }));
-    };
+      }))
+    }
     
-    updatePrompts();
-  }, [formData.collections, formData.references]);
+    updatePrompts()
+  }, [formData.collections.length, formData.references.length])
 
   const loadOllamaModels = async () => {
     setLoadingModels(true)
@@ -232,44 +241,119 @@ Question: {question}`;
     setFormData({ ...formData, ...updates })
   }
 
-  const addReference = () => {
-    if (!newReferenceText.trim() || !newReferenceName.trim()) return;
+  const openReferenceModal = (index = null) => {
+    if (index !== null) {
+      const reference = formData.references[index]
+      setNewReferenceText(reference.text)
+      setNewReferenceName(reference.name)
+      setEditingReferenceIndex(index)
+    } else {
+      setNewReferenceText('')
+      setNewReferenceName('')
+      setEditingReferenceIndex(null)
+    }
+    setIsModalOpen(true)
+  }
+
+  const closeReferenceModal = () => {
+    setIsModalOpen(false)
+    setNewReferenceText('')
+    setNewReferenceName('')
+    setEditingReferenceIndex(null)
+  }
+
+  const saveReference = () => {
+    if (!newReferenceText.trim() || !newReferenceName.trim()) return
     
+    // Sanitize name to only allow alphanumeric and underscores
+    const sanitizedName = newReferenceName.replace(/[^a-zA-Z0-9_]/g, '')
+    if (!sanitizedName) return
+
     if (editingReferenceIndex !== null) {
       // Editing existing reference
-      const updatedReferences = [...formData.references];
+      const updatedReferences = [...formData.references]
+      const oldName = updatedReferences[editingReferenceIndex].name
       updatedReferences[editingReferenceIndex] = {
         text: newReferenceText,
-        name: newReferenceName
-      };
-      setFormData(prev => ({
-        ...prev,
-        references: updatedReferences
-      }));
+        name: sanitizedName,
+        color: updatedReferences[editingReferenceIndex].color
+      }
+      
+      setFormData(prev => {
+        let updatedPrompt = prev.user_prompt
+        
+        // Update prompt if name changed
+        if (oldName !== sanitizedName) {
+          updatedPrompt = updatedPrompt.replace(
+            new RegExp(`\\{${oldName}\\}`, 'g'), 
+            `{${sanitizedName}}`
+          )
+        }
+        
+        return {
+          ...prev,
+          references: updatedReferences,
+          user_prompt: updatedPrompt
+        }
+      })
     } else {
       // Adding new reference
-      setFormData(prev => ({
-        ...prev,
-        references: [...prev.references, {
-          text: newReferenceText,
-          name: newReferenceName
-        }]
-      }));
+      const color = REFERENCE_COLORS[formData.references.length % REFERENCE_COLORS.length]
+      const newRef = {
+        text: newReferenceText,
+        name: sanitizedName,
+        color
+      }
+      
+      setFormData(prev => {
+        let updatedPrompt = prev.user_prompt
+        
+        // Auto-insert placeholder in the appropriate location
+        const lines = updatedPrompt.split('\n')
+        const refSectionIndex = lines.findIndex(line => line.includes('References:'))
+        
+        if (refSectionIndex !== -1) {
+          // Find the last reference placeholder
+          let lastRefIndex = refSectionIndex
+          for (let i = refSectionIndex + 1; i < lines.length; i++) {
+            if (lines[i].trim().match(/^\{[\w_]+\}$/)) {
+              lastRefIndex = i
+            } else if (lines[i].trim() && !lines[i].trim().match(/^\{[\w_]+\}$/)) {
+              break
+            }
+          }
+          lines.splice(lastRefIndex + 1, 0, `{${sanitizedName}}`)
+          updatedPrompt = lines.join('\n')
+        }
+        
+        return {
+          ...prev,
+          references: [...prev.references, newRef],
+          user_prompt: updatedPrompt
+        }
+      })
     }
     
-    // Reset modal
-    setIsModalOpen(false);
-    setNewReferenceText('');
-    setNewReferenceName('');
-    setEditingReferenceIndex(null);
-  };
+    closeReferenceModal()
+  }
 
   const deleteReference = (index) => {
-    setFormData(prevState => ({
-      ...prevState,
-      references: prevState.references.filter((_, i) => i !== index)
-    }));
-  };
+    const refName = formData.references[index].name
+    
+    setFormData(prev => {
+      // Remove from prompt
+      const updatedPrompt = prev.user_prompt.replace(
+        new RegExp(`\n?\\{${refName}\\}`, 'g'), 
+        ''
+      )
+      
+      return {
+        ...prev,
+        references: prev.references.filter((_, i) => i !== index),
+        user_prompt: updatedPrompt
+      }
+    })
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -363,50 +447,57 @@ Question: {question}`;
               )}
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-secondary mb-3">
-                <ScrollText className="w-4 h-4 inline mr-2" />
-                Additional references
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-text-secondary">
+                  <ScrollText className="w-4 h-4 inline mr-2" />
+                  Additional References
+                </label>
+                <button
+                  type="button"
+                  onClick={() => openReferenceModal()}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-lg transition-all text-brand-teal text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Reference
+                </button>
+              </div>
+              
               {formData.references.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {formData.references.map((ref, index) => (
-                    <div key={ref.name} className="relative group">
-                      <button
-                        type="button"
-                        onClick={() => openReferenceModal(index)}
-                        className={`
-                          px-4 py-2 rounded-lg text-sm font-medium transition-all 
-                          flex items-center gap-1
-                          bg-white/5 border border-white/10 hover:border-brand-teal/50 hover:text-white
-                        `}
-                      >
-                        {ref.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteReference(index)}
-                        className="absolute -top-1 -right-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Delete reference"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
+                    <div
+                      key={ref.name}
+                      className="group relative bg-transparent border border-white/10 hover:border-white/20 rounded-xl p-4 transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className={`px-2 py-1 rounded border font-mono text-xs font-semibold ${ref.color}`}>
+                          {`{${ref.name}}`}
+                        </span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => openReferenceModal(index)}
+                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                            title="Edit reference"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-text-tertiary hover:text-white" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteReference(index)}
+                            className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
+                            title="Delete reference"
+                          >
+                            <X className="w-3.5 h-3.5 text-text-tertiary hover:text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-text-tertiary line-clamp-2">{ref.text}</p>
                     </div>
                   ))}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsModalOpen(true);
-                  setEditingReferenceIndex(null);
-                }} 
-                className="p-2 bg-transparent hover:bg-white/5 border border-brand-teal/30 hover:border-brand-teal/50 rounded-xl transition-all"
-              >
-                <Plus className="w-4 h-4 text-brand-teal" />
-              </button>
             </div>
 
             <div className="p-4 bg-transparent border border-white/10 rounded-xl">
@@ -536,58 +627,62 @@ Question: {question}`;
           </Button>
         </div>
 
-        {/* Modal for adding references */}
+        {/* Modal for adding/editing references */}
         {isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
-            <div className="bg-background-elevated rounded-xl shadow-xl w-full max-w-md border border-white/10 relative z-10">
-              <div className="p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeReferenceModal}></div>
+            <div className="bg-background-elevated rounded-xl shadow-2xl w-full max-w-2xl border border-white/10 relative z-10">
+              <div className="p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-white">
                   {editingReferenceIndex !== null ? 'Edit Reference' : 'Add Reference'}
                 </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Reference Text</label>
-                    <textarea
-                      value={newReferenceText}
-                      onChange={(e) => setNewReferenceText(e.target.value)}
-                      placeholder="Enter reference text here"
-                      rows="4"
-                      className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Reference Name</label>
-                    <input
-                      value={newReferenceName}
-                      onChange={(e) => setNewReferenceName(e.target.value)}
-                      placeholder="Enter reference name here"
-                      className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
-                      required
-                    />
-                  </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Reference Name (placeholder)
+                  </label>
+                  <input
+                    value={newReferenceName}
+                    onChange={(e) => setNewReferenceName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                    placeholder="e.g., company_policy"
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white font-mono"
+                  />
+                  <p className="text-xs text-text-quaternary mt-1">
+                    Use letters, numbers, and underscores only. Will appear as <code className="px-1.5 py-0.5 bg-white/5 rounded font-mono">{`{${newReferenceName || 'name'}}`}</code>
+                  </p>
                 </div>
-                <div className="flex justify-end gap-3 mt-6">
+
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Reference Text
+                  </label>
+                  <textarea
+                    value={newReferenceText}
+                    onChange={(e) => setNewReferenceText(e.target.value)}
+                    placeholder="Enter the full reference text that will be injected at runtime..."
+                    rows="8"
+                    className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
+                  />
+                  <p className="text-xs text-text-quaternary mt-1">
+                    This text will replace the placeholder when the assistant runs
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      setNewReferenceText('');
-                      setNewReferenceName('');
-                      setEditingReferenceIndex(null);
-                    }}
+                    onClick={closeReferenceModal}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="button"
                     variant="standout"
-                    onClick={addReference}
-                    disabled={!newReferenceText.trim() || !newReferenceName.trim()}
+                    onClick={saveReference}
+                    disabled={!newReferenceName.trim() || !newReferenceText.trim()}
                   >
-                    {editingReferenceIndex !== null ? 'Edit Reference' : 'Add Reference'}
+                    {editingReferenceIndex !== null ? 'Update' : 'Add'} Reference
                   </Button>
                 </div>
               </div>
