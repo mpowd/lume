@@ -2,6 +2,7 @@
 Main FastAPI application
 """
 
+from backend.config import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -20,22 +21,24 @@ from backend.api.routes import (
 from backend.api.routes.sources import website
 from backend.api.routes.sources import file
 
-from phoenix.otel import register
 
-# configure the Phoenix tracer
-tracer_provider = register(
-    project_name="lume",
-    auto_instrument=True,  # Auto-instrument your app based on installed OI dependencies
-)
-
-# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# configure the Phoenix tracer
+if settings.ENABLE_PHOENIX:
+    from phoenix.otel import register
+
+    logger.info("no" * 100)
+    tracer_provider = register(
+        project_name="lume",
+        auto_instrument=True,
+    )
+
+
 app = FastAPI(
     title="AI Assistant Platform",
     description="Platform for creating and managing AI assistants",
@@ -72,7 +75,7 @@ app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 @app.on_event("startup")
 async def startup_event():
     """Application startup"""
-    logger.info("Starting AI Assistant Platform")
+    logger.info("=" * 60)
     logger.info(
         f"Registered assistant types: {backend.core.assistants.AssistantRegistry.list_types()}"
     )

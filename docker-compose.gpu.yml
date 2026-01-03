@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    networks:
+      - app_network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.gpu.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./data/huggingface_cache:/root/.cache/huggingface
+      - ./data:/data
+    depends_on:
+      - qdrant
+      - mongodb
+    env_file:
+      - .env
+    environment:
+      - DEPLOYMENT_MODE=gpu
+      - USE_GPU=true
+      - ENABLE_PHOENIX=true
+      - ENABLE_OLLAMA=true
+      - PHOENIX_ENDPOINT=http://phoenix:6006
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - app_network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongodb:/data/db
+    networks:
+      - app_network
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./data/phoenix:/root/.phoenix
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
