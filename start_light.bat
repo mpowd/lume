@@ -1,7 +1,6 @@
 @echo off
 echo 🚀 Starting application (Light)...
 
-REM Start Docker in background
 docker compose -f docker-compose.light.yml up -d
 
 echo Waiting for API...
@@ -12,10 +11,13 @@ if errorlevel 1 goto wait_loop
 
 echo Backend ready!
 
-REM Start API logs in new window
 start "API Logs" cmd /c "docker compose -f docker-compose.light.yml logs -f api"
 
 echo Starting frontend...
 cd frontend
-npm install
-npm run dev
+
+call npm run dev
+
+cd ..
+echo Stopping Docker containers...
+docker compose -f docker-compose.light.yml down
