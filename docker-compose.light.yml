@@ -28,6 +28,7 @@ services:
       - USE_GPU=false
       - ENABLE_PHOENIX=false
       - ENABLE_OLLAMA=false
+      - PYTHONPATH=/app
     networks:
       - app_network
 
