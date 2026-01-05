@@ -31,6 +31,8 @@ services:
       - PYTHONPATH=/app
     networks:
       - app_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   mongodb:
     image: mongo:latest
