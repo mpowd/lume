@@ -25,6 +25,12 @@ services:
       - mongodb
     env_file:
       - .env
+    environment:
+      - DEPLOYMENT_MODE=dev
+      - USE_GPU=true
+      - ENABLE_PHOENIX=true
+      - ENABLE_OLLAMA=true
+      - PYTHONPATH=/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
