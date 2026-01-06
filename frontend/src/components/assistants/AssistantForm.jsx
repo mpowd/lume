@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Database, Check, Lock, Plus, ScrollText, X, Edit2 } from 'lucide-react'
+import { Sparkles, Database, Check, Lock, Plus, ScrollText, X, Edit2, MessageSquare } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
 import { ollamaAPI } from '../../services/api'
 import FormInput from '../shared/FormInput'
+import FormTextarea from '../shared/FormTextarea'
 import Button from '../shared/Button'
 import Card from '../shared/Card'
 import ModelSelector from './ModelSelector'
@@ -63,6 +64,7 @@ export default function AssistantForm({
 
   const [formData, setFormData] = useState({
     assistant_name: '',
+    opening_message: '',
     workflow: 'linear',
     collections: [],
     references: [],
@@ -101,6 +103,7 @@ export default function AssistantForm({
 
       setFormData({
         assistant_name: assistant.name || assistant.assistant_name,
+        opening_message: assistant.opening_message || '',
         workflow: assistant.workflow || 'linear',
         collections: assistant.collections || [],
         references: referencesWithColors,
@@ -412,16 +415,33 @@ Question: {question}`
           </div>
         </div>
 
+        {/* Opening Message Field */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
+            <MessageSquare className="w-4 h-4" />
+            Opening Message
+          </label>
+          <FormTextarea
+            value={formData.opening_message}
+            onChange={(e) => setFormData({...formData, opening_message: e.target.value})}
+            placeholder="e.g., Hi! I'm your travel assistant. You can ask me questions about Morocco."
+            rows={3}
+          />
+          <p className="text-xs text-text-quaternary">
+            This message will be shown when users start a new chat with this assistant
+          </p>
+        </div>
+
         {formData.workflow === 'linear' && (
           <>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary mb-3">
                 <Database className="w-4 h-4 inline mr-2" />
-                Collection Access
+                Collection Access (Optional)
               </label>
               {collections.length === 0 ? (
                 <div className="p-4 bg-transparent border border-white/10 rounded-xl text-center">
-                  <p className="text-text-tertiary text-sm">No knowledge bases available. Please create one first.</p>
+                  <p className="text-text-tertiary text-sm">No knowledge bases available. You can still create an assistant without collections.</p>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -613,7 +633,7 @@ Question: {question}`
             variant="standout"
             fullWidth
             loading={loading}
-            disabled={!formData.assistant_name || (formData.workflow === 'linear' && formData.collections.length === 0 && formData.references.length === 0) || (formData.workflow === 'agentic' && formData.tools.length === 0)}
+            disabled={!formData.assistant_name || (formData.workflow === 'agentic' && formData.tools.length === 0)}
           >
             {assistant ? 'Update Assistant' : 'Create Assistant'}
           </Button>

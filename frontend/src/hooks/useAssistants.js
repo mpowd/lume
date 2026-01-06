@@ -25,6 +25,7 @@ export const useAssistants = () => {
         llm: assistant.config?.llm_model || null,
         llm_provider: assistant.config?.llm_provider || null,
         collections: assistant.config?.knowledge_base_ids || [],
+        opening_message: assistant.config?.opening_message || [],
         references: assistant.config?.references || [],
         local_only: assistant.config?.local_only,
         hybrid_search: assistant.config?.hybrid_search,
@@ -71,6 +72,7 @@ export const useAssistants = () => {
           description: '',
           created_by: 'user',
           knowledge_base_ids: formData.collections || [],
+          opening_message: formData.opening_message || [],
           references: formData.references || [],
           llm_model: formData.llm,
           llm_provider: formData.llm_provider,
@@ -135,6 +137,7 @@ export const useAssistants = () => {
           description: '',
           created_by: 'user',
           knowledge_base_ids: formData.collections || [],
+          
           references: formData.references || [],
           llm_model: formData.llm,
           llm_provider: formData.llm_provider,

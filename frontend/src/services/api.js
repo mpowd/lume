@@ -195,6 +195,7 @@ export const createQAAssistant = async ({
       description,
       created_by: 'user',
       knowledge_base_ids: knowledgeBaseIds,
+      opening_message: opening_message,
       llm_model: llmModel,
       llm_provider: llmProvider,
       hybrid_search: hybridSearch,

@@ -18,9 +18,10 @@ export default function ChatPage() {
 
   const handleSelectAssistant = (bot) => {
     setSelectedAssistant(bot)
+    const openingMessage = bot.opening_message || `Hi! I'm ${bot.name}. How can I help you today?`
     setMessages([{ 
       role: 'assistant', 
-      content: `Hi! I'm ${bot.name}. How can I help you today?` 
+      content: openingMessage
     }])
   }
 
@@ -102,9 +103,10 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     if (selectedAssistant) {
+      const openingMessage = selectedAssistant.opening_message || `Hi! I'm ${selectedAssistant.name}. How can I help you today?`
       setMessages([{ 
         role: 'assistant', 
-        content: `Hi! I'm ${selectedAssistant.name}. How can I help you today?` 
+        content: openingMessage
       }])
     }
   }

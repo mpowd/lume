@@ -16,10 +16,11 @@ class QAAssistantConfig(AssistantConfig):
     """Configuration for QA Assistant"""
 
     type: str = "qa"
-    knowledge_base_ids: List[str]
+    knowledge_base_ids: Optional[List[str]] = []
     llm_model: str
     llm_provider: str  # openai or ollama
     references: List[dict]
+    opening_message: Optional[str] = ""
 
     # Retrieval settings
     hybrid_search: bool = True
