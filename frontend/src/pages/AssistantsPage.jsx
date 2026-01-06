@@ -78,6 +78,29 @@ export default function AssistantsPage() {
     setFormError(null)
   }
 
+  const getAssistantDescription = (assistant) => {
+    if (assistant.workflow === 'agentic') {
+      return 'Agentic workflow with tools'
+    }
+    
+    const collectionCount = assistant.collections?.length || 0
+    const referenceCount = assistant.references?.length || 0
+    
+    if (collectionCount === 0 && referenceCount === 0) {
+      return 'General purpose assistant'
+    }
+    
+    const parts = []
+    if (collectionCount > 0) {
+      parts.push(`${collectionCount} knowledge source${collectionCount !== 1 ? 's' : ''}`)
+    }
+    if (referenceCount > 0) {
+      parts.push(`${referenceCount} reference${referenceCount !== 1 ? 's' : ''}`)
+    }
+    
+    return parts.join(', ')
+  }
+
   if (loading) {
     return <LoadingSpinner fullScreen text="Loading assistants..." />
   }
@@ -131,10 +154,7 @@ export default function AssistantsPage() {
                   </div>
                 </div>
                 <p className="text-sm text-text-tertiary mb-4 flex-1">
-                  {assistant.workflow === 'agentic' 
-                    ? 'Agentic workflow with tools' 
-                    : `Assistant with ${assistant.collections?.length || 0} knowledge source${assistant.collections?.length !== 1 ? 's' : ''}`
-                  }
+                  {getAssistantDescription(assistant)}
                 </p>
                 <div className="flex gap-2 mt-auto">
                   <button 
