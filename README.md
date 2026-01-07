@@ -20,7 +20,7 @@ React Frontend → FastAPI Backend → Qdrant (vectors) + MongoDB (docs)
 
 ## Installation
 
-**Prerequisites:** Docker, Docker Compose, OpenAI API key (optional: Cohere API key)
+**Prerequisites:** Docker, Docker Compose, node.js, optional: [OpenAI API key, Cohere api key, Tavily api key, llama_cloud api key, Ollama]
 
 1. Clone repository
 ```bash
@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-## Quick Start
+## Example Workflow
 
 1. Create a knowledge collection (Knowledge Base → New Collection)
 2. Add content via web crawler or file upload
