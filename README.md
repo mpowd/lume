@@ -13,9 +13,27 @@ A modular platform for building AI assistants with RAG capabilities and integrat
 ## Architecture
 
 ```
-React Frontend → FastAPI Backend → Qdrant (vectors) + MongoDB (docs)
-                                 → OpenAI/Ollama (LLMs)
-                                 → Phoenix (observability)
+┌─────────────────────────────────────────────────────────────┐
+│                     Frontend (React)                        │
+│  Chat | Assistants | Knowledge Base | Evaluation            │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  FastAPI Backend                            │
+│  • Assistant Registry & Execution Engine                    │
+│  • Knowledge Base Management                                │
+│  • Evaluation System (RAGAS)                                │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────┬──────────────────┬──────────────────────┐
+│  Qdrant          │  MongoDB         │  LLM Providers       │
+│  (Vector DB)     │  (Documents)     │  (OpenAI, Ollama)    │
+└──────────────────┴──────────────────┴──────────────────────┘
+                            ↓
+                    ┌────────────────┐
+                    │   Phoenix      │
+                    │ (Observability)│
+                    └────────────────┘
 ```
 
 ## Installation
