@@ -8,7 +8,6 @@ from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from uuid import uuid4
 from datetime import datetime
 from langchain_core.documents import Document
