@@ -36,9 +36,11 @@ class MongoDBClient:
             db_name: Name of the database to use
         """
         if connection_string is None:
-            host = os.getenv("MONGODB_HOST", "mongodb")
-            port = os.getenv("MONGODB_PORT", "27017")
-            connection_string = f"mongodb://{host}:{port}"
+            connection_string = os.getenv("MONGODB_URL")
+            if not connection_string:
+                host = os.getenv("MONGODB_HOST", "mongodb")
+                port = os.getenv("MONGODB_PORT", "27017")
+                connection_string = f"mongodb://{host}:{port}"
 
         if db_name is None:
             db_name = os.getenv("MONGODB_DB_NAME", "lume")

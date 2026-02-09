@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 llm = ChatOpenAI(
-    model="gpt-4o-mini", temperature=0, api_key=os.environ["OPENAI_API_KEY"]
+    model="gpt-4o-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY")
 )
 
 

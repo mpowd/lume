@@ -6,6 +6,18 @@ from backend.config import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+import os
+
+env_path = Path(__file__).parent.parent.parent / ".env.dev"
+if not env_path.exists():
+    env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
+
+print(f"🔍 Loading env from: {env_path}")
+print(f"🔍 QDRANT_HOST: {os.getenv('QDRANT_HOST')}")
+print(f"🔍 MONGODB_URL: {os.getenv('MONGODB_URL')}")
 
 # Import to register all assistants
 import backend.core.assistants

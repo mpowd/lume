@@ -53,7 +53,7 @@ Question: {question}"""
         if provider == "openai":
             return ChatOpenAI(
                 model=model_name,
-                api_key=os.environ.get("OPENAI_API_KEY"),
+                api_key=os.getenv("OPENAI_API_KEY"),
                 # temperature=0,
             )
         else:  # ollama

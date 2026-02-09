@@ -39,7 +39,7 @@ class HybridRetriever:
         if provider == "openai":
             return ChatOpenAI(
                 model=model_name,
-                api_key=os.environ.get("OPENAI_API_KEY"),
+                api_key=os.getenv("OPENAI_API_KEY"),
                 # temperature=0,
             )
         else:  # ollama
@@ -93,12 +93,12 @@ class HybridRetriever:
         if reranker_provider == "cohere":
             from langchain_cohere import CohereRerank
 
-            if not os.environ.get("COHERE_API_KEY"):
+            if not os.getenv("COHERE_API_KEY"):
                 logger.warning("COHERE_API_KEY not set, skipping reranking")
                 return retriever
 
             reranker = CohereRerank(
-                cohere_api_key=os.environ.get("COHERE_API_KEY"),
+                cohere_api_key=os.getenv("COHERE_API_KEY"),
                 model=reranker_model,
                 top_n=top_n,
             )
