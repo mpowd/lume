@@ -1,0 +1,44 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Lume Backend API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "qdrant-client",
+    "litellm",
+    "httpx",
+    "langchain-qdrant",
+    "langchain-ollama",
+    "fastembed-gpu",
+    "langchain-community",
+    "pymongo",
+    "langchain-openai",
+    "langchain-cohere",
+    "ragas",
+    "rapidfuzz",
+    "cohere",
+    "pydantic-ai",
+    "arize-phoenix",
+    "arize-phoenix-otel",
+    "openinference-instrumentation-langchain",
+    "FlagEmbedding",
+    "crawl4ai",
+    "llama-index",
+    "llama-parse",
+]
+
+[project.scripts]
+dev = "backend.cli:dev"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["backend"]
+
+[dependency-groups]
+dev = []
