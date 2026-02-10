@@ -2,22 +2,11 @@
 Main FastAPI application
 """
 
-from backend.config import settings
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import logging
-from pathlib import Path
-from dotenv import load_dotenv
 import os
 
-env_path = Path(__file__).parent.parent.parent / ".env.dev"
-if not env_path.exists():
-    env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(env_path)
-
-print(f"🔍 Loading env from: {env_path}")
-print(f"🔍 QDRANT_HOST: {os.getenv('QDRANT_HOST')}")
-print(f"🔍 MONGODB_URL: {os.getenv('MONGODB_URL')}")
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import to register all assistants
 import backend.core.assistants
@@ -25,20 +14,23 @@ import backend.core.assistants
 # Import routes
 from backend.api.routes import (
     assistants,
+    evaluation,
     executions,
     knowledge_base,
-    evaluation,
     ollama,
 )
-from backend.api.routes.sources import website
-from backend.api.routes.sources import file
-
+from backend.api.routes.sources import file, website
+from backend.config import settings
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
+
+logger.info(f"QDRANT_HOST: {os.getenv('QDRANT_HOST')}")
+print(f"MONGODB_URL: {os.getenv('MONGODB_URL')}")
+
 
 # configure the Phoenix tracer
 if settings.ENABLE_PHOENIX:
