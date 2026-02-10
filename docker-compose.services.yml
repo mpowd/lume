@@ -11,13 +11,15 @@ services:
       - app_network
 
   mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - ./data/mongodb:/data/db
-    networks:
-      - app_network
+      image: mongo:latest
+      ports:
+        - "27017:27017"
+      volumes:
+        - ./data/mongodb:/data/db
+      networks:
+        app_network:
+          aliases:
+            - mongo
 
   mongo-express:
     image: mongo-express:latest
