@@ -77,6 +77,8 @@ ignore = [
 [tool.basedpyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
 include = ["backend"]
 exclude = [
     "**/__pycache__",
