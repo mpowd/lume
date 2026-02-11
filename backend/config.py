@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ENABLE_PHOENIX: bool = False
     ENABLE_OLLAMA: bool = False
     DEPLOYMENT_MODE: str = "dev"
+    MONGODB_NAME: str = "Lume"
 
     # URLs
     PHOENIX_COLLECTOR_ENDPOINT: str = "http://localhost:6006"
