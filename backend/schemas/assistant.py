@@ -2,38 +2,35 @@
 API schemas for assistants
 """
 
-from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
+
+from backend.core.assistants.qa_assistant import QAAssistantConfig
 
 
 class AssistantCreateRequest(BaseModel):
-    """Request to create an assistant"""
-
     name: str
-    description: Optional[str] = ""
-    type: str
-    config: Dict[str, Any]
+    description: str | None = ""
+    type: str = "qa"
+    config: QAAssistantConfig
     created_by: str = "system"
 
 
 class AssistantUpdateRequest(BaseModel):
-    """Request to update an assistant"""
-
-    name: Optional[str] = None
-    description: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    config: QAAssistantConfig | None = None
+    is_active: bool | None = None
 
 
 class AssistantResponse(BaseModel):
-    """Response with assistant details"""
-
     id: str
     name: str
     description: str
     type: str
-    config: Dict[str, Any]
+    config: QAAssistantConfig
     created_by: str
     created_at: datetime
     updated_at: datetime
@@ -43,21 +40,20 @@ class AssistantResponse(BaseModel):
 class AssistantListResponse(BaseModel):
     """Response with list of assistants"""
 
-    assistants: List[AssistantResponse]
+    assistants: list[AssistantResponse]
 
 
 class ExecutionRequest(BaseModel):
     """Request to execute an assistant"""
 
-    assistant_id: str
-    input_data: Dict[str, Any]
+    input_data: dict[str, Any]
 
 
 class ExecutionResponse(BaseModel):
     """Response from assistant execution"""
 
-    execution_id: Optional[str] = None
+    execution_id: str | None = None
     status: str
-    output: Dict[str, Any]
-    execution_time: Optional[float] = None
-    error: Optional[str] = None
+    output: dict[str, Any]
+    execution_time: float | None = None
+    error: str | None = None

@@ -3,9 +3,10 @@ Database models for assistants
 """
 
 from datetime import datetime
-from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
+from typing import Any
+
 from bson import ObjectId
+from pydantic import BaseModel, Field
 
 
 class PyObjectId(ObjectId):
@@ -30,11 +31,11 @@ class PyObjectId(ObjectId):
 class AssistantModel(BaseModel):
     """Database model for assistants"""
 
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    id: PyObjectId | None = Field(alias="_id", default=None)
     name: str
-    description: Optional[str] = ""
+    description: str | None = ""
     type: str  # qa, retrieval, image, chatbot
-    config: Dict[str, Any]
+    config: dict[str, Any]
     created_by: str = "system"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -49,13 +50,13 @@ class AssistantModel(BaseModel):
 class ExecutionModel(BaseModel):
     """Database model for execution history"""
 
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    id: PyObjectId | None = Field(alias="_id", default=None)
     assistant_id: str
-    input_data: Dict[str, Any]
-    output_data: Dict[str, Any]
+    input_data: dict[str, Any]
+    output_data: dict[str, Any]
     status: str  # pending, running, completed, failed
-    error: Optional[str] = None
-    execution_time: Optional[float] = None
+    error: str | None = None
+    execution_time: float | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

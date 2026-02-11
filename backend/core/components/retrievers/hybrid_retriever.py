@@ -2,20 +2,16 @@
 Hybrid retriever combining vector and keyword search
 """
 
-from typing import List, Dict, Any
-from langchain_core.documents import Document
-from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-from langchain_ollama import OllamaEmbeddings
-from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
-from langchain_ollama import ChatOllama
-from langchain_core.runnables import RunnableLambda
-from langchain_community.document_transformers import LongContextReorder
-
-
-from qdrant_client import QdrantClient
 import logging
-import os
+from typing import Any
+
+from langchain_core.documents import Document
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
+from qdrant_client import QdrantClient
+
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +35,7 @@ class HybridRetriever:
         if provider == "openai":
             return ChatOpenAI(
                 model=model_name,
-                api_key=os.getenv("OPENAI_API_KEY"),
+                api_key=settings.OPENAI_API_KEY,
                 # temperature=0,
             )
         else:  # ollama
@@ -84,47 +80,9 @@ class HybridRetriever:
             search_kwargs={"k": top_k}
         )
 
-    def _apply_reranking(
-        self, retriever, reranker_provider: str, reranker_model: str, top_n: int
-    ):
-        """Apply reranking to retriever"""
-        from langchain.retrievers import ContextualCompressionRetriever
-
-        if reranker_provider == "cohere":
-            from langchain_cohere import CohereRerank
-
-            if not os.getenv("COHERE_API_KEY"):
-                logger.warning("COHERE_API_KEY not set, skipping reranking")
-                return retriever
-
-            reranker = CohereRerank(
-                cohere_api_key=os.getenv("COHERE_API_KEY"),
-                model=reranker_model,
-                top_n=top_n,
-            )
-
-            return ContextualCompressionRetriever(
-                base_compressor=reranker,
-                base_retriever=retriever,
-            )
-
-        elif reranker_provider == "huggingface":
-            from backend.core.components.retrievers.hf_reranker import (
-                HuggingFaceReranker,
-            )
-
-            reranker = HuggingFaceReranker(model_name=reranker_model, top_n=top_n)
-
-            return ContextualCompressionRetriever(
-                base_compressor=reranker,
-                base_retriever=retriever,
-            )
-
-        return retriever
-
     async def retrieve(
-        self, query: str, knowledge_base_ids: List[str], config: Dict[str, Any]
-    ) -> List[Document]:
+        self, query: str, knowledge_base_ids: list[str], config: dict[str, Any]
+    ) -> list[Document]:
         """Retrieve relevant documents"""
 
         if not knowledge_base_ids:
@@ -166,19 +124,7 @@ class HybridRetriever:
 
         # Apply reranking if enabled
         if config.get("reranking", False):
-            top_n = config.get("top_n") or max(1, int(config.get("top_k", 10) / 2))
-            retriever = self._apply_reranking(
-                retriever,
-                config.get("reranker_provider", "cohere"),
-                config.get("reranker_model", "rerank-v3.5"),
-                top_n,
-            )
-            logger.info(f"Applied reranking with top_n={top_n}")
-        # else:
-        #     # Apply long context reorder only if not reranking
-        #     retriever = retriever | RunnableLambda(
-        #         LongContextReorder().transform_documents
-        #     )
+            logger.info("Reranking is not supported anymore.")
 
         # Execute retrieval
         logger.info(f"Using query {query_to_use} to find similar chunks.")
