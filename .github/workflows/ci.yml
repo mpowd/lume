@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+        working-directory: ./backend
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+        working-directory: ./backend
+
+      - name: Type check (clean modules only)
+        run: |
+          uv run basedpyright \
+            backend/db/repositories/assistant_repo.py \
+            backend/services/assistant_service.py \
+            backend/api/routes/assistants.py \
+            backend/schemas/assistant.py
+        working-directory: ./backend
+
+      - name: Lint (clean modules only)
+        run: |
+          uv run ruff check \
+            backend/db/repositories/assistant_repo.py \
+            backend/services/assistant_service.py \
+            backend/api/routes/assistants.py \
+            backend/schemas/assistant.py \
+            tests/
+        working-directory: ./backend
