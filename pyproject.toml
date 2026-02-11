@@ -33,6 +33,7 @@ dependencies = [
 
 [project.scripts]
 dev = "backend.cli:dev"
+export-spec = "backend.scripts.export_openapi:export"
 
 [build-system]
 requires = ["hatchling"]
