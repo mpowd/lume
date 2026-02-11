@@ -1,197 +1,138 @@
 """
-API routes for assistant management
+API routes for assistant management and execution
 """
 
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
+import json
+import logging
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
+
+from backend.app.dependencies import get_assistant_service
 from backend.schemas.assistant import (
     AssistantCreateRequest,
-    AssistantUpdateRequest,
     AssistantResponse,
-    AssistantListResponse,
+    AssistantUpdateRequest,
+    ExecutionRequest,
+    ExecutionResponse,
 )
-from backend.services.assistant_service import get_assistant_service
-import logging
+from backend.services.assistant_service import AssistantService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/", response_model=AssistantResponse)
-async def create_assistant(request: AssistantCreateRequest):
+# ── CRUD ──────────────────────────────────────────────────
+
+
+@router.post(
+    "/",
+    response_model=AssistantResponse,
+    status_code=201,
+    operation_id="createAssistant",
+)
+async def create_assistant(
+    request: AssistantCreateRequest,
+    service: AssistantService = Depends(get_assistant_service),
+):
     """Create a new assistant"""
-    try:
-        service = get_assistant_service()
-
-        assistant_data = request.dict()
-        assistant_id = service.create_assistant(assistant_data)
-
-        # Get created assistant
-        assistant = service.get_assistant(assistant_id)
-
-        return AssistantResponse(
-            id=assistant["_id"],
-            name=assistant["name"],
-            description=assistant.get("description", ""),
-            type=assistant["type"],
-            config=assistant["config"],
-            created_by=assistant.get("created_by", "system"),
-            created_at=assistant["created_at"],
-            updated_at=assistant["updated_at"],
-            is_active=assistant.get("is_active", True),
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creating assistant: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.create(request)
 
 
-@router.get("/", response_model=AssistantListResponse)
+@router.get("/", response_model=list[AssistantResponse], operation_id="listAssistants")
 async def list_assistants(
-    type: Optional[str] = Query(None, description="Filter by assistant type"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    type: str | None = Query(None, description="Filter by assistant type"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
+    service: AssistantService = Depends(get_assistant_service),
 ):
     """List all assistants"""
-    try:
-        service = get_assistant_service()
-        assistants = service.list_assistants(assistant_type=type, is_active=is_active)
-
-        assistant_responses = [
-            AssistantResponse(
-                id=a["_id"],
-                name=a["name"],
-                description=a.get("description", ""),
-                type=a["type"],
-                config=a["config"],
-                created_by=a.get("created_by", "system"),
-                created_at=a["created_at"],
-                updated_at=a["updated_at"],
-                is_active=a.get("is_active", True),
-            )
-            for a in assistants
-        ]
-
-        return AssistantListResponse(assistants=assistant_responses)
-
-    except Exception as e:
-        logger.error(f"Error listing assistants: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.list_assistants(assistant_type=type, is_active=is_active)
 
 
-@router.get("/{assistant_id}", response_model=AssistantResponse)
-async def get_assistant(assistant_id: str):
+@router.get(
+    "/{assistant_id}", response_model=AssistantResponse, operation_id="getAssistant"
+)
+async def get_assistant(
+    assistant_id: str,
+    service: AssistantService = Depends(get_assistant_service),
+):
     """Get a specific assistant"""
-    try:
-        service = get_assistant_service()
-        assistant = service.get_assistant(assistant_id)
-
-        if not assistant:
-            raise HTTPException(status_code=404, detail="Assistant not found")
-
-        return AssistantResponse(
-            id=assistant["_id"],
-            name=assistant["name"],
-            description=assistant.get("description", ""),
-            type=assistant["type"],
-            config=assistant["config"],
-            created_by=assistant.get("created_by", "system"),
-            created_at=assistant["created_at"],
-            updated_at=assistant["updated_at"],
-            is_active=assistant.get("is_active", True),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting assistant: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.get(assistant_id)
 
 
-@router.put("/{assistant_id}", response_model=AssistantResponse)
-async def update_assistant(assistant_id: str, request: AssistantUpdateRequest):
+@router.put(
+    "/{assistant_id}", response_model=AssistantResponse, operation_id="updateAssistant"
+)
+async def update_assistant(
+    assistant_id: str,
+    request: AssistantUpdateRequest,
+    service: AssistantService = Depends(get_assistant_service),
+):
     """Update an assistant"""
-    try:
-        service = get_assistant_service()
-
-        update_data = request.dict(exclude_unset=True)
-
-        success = service.update_assistant(assistant_id, update_data)
-
-        if not success:
-            raise HTTPException(status_code=404, detail="Assistant not found")
-
-        # Get updated assistant
-        assistant = service.get_assistant(assistant_id)
-
-        return AssistantResponse(
-            id=assistant["_id"],
-            name=assistant["name"],
-            description=assistant.get("description", ""),
-            type=assistant["type"],
-            config=assistant["config"],
-            created_by=assistant.get("created_by", "system"),
-            created_at=assistant["created_at"],
-            updated_at=assistant["updated_at"],
-            is_active=assistant.get("is_active", True),
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating assistant: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.update(assistant_id, request)
 
 
-@router.delete("/{assistant_id}")
-async def delete_assistant(assistant_id: str):
+@router.delete("/{assistant_id}", status_code=204, operation_id="deleteAssistant")
+async def delete_assistant(
+    assistant_id: str,
+    service: AssistantService = Depends(get_assistant_service),
+):
     """Delete an assistant"""
-    try:
-        service = get_assistant_service()
-
-        success = service.delete_assistant(assistant_id)
-
-        if not success:
-            raise HTTPException(status_code=404, detail="Assistant not found")
-
-        return {"status": "success", "message": "Assistant deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting assistant: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    service.delete(assistant_id)
 
 
-@router.get("/types/list")
-async def list_assistant_types():
+# ── Types & Schemas ───────────────────────────────────────
+
+
+@router.get("/types/list", operation_id="listAssistantTypes")
+async def list_assistant_types(
+    service: AssistantService = Depends(get_assistant_service),
+):
     """List all available assistant types"""
-    try:
-        service = get_assistant_service()
-        types = service.list_assistant_types()
-
-        return {"types": types}
-
-    except Exception as e:
-        logger.error(f"Error listing assistant types: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"types": service.list_types()}
 
 
-@router.get("/types/{assistant_type}/schema")
-async def get_assistant_type_schema(assistant_type: str):
+@router.get("/types/{assistant_type}/schema", operation_id="getAssistantTypeSchema")
+async def get_assistant_type_schema(
+    assistant_type: str,
+    service: AssistantService = Depends(get_assistant_service),
+):
     """Get schemas for a specific assistant type"""
-    try:
-        service = get_assistant_service()
-        schemas = service.get_assistant_schemas(assistant_type)
+    return service.get_schemas(assistant_type)
 
-        return schemas
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error getting schemas: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+# ── Execution ─────────────────────────────────────────────
+
+
+@router.post(
+    "/{assistant_id}/execute",
+    response_model=ExecutionResponse,
+    operation_id="executeAssistant",
+)
+async def execute_assistant(
+    assistant_id: str,
+    request: ExecutionRequest,
+    service: AssistantService = Depends(get_assistant_service),
+):
+    """Execute an assistant"""
+    result = await service.execute(assistant_id, request.input_data)
+    return ExecutionResponse(**result)
+
+
+@router.post("/{assistant_id}/execute-stream", operation_id="executeAssistantStream")
+async def execute_assistant_stream(
+    assistant_id: str,
+    request: ExecutionRequest,
+    service: AssistantService = Depends(get_assistant_service),
+):
+    """Execute an assistant in streaming mode"""
+
+    async def event_generator():
+        async for chunk in service.execute_stream(assistant_id, request.input_data):
+            if isinstance(chunk, str):
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            else:
+                yield f"data: {json.dumps(chunk)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

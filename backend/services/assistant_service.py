@@ -2,230 +2,172 @@
 Service layer for assistant business logic
 """
 
-from typing import Dict, Any, List, Optional
-from backend.db.repositories.assistant_repo import AssistantRepository
-from backend.core.assistants.registry import AssistantRegistry
-from backend.core.assistants.base import BaseAssistant
 import logging
 import time
+from typing import Any
+
+from backend.core.assistants.base import BaseAssistant
+from backend.core.assistants.registry import AssistantRegistry
+from backend.db.repositories.assistant_repo import AssistantRepository
+from backend.schemas.assistant import (
+    AssistantCreateRequest,
+    AssistantResponse,
+    AssistantUpdateRequest,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class AssistantNotFoundError(Exception):
+    def __init__(self, assistant_id: str):
+        self.assistant_id = assistant_id
+        super().__init__(f"Assistant '{assistant_id}' not found")
+
+
+class AssistantValidationError(Exception):
+    pass
+
+
+class AssistantInactiveError(Exception):
+    pass
 
 
 class AssistantService:
     """Service for managing and executing assistants"""
 
-    def __init__(self):
-        self.repository = AssistantRepository()
-        self._assistant_instances = {}  # Cache for assistant instances
+    def __init__(self, repo: AssistantRepository):
+        self.repo = repo
+        self._instance_cache: dict[str, BaseAssistant] = {}
 
-    def create_assistant(self, assistant_data: Dict[str, Any]) -> str:
+    # ── CRUD ──────────────────────────────────────────────
+
+    def create(self, request: AssistantCreateRequest) -> AssistantResponse:
         """Create a new assistant"""
+        self._validate_type(request.type)
+        self._validate_config(request.type, request.config)
+        return self.repo.insert(request.model_dump())
 
-        # Validate assistant type
-        assistant_type = assistant_data.get("type")
-        if assistant_type not in AssistantRegistry.list_types():
-            raise ValueError(f"Unknown assistant type: {assistant_type}")
-
-        # Validate configuration against schema
-        assistant_class = AssistantRegistry.get(assistant_type)
-        instance = assistant_class()
-
-        config_schema = instance.get_config_schema()
-        try:
-            config_schema(**assistant_data.get("config", {}))
-        except Exception as e:
-            raise ValueError(f"Invalid configuration: {str(e)}")
-
-        # Create in database
-        assistant_id = self.repository.create(assistant_data)
-
-        logger.info(f"Created assistant {assistant_id} of type {assistant_type}")
-
-        return assistant_id
-
-    def get_assistant(self, assistant_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, assistant_id: str) -> AssistantResponse:
         """Get assistant by ID"""
-        return self.repository.get_by_id(assistant_id)
+        assistant = self.repo.find_by_id(assistant_id)
+        if not assistant:
+            raise AssistantNotFoundError(assistant_id)
+        return assistant
 
     def list_assistants(
-        self, assistant_type: Optional[str] = None, is_active: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        assistant_type: str | None = None,
+        is_active: bool | None = None,
+    ) -> list[AssistantResponse]:
         """List assistants with optional filters"""
+        return self.repo.find_all(assistant_type=assistant_type, is_active=is_active)
 
-        filter_query = {}
-        if assistant_type:
-            filter_query["type"] = assistant_type
-        if is_active is not None:
-            filter_query["is_active"] = is_active
-
-        if filter_query:
-            return self.repository.get_all(filter_query=filter_query)
-
-        return self.repository.get_all()
-
-    def update_assistant(self, assistant_id: str, update_data: Dict[str, Any]) -> bool:
+    def update(
+        self, assistant_id: str, request: AssistantUpdateRequest
+    ) -> AssistantResponse:
         """Update an assistant"""
+        existing = self.get(assistant_id)  # Raises NotFound if missing
 
-        # Get existing assistant
-        existing = self.repository.get_by_id(assistant_id)
-        if not existing:
-            raise ValueError(f"Assistant {assistant_id} not found")
+        if request.config is not None:
+            self._validate_config(existing.type, request.config)
 
-        # If config is being updated, validate it
-        if "config" in update_data:
-            assistant_type = existing["type"]
-            assistant_class = AssistantRegistry.get(assistant_type)
-            instance = assistant_class()
+        self._clear_instance_cache(assistant_id)
 
-            config_schema = instance.get_config_schema()
-            try:
-                config_schema(**update_data["config"])
-            except Exception as e:
-                raise ValueError(f"Invalid configuration: {str(e)}")
+        result = self.repo.update(assistant_id, request.model_dump(exclude_unset=True))
+        if not result:
+            raise AssistantNotFoundError(assistant_id)
+        return result
 
-        # Clear cached instance
-        if assistant_id in self._assistant_instances:
-            del self._assistant_instances[assistant_id]
-
-        return self.repository.update(assistant_id, update_data)
-
-    def delete_assistant(self, assistant_id: str) -> bool:
+    def delete(self, assistant_id: str) -> bool:
         """Delete an assistant"""
+        self._clear_instance_cache(assistant_id)
+        if not self.repo.delete(assistant_id):
+            raise AssistantNotFoundError(assistant_id)
+        return True
 
-        # Clear cached instance
-        if assistant_id in self._assistant_instances:
-            del self._assistant_instances[assistant_id]
+    # ── Execution ─────────────────────────────────────────
 
-        return self.repository.delete(assistant_id)
-
-    def get_assistant_instance(self, assistant_id: str) -> BaseAssistant:
-        """Get or create assistant instance"""
-
-        if assistant_id in self._assistant_instances:
-            logger.info(f"Using cached instance for assistant {assistant_id}")
-            return self._assistant_instances[assistant_id]
-
-        # Get assistant configuration
-        assistant_data = self.repository.get_by_id(assistant_id)
-        if not assistant_data:
-            raise ValueError(f"Assistant {assistant_id} not found")
-
-        # Create instance
-        assistant_type = assistant_data["type"]
-        instance = AssistantRegistry.create_instance(assistant_type)
-
-        # Cache instance
-        self._assistant_instances[assistant_id] = instance
-
-        logger.info(f"Created new instance for assistant {assistant_id}")
-
-        return instance
-
-    async def execute_assistant(
-        self, assistant_id: str, input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute(
+        self, assistant_id: str, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute an assistant"""
-
         start_time = time.time()
 
-        try:
-            # Get assistant data and instance
-            assistant_data = self.repository.get_by_id(assistant_id)
-            if not assistant_data:
-                raise ValueError(f"Assistant {assistant_id} not found")
+        assistant = self.get(assistant_id)
 
-            if not assistant_data.get("is_active", True):
-                raise ValueError(f"Assistant {assistant_id} is not active")
+        if not assistant.is_active:
+            raise AssistantInactiveError(f"Assistant '{assistant_id}' is not active")
 
-            instance = self.get_assistant_instance(assistant_id)
+        instance = self._get_or_create_instance(assistant_id, assistant.type)
 
-            # Validate input
-            input_schema = instance.get_input_schema()
-            try:
-                validated_input = input_schema(**input_data)
-            except Exception as e:
-                raise ValueError(f"Invalid input: {str(e)}")
+        validated_input = self._validate_input(instance, input_data)
+        config = instance.get_config_schema()(**assistant.config)
 
-            # Parse config
-            config_schema = instance.get_config_schema()
-            config = config_schema(**assistant_data["config"])
+        result = await instance.execute(config, validated_input)
+        execution_time = time.time() - start_time
 
-            # Execute
-            logger.info(f"Executing assistant {assistant_id}")
-            result = await instance.execute(config, validated_input)
+        logger.info(f"Assistant {assistant_id} executed in {execution_time:.2f}s")
 
-            execution_time = time.time() - start_time
+        return {
+            "status": "completed",
+            "output": result.model_dump(),
+            "execution_time": execution_time,
+            "error": None,
+        }
 
-            logger.info(
-                f"Assistant {assistant_id} executed successfully "
-                f"in {execution_time:.2f}s"
-            )
+    async def execute_stream(self, assistant_id: str, input_data: dict[str, Any]):
+        """Execute an assistant in streaming mode"""
+        assistant = self.get(assistant_id)
 
-            return {
-                "status": "completed",
-                "output": result.dict(),
-                "execution_time": execution_time,
-                "error": None,
-            }
+        if not assistant.is_active:
+            raise AssistantInactiveError(f"Assistant '{assistant_id}' is not active")
 
-        except Exception as e:
-            execution_time = time.time() - start_time
+        instance = self._get_or_create_instance(assistant_id, assistant.type)
 
-            logger.error(
-                f"Error executing assistant {assistant_id}: {str(e)}", exc_info=True
-            )
+        validated_input = self._validate_input(instance, input_data)
+        config = instance.get_config_schema()(**assistant.config)
 
-            return {
-                "status": "failed",
-                "output": {},
-                "execution_time": execution_time,
-                "error": str(e),
-            }
+        async for chunk in instance.execute_stream(config, validated_input):
+            yield chunk
 
-    async def execute_assistant_stream(self, assistant_id, input_data):
-        try:
+    # ── Schema / Type queries ─────────────────────────────
 
-            assistant_data = self.repository.get_by_id(assistant_id)
-
-            if not assistant_data:
-                raise ValueError(f"Assistant {assistant_id} not found")
-
-            if not assistant_data.get("is_active", True):
-                raise ValueError(f"ASsistant {assistant_id} is not active")
-
-            instance = self.get_assistant_instance(assistant_id)
-            input_schema = instance.get_input_schema()
-            try:
-                validated_input = input_schema(**input_data)
-            except Exception as e:
-                raise ValueError(f"Invalid Input: {str(e)}")
-
-            config_schema = instance.get_config_schema()
-            config = config_schema(**assistant_data["config"])
-
-            async for chunk in instance.execute_stream(config, validated_input):
-                yield chunk
-
-        except Exception as e:
-            logger.error(f"Error executing assistant: {str(e)}", exc_info=True)
-
-    def get_assistant_schemas(self, assistant_type: str) -> Dict[str, Any]:
-        """Get schemas for an assistant type"""
-        return AssistantRegistry.get_schemas(assistant_type)
-
-    def list_assistant_types(self) -> List[str]:
-        """List all available assistant types"""
+    def list_types(self) -> list[str]:
         return AssistantRegistry.list_types()
 
+    def get_schemas(self, assistant_type: str) -> dict[str, Any]:
+        self._validate_type(assistant_type)
+        return AssistantRegistry.get_schemas(assistant_type)
 
-# Singleton instance
-_service_instance = None
+    # ── Private helpers ───────────────────────────────────
 
+    def _validate_type(self, assistant_type: str) -> None:
+        if assistant_type not in AssistantRegistry.list_types():
+            raise AssistantValidationError(f"Unknown assistant type: {assistant_type}")
 
-def get_assistant_service() -> AssistantService:
-    """Get or create the assistant service singleton"""
-    global _service_instance
-    if _service_instance is None:
-        _service_instance = AssistantService()
-    return _service_instance
+    def _validate_config(self, assistant_type: str, config: dict) -> None:
+        instance = AssistantRegistry.create_instance(assistant_type)
+        schema = instance.get_config_schema()
+        try:
+            schema(**config)
+        except Exception as e:
+            raise AssistantValidationError(f"Invalid configuration: {e}") from e
+
+    def _validate_input(self, instance: BaseAssistant, input_data: dict):
+        schema = instance.get_input_schema()
+        try:
+            return schema(**input_data)
+        except Exception as e:
+            raise AssistantValidationError(f"Invalid input: {e}") from e
+
+    def _get_or_create_instance(
+        self, assistant_id: str, assistant_type: str
+    ) -> BaseAssistant:
+        if assistant_id not in self._instance_cache:
+            self._instance_cache[assistant_id] = AssistantRegistry.create_instance(
+                assistant_type
+            )
+        return self._instance_cache[assistant_id]
+
+    def _clear_instance_cache(self, assistant_id: str) -> None:
+        self._instance_cache.pop(assistant_id, None)
