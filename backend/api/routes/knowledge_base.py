@@ -22,7 +22,6 @@ from bson import json_util
 import os
 import shutil
 
-logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 

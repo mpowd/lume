@@ -29,6 +29,7 @@ dependencies = [
     "crawl4ai",
     "llama-index",
     "llama-parse",
+    "colorlog>=6.10.1",
 ]
 
 [project.scripts]

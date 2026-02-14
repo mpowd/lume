@@ -1,45 +1,39 @@
 # backend/api/routes/file_upload.py
-from fastapi import APIRouter, UploadFile, File, Form
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import json
 import asyncio
-import os
 import logging
-from datetime import datetime
-from uuid import uuid4
-from typing import Dict, Any, List, Optional
-import tempfile
-from llama_parse import LlamaParse
-from fastapi.responses import FileResponse
 import mimetypes
+import os
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
 
-
+from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 from langchain_text_splitters import (
     CharacterTextSplitter,
 )
+from llama_parse import LlamaParse
+from pydantic import BaseModel
 
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # In-memory storage for task progress
-upload_tasks: Dict[str, Dict[str, Any]] = {}
+upload_tasks: dict[str, dict[str, Any]] = {}
 
 
 class ProgressStage(BaseModel):
     """Represents a single stage in the upload process"""
 
     label: str
-    current: Optional[int] = None
-    total: Optional[int] = None
-    unit: Optional[str] = "items"
+    current: int | None = None
+    total: int | None = None
+    unit: str | None = "items"
     is_current: bool = False
     show_percentage: bool = True
-    icon: Optional[str] = None
-    current_item: Optional[str] = None
+    icon: str | None = None
+    current_item: str | None = None
 
 
 class CompletionStat(BaseModel):
@@ -54,13 +48,13 @@ class UploadProgress(BaseModel):
     status: str
     title: str
     message: str
-    stages: List[ProgressStage]
-    stats: List[CompletionStat] = []
-    failed: List[str] = []
+    stages: list[ProgressStage]
+    stats: list[CompletionStat] = []
+    failed: list[str] = []
 
 
 async def save_files_to_mongodb(
-    task_id: str, file_data_list: List[dict], collection_name: str
+    task_id: str, file_data_list: list[dict], collection_name: str
 ):
     """
     Step 1: Save raw file content and metadata to MongoDB
@@ -91,13 +85,13 @@ async def save_files_to_mongodb(
 
         if not collection_info:
             upload_tasks[task_id]["status"] = "completed"
-            upload_tasks[task_id][
-                "title"
-            ] = f"Error: No collection configuration document found for collection {collection_name}"
+            upload_tasks[task_id]["title"] = (
+                f"Error: No collection configuration document found for collection {collection_name}"
+            )
             upload_tasks[task_id]["stages"][0]["is_current"] = True
-            upload_tasks[task_id][
-                "message"
-            ] = f"Error: No collection configuration document found for collection {collection_name}"
+            upload_tasks[task_id]["message"] = (
+                f"Error: No collection configuration document found for collection {collection_name}"
+            )
             return
 
         config_doc = collection_info[0]
@@ -177,7 +171,7 @@ async def save_files_to_mongodb(
 
 async def chunk_files(
     task_id: str,
-    mongodb_files: List[dict],
+    mongodb_files: list[dict],
     collection_name: str,
     collection_config: dict,
 ):
@@ -256,13 +250,13 @@ async def chunk_files(
         raise
 
 
-async def save_chunks_to_qdrant(task_id: str, chunks: List[Any], collection_name: str):
+async def save_chunks_to_qdrant(task_id: str, chunks: list[Any], collection_name: str):
     """
     Step 3: Save chunks to Qdrant vector database
     """
     from langchain_ollama import OllamaEmbeddings
+    from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
     from qdrant_client import QdrantClient
-    from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 
     total_chunks = len(chunks)
     saved_chunks = 0
@@ -270,9 +264,9 @@ async def save_chunks_to_qdrant(task_id: str, chunks: List[Any], collection_name
     upload_tasks[task_id]["status"] = "saving_to_qdrant"
     upload_tasks[task_id]["title"] = "Saving to Qdrant"
     upload_tasks[task_id]["stages"][2]["is_current"] = True
-    upload_tasks[task_id][
-        "message"
-    ] = "Creating embeddings and storing in vector database..."
+    upload_tasks[task_id]["message"] = (
+        "Creating embeddings and storing in vector database..."
+    )
 
     try:
         qdrant_client = QdrantClient(url="http://qdrant:6333")
@@ -296,9 +290,9 @@ async def save_chunks_to_qdrant(task_id: str, chunks: List[Any], collection_name
 
             current = min(i + batch_size, total_chunks)
             upload_tasks[task_id]["stages"][2]["current"] = current
-            upload_tasks[task_id][
-                "message"
-            ] = f"Saving chunks {current}/{total_chunks} to Qdrant..."
+            upload_tasks[task_id]["message"] = (
+                f"Saving chunks {current}/{total_chunks} to Qdrant..."
+            )
 
             batch_uuids = [chunk.metadata["chunk_id"] for chunk in batch]
             qdrant.add_documents(documents=batch, ids=batch_uuids)
@@ -307,7 +301,7 @@ async def save_chunks_to_qdrant(task_id: str, chunks: List[Any], collection_name
 
             saved_chunks = current
             logger.info(
-                f"Saved batch {i//batch_size + 1}: {current}/{total_chunks} chunks"
+                f"Saved batch {i // batch_size + 1}: {current}/{total_chunks} chunks"
             )
 
         upload_tasks[task_id]["stages"][2]["current"] = total_chunks
@@ -324,16 +318,19 @@ async def save_chunks_to_qdrant(task_id: str, chunks: List[Any], collection_name
 
 
 async def upload_files_background(
-    task_id: str, collection_name: str, file_data_list: List[dict]
+    task_id: str, collection_name: str, file_data_list: list[dict]
 ):
     """
     Main background processing function that orchestrates all steps
     """
     try:
         # Step 1: Save to MongoDB
-        saved_files, mongodb_failed, collection_config, mongodb_files = (
-            await save_files_to_mongodb(task_id, file_data_list, collection_name)
-        )
+        (
+            saved_files,
+            mongodb_failed,
+            collection_config,
+            mongodb_files,
+        ) = await save_files_to_mongodb(task_id, file_data_list, collection_name)
 
         if upload_tasks[task_id]["status"] == "error":
             return
@@ -357,9 +354,9 @@ async def upload_files_background(
 
         upload_tasks[task_id]["status"] = "complete"
         upload_tasks[task_id]["title"] = "Upload Complete!"
-        upload_tasks[task_id][
-            "message"
-        ] = f"Successfully processed {len(processed_files)} files"
+        upload_tasks[task_id]["message"] = (
+            f"Successfully processed {len(processed_files)} files"
+        )
 
         # Only show 3 stats: Files Processed, Chunks Created, Failed
         upload_tasks[task_id]["stats"] = [
@@ -388,7 +385,7 @@ async def upload_files_background(
 
 @router.post("/upload-files")
 async def upload_files(
-    collection_name: str = Form(...), files: List[UploadFile] = File(...)
+    collection_name: str = Form(...), files: list[UploadFile] = File(...)
 ):
     """
     Start file upload task and return task ID

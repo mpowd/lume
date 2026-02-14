@@ -16,7 +16,6 @@ from ragas.testset.synthesizers.single_hop.specific import (
 from backend.core.llm import get_chat_llm
 from backend.db.mongodb import MongoDBClient
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()

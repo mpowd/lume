@@ -1,10 +1,10 @@
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
 import logging
-from typing import Optional, List, Dict, Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from backend.app.core.services.chatbot_service import get_chatbot_service
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -12,18 +12,18 @@ router = APIRouter()
 
 class SourceUrl(BaseModel):
     url: str
-    score: Optional[float] = None  # Make score optional
+    score: float | None = None  # Make score optional
 
 
 class ChatRequest(BaseModel):
     query: str
-    chatbot_id: Optional[str] = None
+    chatbot_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     response: str
-    contexts: List[str] = []
-    source_urls: List[SourceUrl] = []
+    contexts: list[str] = []
+    source_urls: list[SourceUrl] = []
 
 
 @router.post("/", response_model=ChatResponse)

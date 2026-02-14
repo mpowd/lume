@@ -1,14 +1,14 @@
+import json
+import logging
+import uuid
+
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import logging
-import httpx
-import json
-import uuid
-from typing import List
+
 from backend.db.mongodb import MongoDBClient
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -87,7 +87,7 @@ async def crawl_url(
 
 class UploadDocumentsRequest(BaseModel):
     collection_name: str
-    urls: List[str]
+    urls: list[str]
     crawl_session_id: str
 
 

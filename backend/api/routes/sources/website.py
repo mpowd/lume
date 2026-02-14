@@ -1,39 +1,37 @@
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+import asyncio
+import hashlib
 import logging
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
-import asyncio
-from backend.db.mongodb import MongoDBClient
+
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, LinkPreviewConfig
 from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from langchain_qdrant import (
-    QdrantVectorStore,
-    RetrievalMode,
-    FastEmbedSparse,
-)
-from langchain_text_splitters import (
-    MarkdownHeaderTextSplitter,
-    CharacterTextSplitter,
-)
-from qdrant_client import QdrantClient
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
-import hashlib
-from qdrant_client import models
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+from langchain_qdrant import (
+    FastEmbedSparse,
+    QdrantVectorStore,
+    RetrievalMode,
+)
+from langchain_text_splitters import (
+    CharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+)
+from pydantic import BaseModel
+from qdrant_client import QdrantClient, models
 
+from backend.db.mongodb import MongoDBClient
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # In-memory storage for website upload tasks
-website_upload_tasks: Dict[str, Dict[str, Any]] = {}
+website_upload_tasks: dict[str, dict[str, Any]] = {}
 
 
 @router.get("/links")
@@ -42,7 +40,7 @@ async def get_links(
     include_external_domains: bool = Query(
         False, description="Include external domains"
     ),
-    collection_name: Optional[str] = Query(
+    collection_name: str | None = Query(
         None, description="Collection name to check for existing URLs"
     ),
 ):
@@ -171,10 +169,10 @@ async def get_links(
 
 class UploadDocumentsRequest(BaseModel):
     collection_name: str
-    urls: List[str]
+    urls: list[str]
 
 
-async def get_markdown_from_urls(urls: List[str]):
+async def get_markdown_from_urls(urls: list[str]):
     pass
 
 
@@ -195,9 +193,9 @@ def remove_duplicate_urls(task_id, urls, existing_urls):
         logger.info("All URLs already exist in collection")
         website_upload_tasks[task_id]["status"] = "complete"
         website_upload_tasks[task_id]["title"] = "Already Exists"
-        website_upload_tasks[task_id][
-            "message"
-        ] = "All URLs already exist in collection"
+        website_upload_tasks[task_id]["message"] = (
+            "All URLs already exist in collection"
+        )
         website_upload_tasks[task_id]["stats"] = [
             {
                 "label": "Skipped (Already Exist)",
@@ -259,9 +257,9 @@ async def scrape_urls(crawler_config, urls, collection_name, task_id=None):
                 if task_id:
                     website_upload_tasks[task_id]["stages"][0]["current"] = idx
                     website_upload_tasks[task_id]["stages"][0]["current_item"] = url
-                    website_upload_tasks[task_id][
-                        "message"
-                    ] = f"Crawling {idx}/{len(urls)}..."
+                    website_upload_tasks[task_id]["message"] = (
+                        f"Crawling {idx}/{len(urls)}..."
+                    )
 
                 result = await crawler.arun(url, config=crawler_config)
 
@@ -277,8 +275,7 @@ async def scrape_urls(crawler_config, urls, collection_name, task_id=None):
                         "collection_name": collection_name,
                         "timestamp": datetime.now().isoformat(),
                         "hash": content_hash,
-                        "collection_name"
-                        "metadata": {
+                        "collection_namemetadata": {
                             "status_code": result.status_code,
                             "content_type": result.metadata.get(
                                 "content_type", "text/html"
@@ -351,9 +348,9 @@ async def chunk_documents(documents, collection_config, task_id=None):
                 website_upload_tasks[task_id]["stages"][1]["current_item"] = doc_data[
                     "url"
                 ]
-                website_upload_tasks[task_id][
-                    "message"
-                ] = f"Chunking document {doc_idx}/{len(documents)}..."
+                website_upload_tasks[task_id]["message"] = (
+                    f"Chunking document {doc_idx}/{len(documents)}..."
+                )
 
             md_header_splits = markdown_splitter.split_text(doc_data["markdown"])
             chunks = text_splitter.split_documents(md_header_splits)
@@ -419,21 +416,20 @@ async def calculate_embeddings_and_save_to_qdrant(
         current = min(i + batch_size, len(chunks))
         if task_id:
             website_upload_tasks[task_id]["stages"][2]["current"] = current
-            website_upload_tasks[task_id][
-                "message"
-            ] = f"Embedding {current}/{len(chunks)} chunks..."
+            website_upload_tasks[task_id]["message"] = (
+                f"Embedding {current}/{len(chunks)} chunks..."
+            )
 
         await asyncio.sleep(0.1)
 
 
 async def process_websites_background(
-    task_id: str, collection_name: str, urls: List[str]
+    task_id: str, collection_name: str, urls: list[str]
 ):
     """
     Background task to process website URLs
     """
     try:
-
         # Check for existing URLs
         mongodb_client = MongoDBClient.get_instance()
         existing_docs = mongodb_client.get_docs(
@@ -491,9 +487,9 @@ async def process_websites_background(
         # Complete
         website_upload_tasks[task_id]["status"] = "complete"
         website_upload_tasks[task_id]["title"] = "Upload Complete!"
-        website_upload_tasks[task_id][
-            "message"
-        ] = f"Successfully processed {len(processed_urls)} websites"
+        website_upload_tasks[task_id]["message"] = (
+            f"Successfully processed {len(processed_urls)} websites"
+        )
 
         website_upload_tasks[task_id]["stages"][2]["is_current"] = False
 
