@@ -1,45 +1,29 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
-
 import logging
-import os
+from datetime import UTC, datetime
 
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
-from backend.db.mongodb import MongoDBClient
+from fastapi import APIRouter, HTTPException
+from langchain_core.documents import Document
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_openai import ChatOpenAI
-from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda, RunnableBranch
-from langchain_core.runnables.passthrough import RunnableAssign
-from langchain_core.documents import Document
-from langchain.document_transformers import LongContextReorder
-from bson import ObjectId, json_util
 from pydantic import BaseModel, Field
-from typing import List
-import json
-from tqdm import tqdm
-
-from ragas.testset import TestsetGenerator
-from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.testset import TestsetGenerator
 from ragas.testset.synthesizers.single_hop.specific import (
     SingleHopSpecificQuerySynthesizer,
 )
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+from backend.core.llm import get_chat_llm
+from backend.db.mongodb import MongoDBClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-llm = ChatOpenAI(
-    model="gpt-4o-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY")
-)
+llm = get_chat_llm()
 
 
-def get_mongodb_docs(collection_name: str) -> List[str]:
+def get_mongodb_docs(collection_name: str) -> list[str]:
     mongodb_client = MongoDBClient.get_instance()
     docs = mongodb_client.get_all_documents(collection_name=collection_name)
 
@@ -68,7 +52,7 @@ class QAPair(BaseModel):
 
 class DatasetCreationRequest(BaseModel):
     dataset_name: str = Field(description="Name of the dataset")
-    qa_pairs: List[dict]
+    qa_pairs: list[dict]
 
 
 @router.post("/datasets")
@@ -84,7 +68,7 @@ async def create_dataset(request: DatasetCreationRequest):
         dataset_entry = {
             "name": request.dataset_name,
             "source_collection": "manual",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "generator": "human",
             "model": "None",
             "num_pairs": len(request.qa_pairs),
@@ -216,7 +200,7 @@ class RagasDatasetGenerationRequest(BaseModel):
     )
 
 
-def get_mongodb_docs_as_langchain(collection_name: str) -> List[Document]:
+def get_mongodb_docs_as_langchain(collection_name: str) -> list[Document]:
     """
     Retrieve documents from MongoDB and convert them to Langchain Document format
     """
@@ -329,33 +313,33 @@ async def generate_ragas_dataset(request: RagasDatasetGenerationRequest):
 
 class EvaluationRequest(BaseModel):
     dataset_name: str = Field(description="Name of the evaluation dataset")
-    qag_triplets: List[dict]
+    qag_triplets: list[dict]
 
 
 class EvaluationRequest(BaseModel):
     dataset_name: str = Field(description="Name of the evaluation dataset")
-    questions: List[str] = Field(description="Questions that are evaluated")
-    ground_truths: List[str] = Field(
+    questions: list[str] = Field(description="Questions that are evaluated")
+    ground_truths: list[str] = Field(
         description="Ground truth answers for the questions"
     )
-    answers: List[str] = Field(
+    answers: list[str] = Field(
         description="Answers from the RAG system for the questions"
     )
-    retrieved_contexts: List[str] = Field(
+    retrieved_contexts: list[str] = Field(
         description="Retrieved context chunks for the questions from the RAG system"
     )
 
 
 class EvaluationRequest(BaseModel):
     dataset_name: str = Field(description="Name of the evaluation dataset")
-    questions: List[str] = Field(description="Questions that are evaluated")
-    ground_truths: List[str] = Field(
+    questions: list[str] = Field(description="Questions that are evaluated")
+    ground_truths: list[str] = Field(
         description="Ground truth answers for the questions"
     )
-    answers: List[str] = Field(
+    answers: list[str] = Field(
         description="Answers from the RAG system for the questions"
     )
-    retrieved_contexts: List[List[str]] = Field(
+    retrieved_contexts: list[list[str]] = Field(
         description="Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
     )
 
@@ -366,18 +350,18 @@ async def evaluate(request: EvaluationRequest):
     Evaluate the RAG system using multiple Ragas metrics including faithfulness and context recall.
     """
     try:
-        from ragas import EvaluationDataset
-        from ragas import evaluate
-        from ragas.llms import LangchainLLMWrapper
+        from datetime import datetime
+
+        import pandas as pd
         from langchain_openai import ChatOpenAI
+        from ragas import EvaluationDataset, evaluate
+        from ragas.llms import LangchainLLMWrapper
         from ragas.metrics import (
-            faithfulness,
-            context_recall,
             answer_relevancy,
             context_precision,
+            context_recall,
+            faithfulness,
         )
-        from datetime import datetime, timezone
-        import pandas as pd
 
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         evaluator_llm = LangchainLLMWrapper(llm)
@@ -443,9 +427,9 @@ async def evaluate(request: EvaluationRequest):
         evaluations = result_df.to_dict("records")
 
         evaluation_results = {
-            "name": f"{request.dataset_name}_{datetime.now(timezone.utc).isoformat()}",
+            "name": f"{request.dataset_name}_{datetime.now(UTC).isoformat()}",
             "dataset_name": request.dataset_name,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "questions": request.questions,
             "ground_truths": request.ground_truths,
             "answers": request.answers,
@@ -484,14 +468,14 @@ async def evaluate(request: EvaluationRequest):
 class EnhancedEvaluationRequest(BaseModel):
     dataset_name: str = Field(description="Name of the evaluation dataset")
     chatbot_id: str = Field(description="ID of the chatbot used for evaluation")
-    questions: List[str] = Field(description="Questions that are evaluated")
-    ground_truths: List[str] = Field(
+    questions: list[str] = Field(description="Questions that are evaluated")
+    ground_truths: list[str] = Field(
         description="Ground truth answers for the questions"
     )
-    answers: List[str] = Field(
+    answers: list[str] = Field(
         description="Answers from the RAG system for the questions"
     )
-    retrieved_contexts: List[List[str]] = Field(
+    retrieved_contexts: list[list[str]] = Field(
         description="Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
     )
 
@@ -503,19 +487,19 @@ async def evaluate_chatbot(request: EnhancedEvaluationRequest):
     Also save chatbot information, dataset details, and evaluation results.
     """
     try:
-        from ragas import EvaluationDataset
-        from ragas import evaluate
-        from ragas.llms import LangchainLLMWrapper
-        from langchain_openai import ChatOpenAI
-        from ragas.metrics import (
-            faithfulness,
-            context_recall,
-            answer_relevancy,
-            context_precision,
-        )
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         import pandas as pd
         from bson.objectid import ObjectId
+        from langchain_openai import ChatOpenAI
+        from ragas import EvaluationDataset, evaluate
+        from ragas.llms import LangchainLLMWrapper
+        from ragas.metrics import (
+            answer_relevancy,
+            context_precision,
+            context_recall,
+            faithfulness,
+        )
 
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         evaluator_llm = LangchainLLMWrapper(llm)
@@ -592,7 +576,7 @@ async def evaluate_chatbot(request: EnhancedEvaluationRequest):
             {"name": request.dataset_name}
         )
 
-        eval_timestamp = datetime.now(timezone.utc)
+        eval_timestamp = datetime.now(UTC)
         evaluation_results = {
             "name": f"{request.dataset_name}_{eval_timestamp.isoformat()}",
             "timestamp": eval_timestamp.isoformat(),
@@ -750,10 +734,10 @@ async def get_evaluation_by_id(evaluation_id: str):
 class EvaluateAssistantRequest(BaseModel):
     dataset_name: str
     assistant_id: str
-    questions: List[str]
-    ground_truths: List[str]
-    answers: List[str]
-    retrieved_contexts: List[List[str]]
+    questions: list[str]
+    ground_truths: list[str]
+    answers: list[str]
+    retrieved_contexts: list[list[str]]
     eval_llm_model: str
     eval_llm_provider: str
 
@@ -765,14 +749,14 @@ async def evaluate_assistant(request: EvaluateAssistantRequest):
     """
     try:
         # Import RAGAS here
+        from datasets import Dataset
         from ragas import evaluate
         from ragas.metrics import (
             answer_relevancy,
-            faithfulness,
-            context_recall,
             context_precision,
+            context_recall,
+            faithfulness,
         )
-        from datasets import Dataset
 
         # Initialize evaluation LLM based on provider
         if request.eval_llm_provider == "openai":
@@ -833,7 +817,7 @@ async def evaluate_assistant(request: EvaluateAssistantRequest):
             "detailed_results": result_df.to_dict(
                 "records"
             ),  # Store per-question results
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
         }
 
         # Save to MongoDB - use the same pattern as the existing chatbot evaluation

@@ -101,7 +101,17 @@ class AssistantService:
         instance = self._get_or_create_instance(assistant_id, assistant.type)
 
         validated_input = self._validate_input(instance, input_data)
-        config = instance.get_config_schema()(**assistant.config)
+        config_data = (
+            assistant.config
+            if isinstance(assistant.config, dict)
+            else assistant.config.model_dump()
+        )
+        config_data = (
+            assistant.config
+            if isinstance(assistant.config, dict)
+            else assistant.config.model_dump()
+        )
+        config = instance.get_config_schema()(**config_data)
 
         result = await instance.execute(config, validated_input)
         execution_time = time.time() - start_time
@@ -125,7 +135,12 @@ class AssistantService:
         instance = self._get_or_create_instance(assistant_id, assistant.type)
 
         validated_input = self._validate_input(instance, input_data)
-        config = instance.get_config_schema()(**assistant.config)
+        config_data = (
+            assistant.config
+            if isinstance(assistant.config, dict)
+            else assistant.config.model_dump()
+        )
+        config = instance.get_config_schema()(**config_data)
 
         async for chunk in instance.execute_stream(config, validated_input):
             yield chunk
@@ -145,11 +160,12 @@ class AssistantService:
         if assistant_type not in AssistantRegistry.list_types():
             raise AssistantValidationError(f"Unknown assistant type: {assistant_type}")
 
-    def _validate_config(self, assistant_type: str, config: dict) -> None:
+    def _validate_config(self, assistant_type: str, config) -> None:
         instance = AssistantRegistry.create_instance(assistant_type)
         schema = instance.get_config_schema()
         try:
-            schema(**config)
+            config_data = config if isinstance(config, dict) else config.model_dump()
+            schema(**config_data)
         except Exception as e:
             raise AssistantValidationError(f"Invalid configuration: {e}") from e
 

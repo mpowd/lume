@@ -2,12 +2,13 @@
 Question Answering Assistant with RAG
 """
 
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from .base import BaseAssistant, AssistantConfig, AssistantInput, AssistantOutput
-from .registry import AssistantRegistry
 import logging
-import time
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from .base import AssistantConfig, AssistantInput, AssistantOutput, BaseAssistant
+from .registry import AssistantRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -15,46 +16,52 @@ logger = logging.getLogger(__name__)
 class QAAssistantConfig(AssistantConfig):
     """Configuration for QA Assistant"""
 
-    type: str = "qa"
-    knowledge_base_ids: Optional[List[str]] = []
-    llm_model: str
-    llm_provider: str  # openai or ollama
-    references: List[dict]
-    opening_message: Optional[str] = ""
+    knowledge_base_ids: list[str] = []
+    opening_message: str = ""
+    references: list[dict] = []
+    llm_model: str = "gpt-4o"
+    llm_provider: str = "openai"
 
-    # Retrieval settings
+    # Retrieval
     hybrid_search: bool = True
     top_k: int = 10
     use_hyde: bool = False
-    hyde_prompt: Optional[str] = None
+    hyde_prompt: str | None = None
 
-    # Reranking settings
+    # Reranking
     reranking: bool = False
-    reranker_provider: Optional[str] = None  # cohere or huggingface
-    reranker_model: Optional[str] = None
-    top_n: Optional[int] = None
+    reranker_provider: str | None = None
+    reranker_model: str | None = None
+    top_n: int | None = None
 
-    # Generation settings
-    system_prompt: Optional[str] = None
-    user_prompt: Optional[str] = None
+    # Prompts
+    system_prompt: str | None = None
+    user_prompt: str | None = None
     precise_citation: bool = False
-    precise_citation_system_prompt: Optional[str] = None
-    precise_citation_user_prompt: Optional[str] = None
+    precise_citation_system_prompt: str | None = None
+    precise_citation_user_prompt: str | None = None
+
+    # General
+    local_only: bool = False
+    tools: list[str] = []
+    max_steps: int = 4
+    workflow: str = "linear"
+    agentic_system_prompt: str | None = None
 
 
 class QAAssistantInput(AssistantInput):
     """Input for QA Assistant"""
 
     question: str
-    context: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    context: dict[str, Any] | None = Field(default_factory=dict)
 
 
 class QAAssistantOutput(AssistantOutput):
     """Output from QA Assistant"""
 
     answer: str
-    sources: List[Dict[str, Any]] = Field(default_factory=list)
-    contexts: List[str] = Field(default_factory=list)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    contexts: list[str] = Field(default_factory=list)
 
 
 @AssistantRegistry.register("qa")
@@ -64,8 +71,8 @@ class QAAssistant(BaseAssistant):
     assistant_type = "qa"
 
     def __init__(self):
-        from backend.core.components.retrievers.hybrid_retriever import HybridRetriever
         from backend.core.components.generators.llm_generator import LLMGenerator
+        from backend.core.components.retrievers.hybrid_retriever import HybridRetriever
 
         self.retriever = HybridRetriever()
         self.generator = LLMGenerator()
@@ -126,7 +133,7 @@ class QAAssistant(BaseAssistant):
                 },
             )
 
-            logger.info(f"Successfully generated answer")
+            logger.info("Successfully generated answer")
 
             return QAAssistantOutput(
                 result=generation_result["answer"],

@@ -1,0 +1,2389 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Assistant Platform",
+    "description": "Platform for creating and managing AI assistants",
+    "version": "2.0.0"
+  },
+  "paths": {
+    "/assistants/": {
+      "post": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Create Assistant",
+        "description": "Create a new assistant",
+        "operationId": "createAssistant",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "List Assistants",
+        "description": "List all assistants",
+        "operationId": "listAssistants",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by assistant type",
+              "title": "Type"
+            },
+            "description": "Filter by assistant type"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by active status",
+              "title": "Is Active"
+            },
+            "description": "Filter by active status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssistantResponse"
+                  },
+                  "title": "Response Listassistants"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistants/{assistant_id}": {
+      "get": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Get Assistant",
+        "description": "Get a specific assistant",
+        "operationId": "getAssistant",
+        "parameters": [
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Update Assistant",
+        "description": "Update an assistant",
+        "operationId": "updateAssistant",
+        "parameters": [
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Delete Assistant",
+        "description": "Delete an assistant",
+        "operationId": "deleteAssistant",
+        "parameters": [
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistants/types/list": {
+      "get": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "List Assistant Types",
+        "description": "List all available assistant types",
+        "operationId": "listAssistantTypes",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistants/types/{assistant_type}/schema": {
+      "get": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Get Assistant Type Schema",
+        "description": "Get schemas for a specific assistant type",
+        "operationId": "getAssistantTypeSchema",
+        "parameters": [
+          {
+            "name": "assistant_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistants/{assistant_id}/execute": {
+      "post": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Execute Assistant",
+        "description": "Execute an assistant",
+        "operationId": "executeAssistant",
+        "parameters": [
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistants/{assistant_id}/execute-stream": {
+      "post": {
+        "tags": [
+          "assistants"
+        ],
+        "summary": "Execute Assistant Stream",
+        "description": "Execute an assistant in streaming mode",
+        "operationId": "executeAssistantStream",
+        "parameters": [
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/collections": {
+      "get": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Get Collections",
+        "description": "Get all available collections",
+        "operationId": "get_collections_knowledge_base_collections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Create Collection",
+        "description": "Create a new knowledge base collection with specified configuration.\n\nThis creates:\n1. A Qdrant collection with the specified vector configuration\n2. A MongoDB configuration document with collection metadata and settings",
+        "operationId": "create_collection_knowledge_base_collections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/collection_info": {
+      "get": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Get Collection Info",
+        "description": "Get detailed information about a specific collection",
+        "operationId": "get_collection_info_knowledge_base_collection_info_get",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/upload_documents": {
+      "post": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Upload Documents",
+        "description": "Upload documents to the vector database with duplicate detection and URL normalization.\n\n- collection_name: Name of the collection to add documents to\n- documents: List of document objects containing URL and optional custom payload\n\nPerforms deduplication at multiple levels:\n1. URL normalization - prevents duplicates from http/https, www/non-www variants\n2. Document level in MongoDB - prevents duplicate URLs/documents\n3. Chunk level in Qdrant - prevents duplicate content chunks",
+        "operationId": "upload_documents_knowledge_base_upload_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__knowledge_base__UploadDocumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/check_url_exists": {
+      "get": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Check Url Exists",
+        "description": "Check if a URL already exists in the specified collection.\nUses URL normalization to handle variants (http/https, www/non-www).\n\nArgs:\n    collection_name: Name of the collection to check\n    url: URL to check for existence\n\nReturns:\n    Dict with exists flag and document count",
+        "operationId": "check_url_exists_knowledge_base_check_url_exists_get",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/deduplicate_collection": {
+      "post": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Deduplicate Collection",
+        "description": "Clean up a collection by removing duplicate documents with the same content\nbut different URL variants (http/https, www/non-www).\n\nThis is useful for collections that were created before URL normalization was implemented.\n\nArgs:\n    collection_name: Name of the collection to deduplicate\n\nReturns:\n    Dict with status and summary of the deduplication process",
+        "operationId": "deduplicate_collection_knowledge_base_deduplicate_collection_post",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge_base/collections/{collection_name}": {
+      "delete": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Delete Collection",
+        "description": "Delete a collection and all its associated data.\n\nThis removes:\n1. The Qdrant vector collection\n2. The MongoDB document collection\n3. The MongoDB configuration document",
+        "operationId": "delete_collection_knowledge_base_collections__collection_name__delete",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "knowledge_base"
+        ],
+        "summary": "Update Collection",
+        "description": "Update collection metadata (e.g., description).\n\nArgs:\n    collection_name: Name of the collection to update\n    description: New description for the collection",
+        "operationId": "update_collection_knowledge_base_collections__collection_name__patch",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          },
+          {
+            "name": "description",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Description"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/website/links": {
+      "get": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Get Links",
+        "description": "Get links from a website and mark which ones already exist in the collection.\nReturns links with an 'exists_in_collection' flag for URLs that are already in MongoDB.",
+        "operationId": "get_links_website_links_get",
+        "parameters": [
+          {
+            "name": "base_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "URL to crawl",
+              "title": "Base Url"
+            },
+            "description": "URL to crawl"
+          },
+          {
+            "name": "include_external_domains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include external domains",
+              "default": false,
+              "title": "Include External Domains"
+            },
+            "description": "Include external domains"
+          },
+          {
+            "name": "collection_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name to check for existing URLs",
+              "title": "Collection Name"
+            },
+            "description": "Collection name to check for existing URLs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/website/upload-documents": {
+      "post": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Upload Documents",
+        "description": "Start website upload task and return task ID",
+        "operationId": "upload_documents_website_upload_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__sources__website__UploadDocumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/website/upload-progress/{task_id}": {
+      "get": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Get Website Upload Progress",
+        "description": "Get upload progress for a specific website upload task",
+        "operationId": "get_website_upload_progress_website_upload_progress__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/website/watch_urls/{collection_name}": {
+      "get": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Watch Urls",
+        "description": "Check if website contents have changed",
+        "operationId": "watch_urls_website_watch_urls__collection_name__get",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/website/reindex": {
+      "post": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Reindex",
+        "operationId": "reindex_website_reindex_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/backend__api__routes__sources__website__UploadDocumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/upload-files": {
+      "post": {
+        "tags": [
+          "file"
+        ],
+        "summary": "Upload Files",
+        "description": "Start file upload task and return task ID",
+        "operationId": "upload_files_file_upload_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_files_file_upload_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/upload-progress/{task_id}": {
+      "get": {
+        "tags": [
+          "file"
+        ],
+        "summary": "Get Upload Progress",
+        "description": "Get upload progress for a specific task",
+        "operationId": "get_upload_progress_file_upload_progress__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/files/{collection_name}/{filename}": {
+      "get": {
+        "tags": [
+          "file"
+        ],
+        "summary": "Get File",
+        "description": "Serve uploaded files from the data directory",
+        "operationId": "get_file_file_files__collection_name___filename__get",
+        "parameters": [
+          {
+            "name": "collection_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Name"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/datasets": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Evaluation Datasets",
+        "description": "Retrieve all evaluation datasets.",
+        "operationId": "get_evaluation_datasets_evaluation_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Create Dataset",
+        "description": "Create a dataset with manually provided question-answer pairs.\n\n- name: Name of the dataset (as query parameter)\n- qa_pairs: List of question-answer pairs (as request body)",
+        "operationId": "create_dataset_evaluation_datasets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetCreationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/datasets/{dataset_id}": {
+      "put": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Update Evaluation Dataset",
+        "description": "Update an evaluation dataset.\n\n- dataset_id: ID of the dataset to update\n- update_data: New data to apply to the dataset",
+        "operationId": "update_evaluation_dataset_evaluation_datasets__dataset_id__put",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Update Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Delete Dataset",
+        "description": "Delete an evaluation dataset.\n\n- dataset_id: ID of the dataset to delete",
+        "operationId": "delete_dataset_evaluation_datasets__dataset_id__delete",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/ragas": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Generate Ragas Dataset",
+        "operationId": "generate_ragas_dataset_evaluation_ragas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RagasDatasetGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/evaluate": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Evaluate",
+        "description": "Evaluate the RAG system using multiple Ragas metrics including faithfulness and context recall.",
+        "operationId": "evaluate_evaluation_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/evaluate-chatbot": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Evaluate Chatbot",
+        "description": "Evaluate the RAG system using multiple Ragas metrics including faithfulness and context recall.\nAlso save chatbot information, dataset details, and evaluation results.",
+        "operationId": "evaluate_chatbot_evaluation_evaluate_chatbot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnhancedEvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/evaluations": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Evaluations",
+        "description": "Retrieve all evaluation results.",
+        "operationId": "get_evaluations_evaluation_evaluations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/evaluations/{evaluation_id}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Evaluation By Id",
+        "description": "Retrieve a specific evaluation by ID.",
+        "operationId": "get_evaluation_by_id_evaluation_evaluations__evaluation_id__get",
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/evaluate-assistant": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Evaluate Assistant",
+        "description": "Evaluate an assistant's performance using RAGAS metrics",
+        "operationId": "evaluate_assistant_evaluation_evaluate_assistant_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateAssistantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/datasets/{dataset_name}/evaluations": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Evaluations By Dataset",
+        "description": "Get all evaluations for a specific dataset.",
+        "operationId": "get_evaluations_by_dataset_evaluation_datasets__dataset_name__evaluations_get",
+        "parameters": [
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ollama/models": {
+      "get": {
+        "tags": [
+          "ollama"
+        ],
+        "summary": "Get Ollama Models",
+        "description": "Fetch available Ollama models from the host machine",
+        "operationId": "get_ollama_models_ollama_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssistantCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "qa"
+          },
+          "config": {
+            "$ref": "#/components/schemas/QAAssistantConfig"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "default": "system"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "config"
+        ],
+        "title": "AssistantCreateRequest"
+      },
+      "AssistantResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "config": {
+            "$ref": "#/components/schemas/QAAssistantConfig"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "type",
+          "config",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "is_active"
+        ],
+        "title": "AssistantResponse"
+      },
+      "AssistantUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QAAssistantConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "AssistantUpdateRequest"
+      },
+      "Body_upload_files_file_upload_files_post": {
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name"
+          },
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_name",
+          "files"
+        ],
+        "title": "Body_upload_files_file_upload_files_post"
+      },
+      "CollectionCreateRequest": {
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "default": ""
+          },
+          "embedding_model": {
+            "type": "string",
+            "title": "Embedding Model"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "title": "Chunk Size"
+          },
+          "chunk_overlap": {
+            "type": "integer",
+            "title": "Chunk Overlap"
+          },
+          "distance_metric": {
+            "type": "string",
+            "title": "Distance Metric"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_name",
+          "embedding_model",
+          "chunk_size",
+          "chunk_overlap",
+          "distance_metric"
+        ],
+        "title": "CollectionCreateRequest"
+      },
+      "DatasetCreationRequest": {
+        "properties": {
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name",
+            "description": "Name of the dataset"
+          },
+          "qa_pairs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Qa Pairs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_name",
+          "qa_pairs"
+        ],
+        "title": "DatasetCreationRequest"
+      },
+      "DocumentUpload": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "custom_payload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "DocumentUpload"
+      },
+      "EnhancedEvaluationRequest": {
+        "properties": {
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name",
+            "description": "Name of the evaluation dataset"
+          },
+          "chatbot_id": {
+            "type": "string",
+            "title": "Chatbot Id",
+            "description": "ID of the chatbot used for evaluation"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "Questions that are evaluated"
+          },
+          "ground_truths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ground Truths",
+            "description": "Ground truth answers for the questions"
+          },
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Answers",
+            "description": "Answers from the RAG system for the questions"
+          },
+          "retrieved_contexts": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Retrieved Contexts",
+            "description": "Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_name",
+          "chatbot_id",
+          "questions",
+          "ground_truths",
+          "answers",
+          "retrieved_contexts"
+        ],
+        "title": "EnhancedEvaluationRequest"
+      },
+      "EvaluateAssistantRequest": {
+        "properties": {
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name"
+          },
+          "assistant_id": {
+            "type": "string",
+            "title": "Assistant Id"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "ground_truths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ground Truths"
+          },
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Answers"
+          },
+          "retrieved_contexts": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Retrieved Contexts"
+          },
+          "eval_llm_model": {
+            "type": "string",
+            "title": "Eval Llm Model"
+          },
+          "eval_llm_provider": {
+            "type": "string",
+            "title": "Eval Llm Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_name",
+          "assistant_id",
+          "questions",
+          "ground_truths",
+          "answers",
+          "retrieved_contexts",
+          "eval_llm_model",
+          "eval_llm_provider"
+        ],
+        "title": "EvaluateAssistantRequest"
+      },
+      "EvaluationRequest": {
+        "properties": {
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name",
+            "description": "Name of the evaluation dataset"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "Questions that are evaluated"
+          },
+          "ground_truths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ground Truths",
+            "description": "Ground truth answers for the questions"
+          },
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Answers",
+            "description": "Answers from the RAG system for the questions"
+          },
+          "retrieved_contexts": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Retrieved Contexts",
+            "description": "Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_name",
+          "questions",
+          "ground_truths",
+          "answers",
+          "retrieved_contexts"
+        ],
+        "title": "EvaluationRequest"
+      },
+      "ExecutionRequest": {
+        "properties": {
+          "input_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_data"
+        ],
+        "title": "ExecutionRequest",
+        "description": "Request to execute an assistant"
+      },
+      "ExecutionResponse": {
+        "properties": {
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "output": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output"
+          },
+          "execution_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Time"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "output"
+        ],
+        "title": "ExecutionResponse",
+        "description": "Response from assistant execution"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "QAAssistantConfig": {
+        "properties": {
+          "knowledge_base_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Knowledge Base Ids",
+            "default": []
+          },
+          "opening_message": {
+            "type": "string",
+            "title": "Opening Message",
+            "default": ""
+          },
+          "references": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "References",
+            "default": []
+          },
+          "llm_model": {
+            "type": "string",
+            "title": "Llm Model",
+            "default": "gpt-4o"
+          },
+          "llm_provider": {
+            "type": "string",
+            "title": "Llm Provider",
+            "default": "openai"
+          },
+          "hybrid_search": {
+            "type": "boolean",
+            "title": "Hybrid Search",
+            "default": true
+          },
+          "top_k": {
+            "type": "integer",
+            "title": "Top K",
+            "default": 10
+          },
+          "use_hyde": {
+            "type": "boolean",
+            "title": "Use Hyde",
+            "default": false
+          },
+          "hyde_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hyde Prompt"
+          },
+          "reranking": {
+            "type": "boolean",
+            "title": "Reranking",
+            "default": false
+          },
+          "reranker_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reranker Provider"
+          },
+          "reranker_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reranker Model"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
+          },
+          "user_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Prompt"
+          },
+          "precise_citation": {
+            "type": "boolean",
+            "title": "Precise Citation",
+            "default": false
+          },
+          "precise_citation_system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precise Citation System Prompt"
+          },
+          "precise_citation_user_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precise Citation User Prompt"
+          },
+          "local_only": {
+            "type": "boolean",
+            "title": "Local Only",
+            "default": false
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "default": []
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps",
+            "default": 4
+          },
+          "workflow": {
+            "type": "string",
+            "title": "Workflow",
+            "default": "linear"
+          },
+          "agentic_system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentic System Prompt"
+          }
+        },
+        "type": "object",
+        "title": "QAAssistantConfig",
+        "description": "Configuration for QA Assistant"
+      },
+      "RagasDatasetGenerationRequest": {
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name"
+          },
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name"
+          },
+          "testset_size": {
+            "type": "integer",
+            "title": "Testset Size",
+            "description": "Number of test cases to generate",
+            "default": 1
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "LLM model to use for generation",
+            "default": "gpt-4o-mini"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_name",
+          "dataset_name"
+        ],
+        "title": "RagasDatasetGenerationRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "backend__api__routes__knowledge_base__UploadDocumentsRequest": {
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentUpload"
+            },
+            "type": "array",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_name",
+          "documents"
+        ],
+        "title": "UploadDocumentsRequest"
+      },
+      "backend__api__routes__sources__website__UploadDocumentsRequest": {
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Urls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection_name",
+          "urls"
+        ],
+        "title": "UploadDocumentsRequest"
+      }
+    }
+  }
+}

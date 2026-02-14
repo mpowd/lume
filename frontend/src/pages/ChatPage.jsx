@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MessageSquare, Bot, RefreshCw, Database, Cpu } from 'lucide-react'
-import { useAssistants } from '../hooks/useAssistants'
+import { useListAssistants } from '../api/generated'
 import { chatAPI } from '../services/api'
 import AssistantSelector from '../components/chat/AssistantSelector'
 import MessageList from '../components/chat/MessageList'
@@ -10,90 +10,79 @@ import ErrorAlert from '../components/shared/ErrorAlert'
 import Button from '../components/shared/Button'
 
 export default function ChatPage() {
-  const { assistants, loading: loadingAssistants, error: assistantsError } = useAssistants()
+  const { data: assistants = [], isLoading, error } = useListAssistants({ type: 'qa' })
+  console.log('React Query result:', { assistants, isLoading, error })
   const [selectedAssistant, setSelectedAssistant] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [streamingMessageIndex, setStreamingMessageIndex] = useState(null)
 
+  const getOpeningMessage = (bot) =>
+    bot.config.opening_message || `Hi! I'm ${bot.name}. How can I help you today?`
+
   const handleSelectAssistant = (bot) => {
     setSelectedAssistant(bot)
-    const openingMessage = bot.opening_message || `Hi! I'm ${bot.name}. How can I help you today?`
-    setMessages([{ 
-      role: 'assistant', 
-      content: openingMessage
-    }])
+    setMessages([{ role: 'assistant', content: getOpeningMessage(bot) }])
   }
 
   const handleSendMessage = async (input) => {
-    const userMessage = { role: 'user', content: input }
-    setMessages(prev => [...prev, userMessage])
+    if (!selectedAssistant) return
+
+    setMessages(prev => [...prev, { role: 'user', content: input }])
     setLoading(true)
-    
-    // Add empty assistant message that will be filled during streaming
+
     const assistantMessageIndex = messages.length + 1
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content: '',
-      isStreaming: true
-    }])
+    setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }])
     setStreamingMessageIndex(assistantMessageIndex)
-    
+
     chatAPI.sendMessageStream(
       selectedAssistant.id,
       input,
-      // onChunk - called for each token
       (token) => {
         setMessages(prev => {
-          const newMessages = [...prev]
-          newMessages[assistantMessageIndex] = {
-            ...newMessages[assistantMessageIndex],
-            content: newMessages[assistantMessageIndex].content + token
+          const next = [...prev]
+          next[assistantMessageIndex] = {
+            ...next[assistantMessageIndex],
+            content: next[assistantMessageIndex].content + token
           }
-          return newMessages
+          return next
         })
       },
-      // onComplete - called when streaming finishes
       (result) => {
         let sortedSources = result.source_urls || []
         let sortedContexts = result.contexts || []
-        
+
         if (sortedSources.length > 0) {
-          const sourceIndices = sortedSources.map((source, index) => ({
-            index,
-            score: typeof source === 'string' ? 0.5 : (source.score || 0.5)
-          }))
-          
-          sourceIndices.sort((a, b) => b.score - a.score)
-          sortedSources = sourceIndices.map(item => sortedSources[item.index])
-          sortedContexts = sourceIndices.map(item => sortedContexts[item.index] || '')
+          const indices = sortedSources
+            .map((source, i) => ({ i, score: typeof source === 'string' ? 0.5 : (source.score || 0.5) }))
+            .sort((a, b) => b.score - a.score)
+          sortedSources = indices.map(({ i }) => sortedSources[i])
+          sortedContexts = indices.map(({ i }) => sortedContexts[i] || '')
         }
-        
+
         setMessages(prev => {
-          const newMessages = [...prev]
-          newMessages[assistantMessageIndex] = {
+          const next = [...prev]
+          next[assistantMessageIndex] = {
             role: 'assistant',
-            content: result.response || newMessages[assistantMessageIndex].content,
+            content: result.response || next[assistantMessageIndex].content,
             sources: sortedSources,
             contexts: sortedContexts,
             isStreaming: false
           }
-          return newMessages
+          return next
         })
         setLoading(false)
         setStreamingMessageIndex(null)
       },
-      // onError - called on error
       (err) => {
-        console.error('Error sending message:', err)
         setMessages(prev => {
-          const newMessages = [...prev]
-          newMessages[assistantMessageIndex] = {
+          const next = [...prev]
+          next[assistantMessageIndex] = {
             role: 'assistant',
             content: '❌ Error: ' + (err.message || 'Could not send message'),
             isStreaming: false
           }
-          return newMessages
+          return next
         })
         setLoading(false)
         setStreamingMessageIndex(null)
@@ -103,22 +92,17 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     if (selectedAssistant) {
-      const openingMessage = selectedAssistant.opening_message || `Hi! I'm ${selectedAssistant.name}. How can I help you today?`
-      setMessages([{ 
-        role: 'assistant', 
-        content: openingMessage
-      }])
+      setMessages([{ role: 'assistant', content: getOpeningMessage(selectedAssistant) }])
     }
   }
 
-  if (loadingAssistants) {
+  if (isLoading) {
     return <LoadingSpinner fullScreen text="Loading assistants..." />
   }
 
   return (
     <div className="flex h-screen bg-background">
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <div className="fixed top-0 left-0 right-0 lg:left-80 z-10 border-b border-border-subtle bg-background-elevated/95 backdrop-blur-xl">
           <div className="px-6 py-4">
             <div className="max-w-6xl mx-auto">
@@ -135,9 +119,7 @@ export default function ChatPage() {
                       </div>
                     </div>
                   </div>
-
-                  {assistantsError && <ErrorAlert message={assistantsError} className="mb-4" />}
-
+                  {error && <ErrorAlert message={error.message} className="mb-4" />}
                   {assistants.length > 0 ? (
                     <AssistantSelector assistants={assistants} onSelect={handleSelectAssistant} />
                   ) : (
@@ -157,14 +139,14 @@ export default function ChatPage() {
                       <div className="flex items-center gap-3 text-xs text-text-tertiary">
                         <span className="flex items-center gap-1">
                           <Database className="w-3 h-3" />
-                          {selectedAssistant.collections?.length > 0 
-                            ? `${selectedAssistant.collections.length} sources` 
+                          {(selectedAssistant.config.knowledge_base_ids?.length || 0) > 0
+                            ? `${selectedAssistant.config.knowledge_base_ids.length} sources`
                             : 'No sources'}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Cpu className="w-3 h-3" />
-                          {selectedAssistant.llm || 'Not set'}
+                          {selectedAssistant.config.llm_model || 'Not set'}
                         </span>
                       </div>
                     </div>
@@ -183,27 +165,18 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Messages */}
-        <div 
-          className="flex-1 overflow-y-auto px-6 pb-8" 
-          style={{ 
-            marginTop: selectedAssistant ? '90px' : '280px', 
-            marginBottom: '120px' 
-          }}
+        <div
+          className="flex-1 overflow-y-auto px-6 pb-8"
+          style={{ marginTop: selectedAssistant ? '90px' : '280px', marginBottom: '120px' }}
         >
-          <MessageList 
-            messages={messages} 
+          <MessageList
+            messages={messages}
             loading={loading && streamingMessageIndex === null}
             streamingIndex={streamingMessageIndex}
           />
         </div>
 
-        {/* Input */}
-        <ChatInput 
-          onSend={handleSendMessage}
-          disabled={!selectedAssistant}
-          loading={loading}
-        />
+        <ChatInput onSend={handleSendMessage} disabled={!selectedAssistant} loading={loading} />
       </div>
     </div>
   )

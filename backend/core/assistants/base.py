@@ -3,8 +3,7 @@ Base classes for all assistant types
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
-from datetime import datetime
+from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -54,7 +53,7 @@ class BaseAssistant(ABC):
     @abstractmethod
     async def execute_stream(
         self, config: AssistantConfig, input_data: AssistantInput
-    ) -> AsyncGenerator:
+    ) -> AsyncIterator[Any]:
         pass
 
     @abstractmethod

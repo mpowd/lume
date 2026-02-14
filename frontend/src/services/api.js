@@ -23,15 +23,16 @@ export const assistantsAPI = {
       const params = {}
       if (type) params.type = type
       if (is_active !== null) params.is_active = is_active
-      
+
       const response = await api.get('/assistants/', { params })
-      return response.data.assistants || []
+      console.log(response)
+      return response.data || []
     } catch (error) {
       console.error('Assistants API Error:', error)
       throw error
     }
   },
-  
+
   /**
    * Get assistant by ID
    */
@@ -44,7 +45,7 @@ export const assistantsAPI = {
       throw error
     }
   },
-  
+
   /**
    * Create a new assistant
    * @param {Object} data - Assistant configuration
@@ -62,7 +63,7 @@ export const assistantsAPI = {
       throw error
     }
   },
-  
+
   /**
    * Update an assistant
    */
@@ -75,7 +76,7 @@ export const assistantsAPI = {
       throw error
     }
   },
-  
+
   /**
    * Delete an assistant
    */
@@ -88,7 +89,7 @@ export const assistantsAPI = {
       throw error
     }
   },
-  
+
   /**
    * Get list of available assistant types
    */
@@ -101,7 +102,7 @@ export const assistantsAPI = {
       throw error
     }
   },
-  
+
   /**
    * Get schema for a specific assistant type
    * @param {string} type - Assistant type (e.g., 'qa')
@@ -136,7 +137,7 @@ export const executionAPI = {
       throw error
     }
   },
-  
+
   /**
    * Execute QA assistant (convenience method)
    * @param {string} assistantId - QA Assistant ID
@@ -224,13 +225,13 @@ export const createQAAssistant = async ({
 export const updateQAAssistant = async (assistantId, updates) => {
   // Get current assistant
   const current = await assistantsAPI.getById(assistantId)
-  
+
   // Merge updates with current config
   const updatedConfig = {
     ...current.config,
     ...updates
   }
-  
+
   return assistantsAPI.update(assistantId, {
     name: updates.name || current.name,
     description: updates.description || current.description,
@@ -251,11 +252,15 @@ export const chatAPI = {
    */
   sendMessageStream: async (assistantId, message, onChunk, onComplete, onError) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/execute/qa-stream?assistant_id=${assistantId}&question=${encodeURIComponent(message)}`, {
+      const response = await fetch(`${API_BASE_URL}/assistants/${assistantId}/execute-stream`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
+        body: JSON.stringify({
+          input_data: { question: message }
+        }),
       })
 
       if (!response.ok) {
@@ -271,7 +276,7 @@ export const chatAPI = {
 
       while (true) {
         const { done, value } = await reader.read()
-        
+
         if (done) {
           onComplete({
             response: fullResponse,
@@ -289,7 +294,7 @@ export const chatAPI = {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
-              
+
               if (data.token) {
                 // Stream token
                 fullResponse += data.token
@@ -322,7 +327,7 @@ export const chatAPI = {
           question: message
         }
       })
-      
+
       return {
         response: response.data.response,
         contexts: response.data.contexts || [],
@@ -361,7 +366,7 @@ export const knowledgeBaseAPI = {
       throw error
     }
   },
-  
+
   create: async (config) => {
     try {
       const response = await api.post('/knowledge_base/collections', {
@@ -390,7 +395,7 @@ export const knowledgeBaseAPI = {
       throw error
     }
   },
-  
+
   delete: async (collectionName) => {
     try {
       const response = await api.delete(`/knowledge_base/collections/${collectionName}`)
@@ -427,28 +432,28 @@ export const knowledgeBaseAPI = {
       throw error
     }
   },
-  
+
   uploadFilesStream: async (collectionName, files) => {
-      try {
-        const formData = new FormData();
-        formData.append('collection_name', collectionName);
-        
-        files.forEach((file, index) => {
-          formData.append('files', file);
-        });
-        
-        const response = await api.post('/file/upload-files-stream', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        
-        return response.data;
-      } catch (error) {
-        console.error('Upload Files Error:', error);
-        throw error;
-      }
+    try {
+      const formData = new FormData();
+      formData.append('collection_name', collectionName);
+
+      files.forEach((file, index) => {
+        formData.append('files', file);
+      });
+
+      const response = await api.post('/file/upload-files-stream', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Upload Files Error:', error);
+      throw error;
     }
+  }
 }
 
 // ==================== FILE API ====================
@@ -486,7 +491,7 @@ export const websiteAPI = {
         base_url: baseUrl,
         include_external_domains: includeExternal
       }
-      
+
       if (collectionName) {
         params.collection_name = collectionName
       }
