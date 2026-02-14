@@ -5,6 +5,7 @@ Main FastAPI application
 import logging
 from contextlib import asynccontextmanager
 
+import colorlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,11 +14,28 @@ from backend.api.routes import assistants, evaluation, knowledge_base, ollama
 from backend.app.exception_handlers import register_exception_handlers
 from backend.config import settings
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+handler = colorlog.StreamHandler()
+handler.setFormatter(
+    colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_red",
+        },
+    )
 )
-logger = logging.getLogger(__name__)
 
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.handlers.clear()
+root_logger.addHandler(handler)
+
+logging.getLogger("backend").setLevel(logging.DEBUG)
+
+logger = logging.getLogger(__name__)
 if settings.ENABLE_PHOENIX:
     from phoenix.otel import register
 
