@@ -6,6 +6,11 @@ import logging
 import time
 from typing import Any
 
+from backend.app.exceptions import (
+    AssistantInactiveError,
+    AssistantNotFoundError,
+    AssistantValidationError,
+)
 from backend.core.assistants.base import BaseAssistant
 from backend.core.assistants.registry import AssistantRegistry
 from backend.db.repositories.assistant_repo import AssistantRepository
@@ -18,20 +23,6 @@ from backend.schemas.assistant import (
 logger = logging.getLogger(__name__)
 
 
-class AssistantNotFoundError(Exception):
-    def __init__(self, assistant_id: str):
-        self.assistant_id = assistant_id
-        super().__init__(f"Assistant '{assistant_id}' not found")
-
-
-class AssistantValidationError(Exception):
-    pass
-
-
-class AssistantInactiveError(Exception):
-    pass
-
-
 class AssistantService:
     """Service for managing and executing assistants"""
 
@@ -42,13 +33,11 @@ class AssistantService:
     # ── CRUD ──────────────────────────────────────────────
 
     def create(self, request: AssistantCreateRequest) -> AssistantResponse:
-        """Create a new assistant"""
         self._validate_type(request.type)
         self._validate_config(request.type, request.config)
         return self.repo.insert(request.model_dump())
 
     def get(self, assistant_id: str) -> AssistantResponse:
-        """Get assistant by ID"""
         assistant = self.repo.find_by_id(assistant_id)
         if not assistant:
             raise AssistantNotFoundError(assistant_id)
@@ -59,14 +48,12 @@ class AssistantService:
         assistant_type: str | None = None,
         is_active: bool | None = None,
     ) -> list[AssistantResponse]:
-        """List assistants with optional filters"""
         return self.repo.find_all(assistant_type=assistant_type, is_active=is_active)
 
     def update(
         self, assistant_id: str, request: AssistantUpdateRequest
     ) -> AssistantResponse:
-        """Update an assistant"""
-        existing = self.get(assistant_id)  # Raises NotFound if missing
+        existing = self.get(assistant_id)
 
         if request.config is not None:
             self._validate_config(existing.type, request.config)
@@ -79,7 +66,6 @@ class AssistantService:
         return result
 
     def delete(self, assistant_id: str) -> bool:
-        """Delete an assistant"""
         self._clear_instance_cache(assistant_id)
         if not self.repo.delete(assistant_id):
             raise AssistantNotFoundError(assistant_id)
@@ -90,22 +76,16 @@ class AssistantService:
     async def execute(
         self, assistant_id: str, input_data: dict[str, Any]
     ) -> dict[str, Any]:
-        """Execute an assistant"""
         start_time = time.time()
 
         assistant = self.get(assistant_id)
 
         if not assistant.is_active:
-            raise AssistantInactiveError(f"Assistant '{assistant_id}' is not active")
+            raise AssistantInactiveError(assistant_id)
 
         instance = self._get_or_create_instance(assistant_id, assistant.type)
-
         validated_input = self._validate_input(instance, input_data)
-        config_data = (
-            assistant.config
-            if isinstance(assistant.config, dict)
-            else assistant.config.model_dump()
-        )
+
         config_data = (
             assistant.config
             if isinstance(assistant.config, dict)
@@ -126,15 +106,14 @@ class AssistantService:
         }
 
     async def execute_stream(self, assistant_id: str, input_data: dict[str, Any]):
-        """Execute an assistant in streaming mode"""
         assistant = self.get(assistant_id)
 
         if not assistant.is_active:
-            raise AssistantInactiveError(f"Assistant '{assistant_id}' is not active")
+            raise AssistantInactiveError(assistant_id)
 
         instance = self._get_or_create_instance(assistant_id, assistant.type)
-
         validated_input = self._validate_input(instance, input_data)
+
         config_data = (
             assistant.config
             if isinstance(assistant.config, dict)

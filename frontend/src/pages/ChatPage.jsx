@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MessageSquare, Bot, RefreshCw, Database, Cpu } from 'lucide-react'
 import { useListAssistants } from '../api/generated'
-import { chatAPI } from '../services/api'
+import { sendMessageStream } from '../api/streaming'
 import AssistantSelector from '../components/chat/AssistantSelector'
 import MessageList from '../components/chat/MessageList'
 import ChatInput from '../components/chat/ChatInput'
@@ -11,7 +11,6 @@ import Button from '../components/shared/Button'
 
 export default function ChatPage() {
   const { data: assistants = [], isLoading, error } = useListAssistants({ type: 'qa' })
-  console.log('React Query result:', { assistants, isLoading, error })
   const [selectedAssistant, setSelectedAssistant] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -35,20 +34,18 @@ export default function ChatPage() {
     setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }])
     setStreamingMessageIndex(assistantMessageIndex)
 
-    chatAPI.sendMessageStream(
-      selectedAssistant.id,
-      input,
-      (token) => {
+    sendMessageStream(selectedAssistant.id, input, {
+      onToken: (token) => {
         setMessages(prev => {
           const next = [...prev]
           next[assistantMessageIndex] = {
             ...next[assistantMessageIndex],
-            content: next[assistantMessageIndex].content + token
+            content: next[assistantMessageIndex].content + token,
           }
           return next
         })
       },
-      (result) => {
+      onComplete: (result) => {
         let sortedSources = result.source_urls || []
         let sortedContexts = result.contexts || []
 
@@ -67,27 +64,27 @@ export default function ChatPage() {
             content: result.response || next[assistantMessageIndex].content,
             sources: sortedSources,
             contexts: sortedContexts,
-            isStreaming: false
+            isStreaming: false,
           }
           return next
         })
         setLoading(false)
         setStreamingMessageIndex(null)
       },
-      (err) => {
+      onError: (err) => {
         setMessages(prev => {
           const next = [...prev]
           next[assistantMessageIndex] = {
             role: 'assistant',
             content: '❌ Error: ' + (err.message || 'Could not send message'),
-            isStreaming: false
+            isStreaming: false,
           }
           return next
         })
         setLoading(false)
         setStreamingMessageIndex(null)
-      }
-    )
+      },
+    })
   }
 
   const handleNewChat = () => {

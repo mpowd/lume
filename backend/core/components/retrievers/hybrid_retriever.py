@@ -28,7 +28,7 @@ class HybridRetriever:
         # self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         # logger.info(f"Retriever uses OpenAI Embedding Model")
 
-        self.client = QdrantClient(url="http://qdrant:6333", timeout=10.0)
+        self.client = QdrantClient(url="http://qdrant:6333", timeout=10)
 
     def _get_llm(self, model_name: str, provider: str):
         """Get LLM for HyDE"""

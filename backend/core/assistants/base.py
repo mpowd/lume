@@ -34,32 +34,27 @@ class BaseAssistant(ABC):
     assistant_type: str = "base"
 
     @abstractmethod
-    def get_config_schema(self) -> type[AssistantConfig]:
+    def get_config_schema(self) -> type[BaseModel]:
         """Return the Pydantic schema for configuration"""
-        pass
+        ...
 
     @abstractmethod
-    def get_input_schema(self) -> type[AssistantInput]:
+    def get_input_schema(self) -> type[BaseModel]:
         """Return the Pydantic schema for runtime input"""
-        pass
+        ...
 
     @abstractmethod
-    async def execute(
-        self, config: AssistantConfig, input_data: AssistantInput
-    ) -> AssistantOutput:
+    async def execute(self, config: Any, input_data: Any) -> AssistantOutput:
         """Execute the assistant logic"""
-        pass
+        ...
 
     @abstractmethod
-    async def execute_stream(
-        self, config: AssistantConfig, input_data: AssistantInput
-    ) -> AsyncIterator[Any]:
-        pass
+    def execute_stream(self, config: Any, input_data: Any) -> AsyncIterator[Any]: ...
 
     @abstractmethod
     def supports_evaluation(self) -> bool:
         """Whether this assistant type can be evaluated"""
-        pass
+        ...
 
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate assistant configuration"""

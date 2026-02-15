@@ -1,887 +1,210 @@
+"""
+API routes for evaluation management.
+"""
+
 import logging
-from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException
-from langchain_core.documents import Document
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
-from ragas.embeddings import LangchainEmbeddingsWrapper
-from ragas.llms import LangchainLLMWrapper
-from ragas.testset import TestsetGenerator
-from ragas.testset.synthesizers.single_hop.specific import (
-    SingleHopSpecificQuerySynthesizer,
+from fastapi import APIRouter, Depends
+
+from backend.app.dependencies import get_evaluation_service
+from backend.schemas.evaluation import (
+    DatasetCreateRequest,
+    DatasetListResponse,
+    DatasetResponse,
+    DatasetUpdateRequest,
+    EvaluateAssistantRequest,
+    EvaluationListResponse,
+    EvaluationResponse,
+    RagasGenerationRequest,
 )
-
-from backend.core.llm import get_chat_llm
-from backend.db.mongodb import MongoDBClient
+from backend.services.evaluation_service import EvaluationService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-llm = get_chat_llm()
 
 
-def get_mongodb_docs(collection_name: str) -> list[str]:
-    mongodb_client = MongoDBClient.get_instance()
-    docs = mongodb_client.get_all_documents(collection_name=collection_name)
-
-    if not docs or not isinstance(docs, list) or len(docs) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No documents found in collection {collection_name}",
-        )
-    markdown_contents = []
-    for doc in docs:
-        markdown = doc.get("markdown")
-        if markdown:
-            markdown_contents.append({"url": doc.get("url", ""), "markdown": markdown})
-    return markdown_contents
+# ── Dataset CRUD ──────────────────────────────────────────
 
 
-class QAPair(BaseModel):
-    question: str = Field(
-        description="Eine realistische Frage eines Bürgers zum Dokument"
+@router.post(
+    "/datasets",
+    response_model=DatasetResponse,
+    status_code=201,
+    operation_id="createDataset",
+)
+async def create_dataset(
+    request: DatasetCreateRequest,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Create a dataset with manually provided QA pairs."""
+    dataset = service.create_dataset(request.dataset_name, request.qa_pairs)
+    return _to_dataset_response(dataset)
+
+
+@router.get(
+    "/datasets",
+    response_model=DatasetListResponse,
+    operation_id="listDatasets",
+)
+async def list_datasets(
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Retrieve all evaluation datasets."""
+    datasets = service.list_datasets()
+    return DatasetListResponse(datasets=[_to_dataset_response(d) for d in datasets])
+
+
+@router.put(
+    "/datasets/{dataset_id}",
+    response_model=DatasetResponse,
+    operation_id="updateDataset",
+)
+async def update_dataset(
+    dataset_id: str,
+    request: DatasetUpdateRequest,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Update an evaluation dataset."""
+    result = service.update_dataset(dataset_id, request.model_dump(exclude_unset=True))
+    return _to_dataset_response(result)
+
+
+@router.delete(
+    "/datasets/{dataset_id}",
+    status_code=204,
+    operation_id="deleteDataset",
+)
+async def delete_dataset(
+    dataset_id: str,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Delete an evaluation dataset."""
+    service.delete_dataset(dataset_id)
+
+
+# ── RAGAS generation ──────────────────────────────────────
+
+
+@router.post(
+    "/ragas",
+    response_model=DatasetResponse,
+    status_code=201,
+    operation_id="generateRagasDataset",
+)
+async def generate_ragas_dataset(
+    request: RagasGenerationRequest,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Generate a synthetic QA dataset using RAGAS."""
+    dataset = await service.generate_ragas_dataset(
+        collection_name=request.collection_name,
+        dataset_name=request.dataset_name,
+        testset_size=request.testset_size,
+        model_name=request.model_name,
     )
-    answer: str = Field(
-        description="Eine faktenbasierte Antwort auf die Frage aus dem Dokument"
+    return _to_dataset_response(dataset)
+
+
+# ── Evaluation ────────────────────────────────────────────
+
+
+@router.post(
+    "/evaluate-assistant",
+    response_model=EvaluationResponse,
+    status_code=201,
+    operation_id="evaluateAssistant",
+)
+async def evaluate_assistant(
+    request: EvaluateAssistantRequest,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Evaluate an assistant's performance using RAGAS metrics."""
+    result = await service.evaluate_assistant(
+        dataset_name=request.dataset_name,
+        assistant_id=request.assistant_id,
+        questions=request.questions,
+        ground_truths=request.ground_truths,
+        answers=request.answers,
+        retrieved_contexts=request.retrieved_contexts,
+        eval_llm_model=request.eval_llm_model,
+        eval_llm_provider=request.eval_llm_provider,
     )
-    source_doc: str = Field(description="Die Quelle des Dokuments")
+    return _to_evaluation_response(result)
 
 
-class DatasetCreationRequest(BaseModel):
-    dataset_name: str = Field(description="Name of the dataset")
-    qa_pairs: list[dict]
+# ── Evaluation results ────────────────────────────────────
 
 
-@router.post("/datasets")
-async def create_dataset(request: DatasetCreationRequest):
-    """
-    Create a dataset with manually provided question-answer pairs.
-
-    - name: Name of the dataset (as query parameter)
-    - qa_pairs: List of question-answer pairs (as request body)
-    """
-
-    try:
-        dataset_entry = {
-            "name": request.dataset_name,
-            "source_collection": "manual",
-            "generated_at": datetime.now(UTC).isoformat(),
-            "generator": "human",
-            "model": "None",
-            "num_pairs": len(request.qa_pairs),
-            "qa_pairs": request.qa_pairs,
-        }
-
-        mongodb_client = MongoDBClient.get_instance()
-
-        if mongodb_client.get_collection(
-            collection_name="evaluation_datasets"
-        ).find_one({"name": request.dataset_name}):
-            return {
-                "status": "error",
-                "message": f"A dataset with the name '{request.dataset_name}' already exists. Please choose another name.",
-            }
-
-        inserted_id = mongodb_client.persist_docs(
-            docs=[dataset_entry], collection_name="evaluation_datasets"
-        )
-
-        dataset_entry["_id"] = (
-            str(inserted_id[0]) if isinstance(inserted_id, list) else str(inserted_id)
-        )
-
-        return {
-            "status": "success",
-            "dataset_id": dataset_entry["_id"],
-            "response": dataset_entry,
-        }
-    except Exception as e:
-        logger.error(f"Error creating dataset: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error creating dataset: {str(e)}")
-
-
-@router.get("/datasets")
-async def get_evaluation_datasets():
-    """
-    Retrieve all evaluation datasets.
-    """
-    try:
-        mongodb_client = MongoDBClient.get_instance()
-        evaluation_collection = mongodb_client.get_collection("evaluation_datasets")
-
-        datasets = list(evaluation_collection.find({}))
-
-        for dataset in datasets:
-            dataset["_id"] = str(dataset["_id"])
-
-        return {"status": "success", "datasets": datasets}
-    except Exception as e:
-        logger.error(f"Error retrieving evaluation datasets: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving evaluation datasets: {str(e)}"
-        )
-
-
-@router.put("/datasets/{dataset_id}")
-async def update_evaluation_dataset(dataset_id: str, update_data: dict):
-    """
-    Update an evaluation dataset.
-
-    - dataset_id: ID of the dataset to update
-    - update_data: New data to apply to the dataset
-    """
-    try:
-        from bson.objectid import ObjectId
-
-        mongodb_client = MongoDBClient.get_instance()
-        evaluation_collection = mongodb_client.get_collection("evaluation_datasets")
-
-        result = evaluation_collection.update_one(
-            {"_id": ObjectId(dataset_id)}, {"$set": update_data}
-        )
-
-        if result.modified_count == 0:
-            raise HTTPException(
-                status_code=404, detail=f"Dataset with ID {dataset_id} not found"
-            )
-
-        updated_dataset = evaluation_collection.find_one({"_id": ObjectId(dataset_id)})
-        updated_dataset["_id"] = str(updated_dataset["_id"])
-
-        return {"status": "success", "dataset": updated_dataset}
-    except Exception as e:
-        logger.error(f"Error updating evaluation dataset: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error updating evaluation dataset: {str(e)}"
-        )
-
-
-@router.delete("/datasets/{dataset_id}")
-async def delete_dataset(dataset_id: str):
-    """
-    Delete an evaluation dataset.
-
-    - dataset_id: ID of the dataset to delete
-    """
-    try:
-        from bson.objectid import ObjectId
-
-        mongodb_client = MongoDBClient.get_instance()
-        evaluation_collection = mongodb_client.get_collection("evaluation_datasets")
-
-        result = evaluation_collection.delete_one({"_id": ObjectId(dataset_id)})
-
-        if result.deleted_count == 0:
-            raise HTTPException(
-                status_code=404, detail=f"Dataset with ID {dataset_id} not found"
-            )
-
-        return {
-            "status": "success",
-            "message": f"Dataset {dataset_id} deleted successfully",
-            "deleted_count": result.deleted_count,
-        }
-    except Exception as e:
-        logger.error(f"Error deleting evaluation dataset: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting evaluation dataset: {str(e)}"
-        )
-
-
-class RagasDatasetGenerationRequest(BaseModel):
-    collection_name: str
-    dataset_name: str
-    testset_size: int = Field(default=1, description="Number of test cases to generate")
-    model_name: str = Field(
-        default="gpt-4o-mini", description="LLM model to use for generation"
+@router.get(
+    "/evaluations",
+    response_model=EvaluationListResponse,
+    operation_id="listEvaluations",
+)
+async def list_evaluations(
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Retrieve all evaluation results."""
+    evaluations = service.list_evaluations()
+    return EvaluationListResponse(
+        evaluations=[_to_evaluation_response(e) for e in evaluations]
     )
 
 
-def get_mongodb_docs_as_langchain(collection_name: str) -> list[Document]:
-    """
-    Retrieve documents from MongoDB and convert them to Langchain Document format
-    """
-    mongodb_client = MongoDBClient.get_instance()
-    docs = mongodb_client.get_all_documents(collection_name=collection_name)
-
-    if not docs or not isinstance(docs, list) or len(docs) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No documents found in collection {collection_name}",
-        )
-
-    langchain_docs = []
-    for doc in docs:
-        markdown = doc.get("markdown")
-        if markdown:
-            langchain_docs.append(
-                Document(
-                    page_content=markdown,
-                    metadata={"url": doc.get("url", ""), "source": doc.get("url", "")},
-                )
-            )
-    return langchain_docs
+@router.get(
+    "/evaluations/{evaluation_id}",
+    response_model=EvaluationResponse,
+    operation_id="getEvaluation",
+)
+async def get_evaluation(
+    evaluation_id: str,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Retrieve a specific evaluation by ID."""
+    return _to_evaluation_response(service.get_evaluation(evaluation_id))
 
 
-@router.post("/ragas")
-async def generate_ragas_dataset(request: RagasDatasetGenerationRequest):
-    try:
-        logger.info(f"Starting RAGAS dataset generation for {request.collection_name}")
-
-        langchain_docs = get_mongodb_docs_as_langchain(request.collection_name)
-        logger.info(f"Retrieved {len(langchain_docs)} documents")
-
-        generator_llm = LangchainLLMWrapper(ChatOpenAI(model=request.model_name))
-        ollama_embeddings = OllamaEmbeddings(
-            model="jina/jina-embeddings-v2-base-de",
-            base_url="http://host.docker.internal:11434",
-        )
-
-        generator_embeddings = LangchainEmbeddingsWrapper(ollama_embeddings)
-        generator = TestsetGenerator(
-            llm=generator_llm, embedding_model=generator_embeddings
-        )
-
-        distribution = [(SingleHopSpecificQuerySynthesizer(llm=generator_llm), 1.0)]
-
-        for query, _ in distribution:
-            logger.info("Adapting prompts for German")
-            prompts = await query.adapt_prompts("german", llm=generator_llm)
-            query.set_prompts(**prompts)
-            logger.info("Prompts adapted successfully")
-
-        logger.info(f"Generating RAGAS dataset with size {request.testset_size}")
-        ragas_dataset = generator.generate_with_langchain_docs(
-            langchain_docs,
-            testset_size=request.testset_size,
-            query_distribution=distribution,
-        )
-
-        ragas_data = ragas_dataset.to_pandas()
-        logger.info(f"RAGAS dataset columns: {ragas_data.columns.tolist()}")
-        logger.info(f"RAGAS dataset shape: {ragas_data.shape}")
-        logger.info(
-            f"First row sample: {ragas_data.iloc[0].to_dict() if not ragas_data.empty else 'Empty'}"
-        )
-
-        if ragas_data.empty:
-            logger.error("RAGAS dataset is empty!")
-            raise ValueError("RAGAS generated an empty dataset")
-
-        qa_pairs = []
-        for idx, row in ragas_data.iterrows():
-            pair = {
-                "question": row.get("user_input", ""),
-                "ground_truth": row.get("reference", ""),
-                "context": row.get("reference_contexts", []),
-                "source_doc": row.get("source", ""),
-            }
-            qa_pairs.append(pair)
-
-        dataset_entry = {
-            "name": request.dataset_name,
-            "source_collection": request.collection_name,
-            "generated_at": datetime.now().isoformat(),
-            "generator": "ragas",
-            "model": request.model_name,
-            "num_pairs": len(qa_pairs),
-            "qa_pairs": qa_pairs,
-        }
-
-        mongodb_client = MongoDBClient.get_instance()
-        inserted_id = mongodb_client.persist_docs(
-            docs=[dataset_entry], collection_name="evaluation_datasets"
-        )
-
-        dataset_entry["_id"] = str(inserted_id)
-
-        return {
-            "status": "success",
-            "dataset_id": str(inserted_id),
-            "response": dataset_entry,
-        }
-
-    except Exception as e:
-        logger.error(f"Error generating RAGAS dataset: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error generating RAGAS dataset: {str(e)}"
-        )
-
-
-class EvaluationRequest(BaseModel):
-    dataset_name: str = Field(description="Name of the evaluation dataset")
-    qag_triplets: list[dict]
-
-
-class EvaluationRequest(BaseModel):
-    dataset_name: str = Field(description="Name of the evaluation dataset")
-    questions: list[str] = Field(description="Questions that are evaluated")
-    ground_truths: list[str] = Field(
-        description="Ground truth answers for the questions"
-    )
-    answers: list[str] = Field(
-        description="Answers from the RAG system for the questions"
-    )
-    retrieved_contexts: list[str] = Field(
-        description="Retrieved context chunks for the questions from the RAG system"
+@router.get(
+    "/datasets/{dataset_name}/evaluations",
+    response_model=EvaluationListResponse,
+    operation_id="listEvaluationsByDataset",
+)
+async def list_evaluations_by_dataset(
+    dataset_name: str,
+    service: EvaluationService = Depends(get_evaluation_service),
+):
+    """Get all evaluations for a specific dataset."""
+    evaluations = service.list_evaluations_by_dataset(dataset_name)
+    return EvaluationListResponse(
+        evaluations=[_to_evaluation_response(e) for e in evaluations]
     )
 
 
-class EvaluationRequest(BaseModel):
-    dataset_name: str = Field(description="Name of the evaluation dataset")
-    questions: list[str] = Field(description="Questions that are evaluated")
-    ground_truths: list[str] = Field(
-        description="Ground truth answers for the questions"
-    )
-    answers: list[str] = Field(
-        description="Answers from the RAG system for the questions"
-    )
-    retrieved_contexts: list[list[str]] = Field(
-        description="Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
-    )
+# ── Response mappers ──────────────────────────────────────
 
 
-@router.post("/evaluate")
-async def evaluate(request: EvaluationRequest):
-    """
-    Evaluate the RAG system using multiple Ragas metrics including faithfulness and context recall.
-    """
-    try:
-        from datetime import datetime
-
-        import pandas as pd
-        from langchain_openai import ChatOpenAI
-        from ragas import EvaluationDataset, evaluate
-        from ragas.llms import LangchainLLMWrapper
-        from ragas.metrics import (
-            answer_relevancy,
-            context_precision,
-            context_recall,
-            faithfulness,
-        )
-
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        evaluator_llm = LangchainLLMWrapper(llm)
-
-        logger.info(f"Number of questions: {len(request.questions)}")
-        logger.info(f"Number of context lists: {len(request.retrieved_contexts)}")
-        for i, ctx_list in enumerate(request.retrieved_contexts):
-            if i < 2:
-                logger.info(f"Question {i}: '{request.questions[i]}'")
-                logger.info(f"Context list {i} has {len(ctx_list)} segments")
-                for j, ctx in enumerate(ctx_list[:2]):
-                    logger.info(f"  Context {j} (first 100 chars): {ctx[:100]}...")
-
-        df = pd.DataFrame(
-            {
-                "user_input": request.questions,
-                "response": request.answers,
-                "ground_truth": request.ground_truths,
-                "reference": request.ground_truths,
-                "retrieved_contexts": request.retrieved_contexts,
-            }
-        )
-
-        logger.info(f"DataFrame columns: {df.columns.tolist()}")
-        if len(df) > 0:
-            sample_row = df.iloc[0].to_dict()
-            logger.info(f"Sample row user_input: {sample_row['user_input']}")
-            logger.info(
-                f"Sample row retrieved_contexts type: {type(sample_row['retrieved_contexts'])}"
-            )
-            if isinstance(sample_row["retrieved_contexts"], list):
-                logger.info(
-                    f"Sample row retrieved_contexts length: {len(sample_row['retrieved_contexts'])}"
-                )
-                if len(sample_row["retrieved_contexts"]) > 0:
-                    logger.info(
-                        f"First context type: {type(sample_row['retrieved_contexts'][0])}"
-                    )
-
-        evaluation_dataset = EvaluationDataset.from_pandas(df)
-
-        result = evaluate(
-            dataset=evaluation_dataset,
-            metrics=[faithfulness, context_recall, answer_relevancy, context_precision],
-            llm=evaluator_llm,
-        )
-
-        result_df = result.to_pandas()
-
-        metrics_summary = {}
-        for metric in [
-            "faithfulness",
-            "context_recall",
-            "answer_relevancy",
-            "context_precision",
-        ]:
-            if metric in result_df.columns:
-                metrics_summary[metric] = float(result_df[metric].mean())
-            else:
-                metrics_summary[metric] = 0.0
-                logger.warning(f"Metric {metric} not found in evaluation results")
-
-        evaluations = result_df.to_dict("records")
-
-        evaluation_results = {
-            "name": f"{request.dataset_name}_{datetime.now(UTC).isoformat()}",
-            "dataset_name": request.dataset_name,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "questions": request.questions,
-            "ground_truths": request.ground_truths,
-            "answers": request.answers,
-            "retrieved_contexts": request.retrieved_contexts,
-            "metrics_summary": metrics_summary,
-            "evaluations": evaluations,
-        }
-
-        mongodb_client = MongoDBClient.get_instance()
-
-        inserted_id = mongodb_client.persist_docs(
-            docs=[evaluation_results], collection_name="evaluation_results"
-        )
-
-        evaluation_results["_id"] = (
-            str(inserted_id[0]) if isinstance(inserted_id, list) else str(inserted_id)
-        )
-
-        return {
-            "status": "success",
-            "evaluation_id": evaluation_results["_id"],
-            "metrics_summary": metrics_summary,
-            "evaluations": evaluations,
-            "response": evaluation_results,
-        }
-    except Exception as e:
-        logger.error(f"Error evaluating dataset: {str(e)}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail=f"Error evaluating dataset: {str(e)}"
-        )
-
-
-class EnhancedEvaluationRequest(BaseModel):
-    dataset_name: str = Field(description="Name of the evaluation dataset")
-    chatbot_id: str = Field(description="ID of the chatbot used for evaluation")
-    questions: list[str] = Field(description="Questions that are evaluated")
-    ground_truths: list[str] = Field(
-        description="Ground truth answers for the questions"
-    )
-    answers: list[str] = Field(
-        description="Answers from the RAG system for the questions"
-    )
-    retrieved_contexts: list[list[str]] = Field(
-        description="Retrieved context chunks for the questions from the RAG system, each question has a list of context chunks"
+def _to_dataset_response(doc: dict) -> DatasetResponse:
+    return DatasetResponse(
+        id=doc.get("_id", ""),
+        name=doc["name"],
+        source_collection=doc.get("source_collection", ""),
+        generated_at=doc.get("generated_at", ""),
+        generator=doc.get("generator", ""),
+        model=doc.get("model", ""),
+        num_pairs=doc.get("num_pairs", 0),
+        qa_pairs=doc.get("qa_pairs", []),
     )
 
 
-@router.post("/evaluate-chatbot")
-async def evaluate_chatbot(request: EnhancedEvaluationRequest):
-    """
-    Evaluate the RAG system using multiple Ragas metrics including faithfulness and context recall.
-    Also save chatbot information, dataset details, and evaluation results.
-    """
-    try:
-        from datetime import datetime
-
-        import pandas as pd
-        from bson.objectid import ObjectId
-        from langchain_openai import ChatOpenAI
-        from ragas import EvaluationDataset, evaluate
-        from ragas.llms import LangchainLLMWrapper
-        from ragas.metrics import (
-            answer_relevancy,
-            context_precision,
-            context_recall,
-            faithfulness,
-        )
-
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        evaluator_llm = LangchainLLMWrapper(llm)
-
-        logger.info(f"Number of questions: {len(request.questions)}")
-        logger.info(f"Number of context lists: {len(request.retrieved_contexts)}")
-        for i, ctx_list in enumerate(request.retrieved_contexts):
-            if i < 2:
-                logger.info(f"Question {i}: '{request.questions[i]}'")
-                logger.info(f"Context list {i} has {len(ctx_list)} segments")
-
-        df = pd.DataFrame(
-            {
-                "user_input": request.questions,
-                "response": request.answers,
-                "ground_truth": request.ground_truths,
-                "reference": request.ground_truths,
-                "retrieved_contexts": request.retrieved_contexts,
-            }
-        )
-
-        logger.info(f"DataFrame columns: {df.columns.tolist()}")
-        if len(df) > 0:
-            sample_row = df.iloc[0].to_dict()
-            logger.info(f"Sample row user_input: {sample_row['user_input']}")
-            logger.info(
-                f"Sample row retrieved_contexts type: {type(sample_row['retrieved_contexts'])}"
-            )
-            if isinstance(sample_row["retrieved_contexts"], list):
-                logger.info(
-                    f"Sample row retrieved_contexts length: {len(sample_row['retrieved_contexts'])}"
-                )
-
-        evaluation_dataset = EvaluationDataset.from_pandas(df)
-
-        result = evaluate(
-            dataset=evaluation_dataset,
-            metrics=[faithfulness, context_recall, answer_relevancy, context_precision],
-            llm=evaluator_llm,
-        )
-
-        result_df = result.to_pandas()
-
-        metrics_summary = {}
-        for metric in [
-            "faithfulness",
-            "context_recall",
-            "answer_relevancy",
-            "context_precision",
-        ]:
-            if metric in result_df.columns:
-                metrics_summary[metric] = float(result_df[metric].mean())
-            else:
-                metrics_summary[metric] = 0.0
-                logger.warning(f"Metric {metric} not found in evaluation results")
-
-        evaluations = result_df.to_dict("records")
-
-        mongodb_client = MongoDBClient.get_instance()
-
-        chatbot_info = mongodb_client.get_docs(
-            filter={"_id": ObjectId(request.chatbot_id)}, collection_name="chatbots"
-        )
-
-        if not chatbot_info:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Chatbot with ID {request.chatbot_id} not found",
-            )
-
-        chatbot_data = chatbot_info[0]
-
-        dataset_info = mongodb_client.get_collection("evaluation_datasets").find_one(
-            {"name": request.dataset_name}
-        )
-
-        eval_timestamp = datetime.now(UTC)
-        evaluation_results = {
-            "name": f"{request.dataset_name}_{eval_timestamp.isoformat()}",
-            "timestamp": eval_timestamp.isoformat(),
-            "chatbot": {
-                "id": str(chatbot_data.get("_id")),
-                "name": chatbot_data.get("chatbot_name", "Unknown"),
-                "workflow": chatbot_data.get("workflow", "linear"),
-                "llm": chatbot_data.get("llm", "Unknown"),
-                "collections": chatbot_data.get("collections", []),
-                "hyde": chatbot_data.get("hyde", False),
-                "hybrid_search": chatbot_data.get("hybrid_search", True),
-                "top_k": chatbot_data.get("top_k", 10),
-                "reranking": chatbot_data.get("reranking", False),
-                "reranker": chatbot_data.get("reranker", ""),
-            },
-            "dataset": {
-                "name": request.dataset_name,
-                "id": str(dataset_info.get("_id")) if dataset_info else None,
-                "source_collection": (
-                    dataset_info.get("source_collection") if dataset_info else None
-                ),
-                "generated_at": (
-                    dataset_info.get("generated_at") if dataset_info else None
-                ),
-                "generator": dataset_info.get("generator") if dataset_info else None,
-                "num_questions": len(request.questions),
-            },
-            "evaluation": {
-                "metrics_summary": metrics_summary,
-                "metrics_details": evaluations,
-                "question_answer_pairs": [
-                    {"question": q, "ground_truth": gt, "answer": a, "contexts": ctx}
-                    for q, gt, a, ctx in zip(
-                        request.questions,
-                        request.ground_truths,
-                        request.answers,
-                        request.retrieved_contexts,
-                    )
-                ],
-            },
-        }
-
-        inserted_id = mongodb_client.persist_docs(
-            docs=[evaluation_results], collection_name="evaluations"
-        )
-
-        evaluation_results["_id"] = (
-            str(inserted_id[0]) if isinstance(inserted_id, list) else str(inserted_id)
-        )
-
-        return {
-            "status": "success",
-            "evaluation_id": evaluation_results["_id"],
-            "metrics_summary": metrics_summary,
-            "chatbot": evaluation_results["chatbot"],
-            "dataset": evaluation_results["dataset"],
-        }
-
-    except Exception as e:
-        logger.error(f"Error evaluating chatbot: {str(e)}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=500, detail=f"Error evaluating chatbot: {str(e)}"
-        )
-
-
-@router.get("/evaluations")
-async def get_evaluations():
-    """
-    Retrieve all evaluation results.
-    """
-    try:
-        mongodb_client = MongoDBClient.get_instance()
-        evaluations = list(mongodb_client.get_collection("evaluations").find({}))
-
-        for eval in evaluations:
-            eval["_id"] = str(eval["_id"])
-
-            if "evaluation" in eval and "metrics_summary" in eval["evaluation"]:
-                metrics = eval["evaluation"]["metrics_summary"]
-                for key, value in metrics.items():
-                    if isinstance(value, float) and (
-                        math.isnan(value) or math.isinf(value)
-                    ):
-                        metrics[key] = None
-
-            if "evaluation" in eval and "metrics_details" in eval["evaluation"]:
-                for detail in eval["evaluation"]["metrics_details"]:
-                    for key, value in list(detail.items()):
-                        if isinstance(value, float) and (
-                            math.isnan(value) or math.isinf(value)
-                        ):
-                            detail[key] = None
-
-        return {"status": "success", "evaluations": evaluations}
-    except Exception as e:
-        logger.error(f"Error retrieving evaluations: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving evaluations: {str(e)}"
-        )
-
-
-import math
-
-
-@router.get("/evaluations/{evaluation_id}")
-async def get_evaluation_by_id(evaluation_id: str):
-    """
-    Retrieve a specific evaluation by ID.
-    """
-    try:
-        from bson.objectid import ObjectId
-
-        mongodb_client = MongoDBClient.get_instance()
-        evaluation = mongodb_client.get_collection("evaluations").find_one(
-            {"_id": ObjectId(evaluation_id)}
-        )
-
-        if not evaluation:
-            raise HTTPException(
-                status_code=404, detail=f"Evaluation with ID {evaluation_id} not found"
-            )
-
-        evaluation["_id"] = str(evaluation["_id"])
-
-        if "evaluation" in evaluation and "metrics_summary" in evaluation["evaluation"]:
-            metrics = evaluation["evaluation"]["metrics_summary"]
-            for key, value in metrics.items():
-                if isinstance(value, float) and (
-                    math.isnan(value) or math.isinf(value)
-                ):
-                    metrics[key] = None
-
-        if "evaluation" in evaluation and "metrics_details" in evaluation["evaluation"]:
-            for detail in evaluation["evaluation"]["metrics_details"]:
-                for key, value in list(detail.items()):
-                    if isinstance(value, float) and (
-                        math.isnan(value) or math.isinf(value)
-                    ):
-                        detail[key] = None
-
-        return {"status": "success", "evaluation": evaluation}
-    except Exception as e:
-        logger.error(f"Error retrieving evaluation: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving evaluation: {str(e)}"
-        )
-
-
-# In your backend evaluation router file
-
-
-class EvaluateAssistantRequest(BaseModel):
-    dataset_name: str
-    assistant_id: str
-    questions: list[str]
-    ground_truths: list[str]
-    answers: list[str]
-    retrieved_contexts: list[list[str]]
-    eval_llm_model: str
-    eval_llm_provider: str
-
-
-@router.post("/evaluate-assistant")
-async def evaluate_assistant(request: EvaluateAssistantRequest):
-    """
-    Evaluate an assistant's performance using RAGAS metrics
-    """
-    try:
-        # Import RAGAS here
-        from datasets import Dataset
-        from ragas import evaluate
-        from ragas.metrics import (
-            answer_relevancy,
-            context_precision,
-            context_recall,
-            faithfulness,
-        )
-
-        # Initialize evaluation LLM based on provider
-        if request.eval_llm_provider == "openai":
-            eval_llm = ChatOpenAI(model=request.eval_llm_model)
-        elif request.eval_llm_provider == "ollama":
-            eval_llm = ChatOllama(model=request.eval_llm_model)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported LLM provider: {request.eval_llm_provider}",
-            )
-
-        # Prepare data for RAGAS
-        data = {
-            "question": request.questions,
-            "answer": request.answers,
-            "contexts": request.retrieved_contexts,
-            "ground_truth": request.ground_truths,
-        }
-
-        dataset = Dataset.from_dict(data)
-
-        # Run evaluation
-        result = evaluate(
-            dataset,
-            metrics=[answer_relevancy, faithfulness, context_recall, context_precision],
-            llm=eval_llm,
-        )
-
-        # OLD CODE (doesn't work):
-        # metrics = result.to_dict()
-
-        # NEW CODE (works):
-        # Convert result to pandas DataFrame, then to dict
-        result_df = result.to_pandas()
-        metrics = result_df.to_dict("records")[0] if len(result_df) > 0 else {}
-
-        # Also get overall scores
-        overall_scores = {
-            metric: (
-                float(result_df[metric].mean()) if metric in result_df.columns else None
-            )
-            for metric in [
-                "answer_relevancy",
-                "faithfulness",
-                "context_recall",
-                "context_precision",
-            ]
-        }
-
-        # Store evaluation result in MongoDB
-        evaluation_result = {
-            "dataset_name": request.dataset_name,
-            "assistant_id": request.assistant_id,
-            "eval_llm_model": request.eval_llm_model,
-            "eval_llm_provider": request.eval_llm_provider,
-            "metrics": overall_scores,  # Store the averaged metrics
-            "detailed_results": result_df.to_dict(
-                "records"
-            ),  # Store per-question results
-            "created_at": datetime.now(UTC),
-        }
-
-        # Save to MongoDB - use the same pattern as the existing chatbot evaluation
-        mongodb_client = MongoDBClient.get_instance()
-        inserted_id = mongodb_client.persist_docs(
-            docs=[evaluation_result], collection_name="evaluations"
-        )
-
-        evaluation_result["_id"] = (
-            str(inserted_id[0]) if isinstance(inserted_id, list) else str(inserted_id)
-        )
-
-        return {
-            "success": True,
-            "evaluation_id": evaluation_result["_id"],
-            "metrics": overall_scores,
-            "detailed_results": result_df.to_dict("records"),
-        }
-
-    except Exception as e:
-        logging.error(f"Evaluation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Add this to your evaluation router (after the existing endpoints)
-
-
-@router.get("/datasets/{dataset_name}/evaluations")
-async def get_evaluations_by_dataset(dataset_name: str):
-    """
-    Get all evaluations for a specific dataset.
-    """
-    try:
-        mongodb_client = MongoDBClient.get_instance()
-        evaluations = list(
-            mongodb_client.get_collection("evaluations").find(
-                {"dataset_name": dataset_name}
-            )
-        )
-
-        for eval in evaluations:
-            eval["_id"] = str(eval["_id"])
-
-            # Handle NaN and Inf values in metrics
-            if "metrics" in eval:
-                for key, value in eval["metrics"].items():
-                    if isinstance(value, float) and (
-                        math.isnan(value) or math.isinf(value)
-                    ):
-                        eval["metrics"][key] = None
-
-            # Handle NaN and Inf in detailed results
-            if "detailed_results" in eval:
-                for detail in eval["detailed_results"]:
-                    for key, value in list(detail.items()):
-                        if isinstance(value, float) and (
-                            math.isnan(value) or math.isinf(value)
-                        ):
-                            detail[key] = None
-
-        return {"status": "success", "evaluations": evaluations}
-    except Exception as e:
-        logger.error(
-            f"Error retrieving evaluations for dataset {dataset_name}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving evaluations: {str(e)}"
-        )
+def _to_evaluation_response(doc: dict) -> EvaluationResponse:
+    metrics = doc.get("metrics", {})
+    return EvaluationResponse(
+        id=doc.get("_id", ""),
+        dataset_name=doc.get("dataset_name", ""),
+        assistant_id=doc.get("assistant_id", ""),
+        eval_llm_model=doc.get("eval_llm_model", ""),
+        eval_llm_provider=doc.get("eval_llm_provider", ""),
+        metrics=metrics,
+        detailed_results=doc.get("detailed_results", []),
+        created_at=doc.get("created_at", ""),
+    )

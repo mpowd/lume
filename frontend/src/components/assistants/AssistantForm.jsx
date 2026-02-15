@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Sparkles, Database, Check, Lock, Plus, ScrollText, X, Edit2, MessageSquare } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
-import { ollamaAPI } from '../../services/api'
+import { getOllamaModelsIntegrationsOllamaModelsGet } from '../../api/generated'
 import FormInput from '../shared/FormInput'
 import FormTextarea from '../shared/FormTextarea'
 import Button from '../shared/Button'
@@ -46,11 +46,11 @@ const REFERENCE_COLORS = [
   'bg-red-500/20 border-red-500/50 text-red-300'
 ]
 
-export default function AssistantForm({ 
-  assistant, 
-  onSubmit, 
-  onCancel, 
-  loading 
+export default function AssistantForm({
+  assistant,
+  onSubmit,
+  onCancel,
+  loading
 }) {
   const { collections } = useCollections()
   const [ollamaModels, setOllamaModels] = useState([])
@@ -95,64 +95,59 @@ export default function AssistantForm({
 
   useEffect(() => {
     if (assistant) {
-      // Assign colors to references if they don't have them
-      const referencesWithColors = (assistant.references || []).map((ref, index) => ({
+      // Read from assistant.config.* (Orval format) with fallback to flat fields (legacy)
+      const c = assistant.config || {}
+      const referencesWithColors = (c.references || assistant.references || []).map((ref, index) => ({
         ...ref,
         color: ref.color || REFERENCE_COLORS[index % REFERENCE_COLORS.length]
       }))
 
       setFormData({
         assistant_name: assistant.name || assistant.assistant_name,
-        opening_message: assistant.opening_message || '',
-        workflow: assistant.workflow || 'linear',
-        collections: assistant.collections || [],
+        opening_message: c.opening_message || assistant.opening_message || '',
+        workflow: c.workflow || assistant.workflow || 'linear',
+        collections: c.knowledge_base_ids || assistant.collections || [],
         references: referencesWithColors,
-        local_only: assistant.local_only || false,
-        hybrid_search: assistant.hybrid_search ?? true,
-        hyde: assistant.hyde ?? false,
-        hyde_prompt: assistant.hyde_prompt || formData.hyde_prompt,
-        top_k: assistant.top_k || 10,
-        reranking: assistant.reranking ?? false,
-        reranker_provider: assistant.reranker_provider || 'cohere',
-        reranker_model: assistant.reranker_model || 'rerank-v3.5',
-        top_n: assistant.top_n || 5,
-        llm: assistant.llm || 'gpt-4o-mini',
-        llm_provider: assistant.llm_provider || 'openai',
-        system_prompt: assistant.system_prompt || DEFAULT_SYSTEM_PROMPT,
-        user_prompt: assistant.user_prompt || DEFAULT_USER_PROMPT,
-        precise_citation_system_prompt: assistant.precise_citation_system_prompt || DEFAULT_PRECISE_CITATION_SYSTEM,
-        precise_citation_user_prompt: assistant.precise_citation_user_prompt || DEFAULT_PRECISE_CITATION_USER,
-        tools: assistant.tools || [],
-        max_steps: assistant.max_steps || 4,
-        precise_citation: assistant.precise_citation ?? false,
-        agentic_system_prompt: assistant.agentic_system_prompt || 'Search Tavily for the given query and return the results.'
+        local_only: c.local_only ?? assistant.local_only ?? false,
+        hybrid_search: c.hybrid_search ?? assistant.hybrid_search ?? true,
+        hyde: c.use_hyde ?? assistant.hyde ?? false,
+        hyde_prompt: c.hyde_prompt || assistant.hyde_prompt || formData.hyde_prompt,
+        top_k: c.top_k || assistant.top_k || 10,
+        reranking: c.reranking ?? assistant.reranking ?? false,
+        reranker_provider: c.reranker_provider || assistant.reranker_provider || 'cohere',
+        reranker_model: c.reranker_model || assistant.reranker_model || 'rerank-v3.5',
+        top_n: c.top_n || assistant.top_n || 5,
+        llm: c.llm_model || assistant.llm || 'gpt-4o-mini',
+        llm_provider: c.llm_provider || assistant.llm_provider || 'openai',
+        system_prompt: c.system_prompt || assistant.system_prompt || DEFAULT_SYSTEM_PROMPT,
+        user_prompt: c.user_prompt || assistant.user_prompt || DEFAULT_USER_PROMPT,
+        precise_citation_system_prompt: c.precise_citation_system_prompt || assistant.precise_citation_system_prompt || DEFAULT_PRECISE_CITATION_SYSTEM,
+        precise_citation_user_prompt: c.precise_citation_user_prompt || assistant.precise_citation_user_prompt || DEFAULT_PRECISE_CITATION_USER,
+        tools: c.tools || assistant.tools || [],
+        max_steps: c.max_steps || assistant.max_steps || 4,
+        precise_citation: c.precise_citation ?? assistant.precise_citation ?? false,
+        agentic_system_prompt: c.agentic_system_prompt || assistant.agentic_system_prompt || 'Search Tavily for the given query and return the results.'
       })
     }
   }, [assistant])
 
   useEffect(() => {
     const updatePrompts = () => {
-      // Skip prompt updates when loading an existing assistant
-      if (assistant) {
-        return
-      }
-      
+      if (assistant) return
+
       const hasCollections = formData.collections && formData.collections.length > 0
       const hasReferences = formData.references && formData.references.length > 0
-      
+
       let newSystemPrompt = DEFAULT_SYSTEM_PROMPT
       let newUserPrompt = DEFAULT_USER_PROMPT
-      
+
       if (!hasCollections && !hasReferences) {
-        // Case 4: No collections, no references
         newSystemPrompt = `You are a helpful assistant that answers questions based on your knowledge.`
         newUserPrompt = `Question: {question}`
       } else if (hasCollections && !hasReferences) {
-        // Case 1: Collections, no references (keep defaults)
         newSystemPrompt = DEFAULT_SYSTEM_PROMPT
         newUserPrompt = DEFAULT_USER_PROMPT
       } else if (hasCollections && hasReferences) {
-        // Case 2: Collections and references - use placeholders
         const refPlaceholders = formData.references.map(ref => `{${ref.name}}`).join('\n')
         newSystemPrompt = `You are a helpful assistant that answers questions using the provided context and reference materials.
 Answer conversationally without mentioning the context or chunks to the user.`
@@ -164,7 +159,6 @@ ${refPlaceholders}
 
 Question: {question}`
       } else if (!hasCollections && hasReferences) {
-        // Case 3: No collections, references only - use placeholders
         const refPlaceholders = formData.references.map(ref => `{${ref.name}}`).join('\n')
         newSystemPrompt = `You are a helpful assistant that answers questions based on the provided reference materials.`
         newUserPrompt = `References:
@@ -172,21 +166,21 @@ ${refPlaceholders}
 
 Question: {question}`
       }
-      
+
       setFormData(prev => ({
         ...prev,
         system_prompt: newSystemPrompt,
         user_prompt: newUserPrompt
       }))
     }
-    
+
     updatePrompts()
   }, [formData.collections.length, formData.references.length])
 
   const loadOllamaModels = async () => {
     setLoadingModels(true)
     try {
-      const response = await ollamaAPI.getModels()
+      const response = await getOllamaModelsIntegrationsOllamaModelsGet()
       const chatModels = (response.models || [])
         .filter(m => !m.name.includes('embed') && !m.name.includes('jina'))
         .map(m => ({ name: m.name, fullName: m.name, size: m.size }))
@@ -228,7 +222,7 @@ Question: {question}`
 
   const handleLocalOnlyToggle = (checked) => {
     const updates = { local_only: checked }
-    
+
     if (checked) {
       if (formData.llm_provider === 'openai') {
         const firstOllama = ollamaModels[0]?.name || 'mistral'
@@ -240,7 +234,7 @@ Question: {question}`
         updates.reranker_model = 'BAAI/bge-reranker-v2-m3'
       }
     }
-    
+
     setFormData({ ...formData, ...updates })
   }
 
@@ -267,13 +261,11 @@ Question: {question}`
 
   const saveReference = () => {
     if (!newReferenceText.trim() || !newReferenceName.trim()) return
-    
-    // Sanitize name to only allow alphanumeric and underscores
+
     const sanitizedName = newReferenceName.replace(/[^a-zA-Z0-9_]/g, '')
     if (!sanitizedName) return
 
     if (editingReferenceIndex !== null) {
-      // Editing existing reference
       const updatedReferences = [...formData.references]
       const oldName = updatedReferences[editingReferenceIndex].name
       updatedReferences[editingReferenceIndex] = {
@@ -281,18 +273,15 @@ Question: {question}`
         name: sanitizedName,
         color: updatedReferences[editingReferenceIndex].color
       }
-      
+
       setFormData(prev => {
         let updatedPrompt = prev.user_prompt
-        
-        // Update prompt if name changed
         if (oldName !== sanitizedName) {
           updatedPrompt = updatedPrompt.replace(
-            new RegExp(`\\{${oldName}\\}`, 'g'), 
+            new RegExp(`\\{${oldName}\\}`, 'g'),
             `{${sanitizedName}}`
           )
         }
-        
         return {
           ...prev,
           references: updatedReferences,
@@ -300,23 +289,15 @@ Question: {question}`
         }
       })
     } else {
-      // Adding new reference
       const color = REFERENCE_COLORS[formData.references.length % REFERENCE_COLORS.length]
-      const newRef = {
-        text: newReferenceText,
-        name: sanitizedName,
-        color
-      }
-      
+      const newRef = { text: newReferenceText, name: sanitizedName, color }
+
       setFormData(prev => {
         let updatedPrompt = prev.user_prompt
-        
-        // Auto-insert placeholder in the appropriate location
         const lines = updatedPrompt.split('\n')
         const refSectionIndex = lines.findIndex(line => line.includes('References:'))
-        
+
         if (refSectionIndex !== -1) {
-          // Find the last reference placeholder
           let lastRefIndex = refSectionIndex
           for (let i = refSectionIndex + 1; i < lines.length; i++) {
             if (lines[i].trim().match(/^\{[\w_]+\}$/)) {
@@ -328,7 +309,7 @@ Question: {question}`
           lines.splice(lastRefIndex + 1, 0, `{${sanitizedName}}`)
           updatedPrompt = lines.join('\n')
         }
-        
+
         return {
           ...prev,
           references: [...prev.references, newRef],
@@ -336,20 +317,18 @@ Question: {question}`
         }
       })
     }
-    
+
     closeReferenceModal()
   }
 
   const deleteReference = (index) => {
     const refName = formData.references[index].name
-    
+
     setFormData(prev => {
-      // Remove from prompt
       const updatedPrompt = prev.user_prompt.replace(
-        new RegExp(`\n?\\{${refName}\\}`, 'g'), 
+        new RegExp(`\n?\\{${refName}\\}`, 'g'),
         ''
       )
-      
       return {
         ...prev,
         references: prev.references.filter((_, i) => i !== index),
@@ -371,13 +350,13 @@ Question: {question}`
           {assistant ? 'Edit Assistant' : 'Create New Assistant'}
         </h2>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Name"
             value={formData.assistant_name}
-            onChange={(e) => setFormData({...formData, assistant_name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, assistant_name: e.target.value })}
             placeholder="e.g., Customer Support Bot"
             required
           />
@@ -387,7 +366,7 @@ Question: {question}`
             <div className="grid grid-cols-2 gap-2 p-1 bg-transparent rounded-xl border border-white/10">
               <button
                 type="button"
-                onClick={() => setFormData({...formData, workflow: 'linear'})}
+                onClick={() => setFormData({ ...formData, workflow: 'linear' })}
                 className={`
                   py-2.5 rounded-lg font-medium transition-all
                   ${formData.workflow === 'linear'
@@ -400,7 +379,7 @@ Question: {question}`
               </button>
               <button
                 type="button"
-                onClick={() => setFormData({...formData, workflow: 'agentic'})}
+                onClick={() => setFormData({ ...formData, workflow: 'agentic' })}
                 className={`
                   py-2.5 rounded-lg font-medium transition-all
                   ${formData.workflow === 'agentic'
@@ -423,7 +402,7 @@ Question: {question}`
           </label>
           <FormTextarea
             value={formData.opening_message}
-            onChange={(e) => setFormData({...formData, opening_message: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, opening_message: e.target.value })}
             placeholder="e.g., Hi! I'm your travel assistant. You can ask me questions about Morocco."
             rows={3}
           />
@@ -482,7 +461,7 @@ Question: {question}`
                   Add Reference
                 </button>
               </div>
-              
+
               {formData.references.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {formData.references.map((ref, index) => (
@@ -594,7 +573,7 @@ Question: {question}`
               </label>
               <textarea
                 value={formData.agentic_system_prompt}
-                onChange={(e) => setFormData({...formData, agentic_system_prompt: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, agentic_system_prompt: e.target.value })}
                 placeholder="Enter system prompt for the agent..."
                 rows="4"
                 className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white font-mono text-sm"
@@ -619,7 +598,7 @@ Question: {question}`
                 min="1"
                 max="20"
                 value={formData.max_steps}
-                onChange={(e) => setFormData({...formData, max_steps: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({ ...formData, max_steps: parseInt(e.target.value) })}
                 className="w-full border border-white/10 rounded-lg px-3 py-2 focus:outline-none bg-background-elevated focus:border-brand-teal text-white"
               />
               <p className="text-xs text-text-quaternary mt-1">Maximum number of reasoning steps the agent can take</p>
@@ -656,7 +635,7 @@ Question: {question}`
                 <h2 className="text-xl font-semibold text-white">
                   {editingReferenceIndex !== null ? 'Edit Reference' : 'Add Reference'}
                 </h2>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
                     Reference Name (placeholder)

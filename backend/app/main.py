@@ -9,33 +9,36 @@ import colorlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import backend.core.assistants
-from backend.api.routes import assistants, evaluation, knowledge_base, ollama
 from backend.app.exception_handlers import register_exception_handlers
 from backend.config import settings
 
-handler = colorlog.StreamHandler()
-handler.setFormatter(
-    colorlog.ColoredFormatter(
-        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        log_colors={
-            "DEBUG": "cyan",
-            "INFO": "green",
-            "WARNING": "yellow",
-            "ERROR": "red",
-            "CRITICAL": "bold_red",
-        },
+
+def setup_logging() -> None:
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "bold_red",
+            },
+        )
     )
-)
 
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.handlers.clear()
-root_logger.addHandler(handler)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
 
-logging.getLogger("backend").setLevel(logging.DEBUG)
+    logging.getLogger("backend").setLevel(logging.DEBUG)
 
+
+setup_logging()
 logger = logging.getLogger(__name__)
+
 if settings.ENABLE_PHOENIX:
     from phoenix.otel import register
 
@@ -44,22 +47,23 @@ if settings.ENABLE_PHOENIX:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("=" * 60)
+    import backend.core.assistants  # noqa: F401 — triggers @register decorators
+
     logger.info("Application startup")
     logger.info(
         f"Registered assistant types: {backend.core.assistants.AssistantRegistry.list_types()}"
     )
     yield
-    logger.info("=" * 60)
     logger.info("Application shutdown")
 
 
 app = FastAPI(
-    title="AI Assistant Platform",
-    description="Platform for creating and managing AI assistants",
+    title="Lume - AI Assistant Platform",
+    description="Platform for creating and managing AI assistants with RAG",
     version="2.0.0",
     lifespan=lifespan,
 )
+
 register_exception_handlers(app)
 
 app.add_middleware(
@@ -76,7 +80,16 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+
 # ── Routers ───────────────────────────────────────────────
+
+from backend.api.routes import (  # noqa: E402
+    assistants,
+    evaluation,
+    knowledge_base,
+    ollama,
+)
+
 app.include_router(assistants.router, prefix="/assistants", tags=["assistants"])
 app.include_router(
     knowledge_base.router, prefix="/knowledge-base", tags=["knowledge-base"]
@@ -85,15 +98,6 @@ app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
 app.include_router(ollama.router, prefix="/integrations/ollama", tags=["integrations"])
 
 
-@app.get("/")
-async def root():
-    return {
-        "message": "AI Assistant Platform is running",
-        "version": "2.0.0",
-        "assistant_types": backend.core.assistants.AssistantRegistry.list_types(),
-    }
-
-
-@app.get("/health")
+@app.get("/health", operation_id="healthCheck")
 async def health_check():
     return {"status": "healthy"}

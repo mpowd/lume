@@ -1,193 +1,152 @@
-import logging
-from typing import List, Dict, Any, Optional
-from uuid import uuid4
+"""
+Qdrant vector store operations.
 
-from qdrant_client import QdrantClient as QdrantBaseClient
-from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
-from qdrant_client import models
-from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-from langchain_ollama import OllamaEmbeddings
-from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import (
-    MarkdownHeaderTextSplitter,
-    RecursiveCharacterTextSplitter,
-)
+Thin helper around QdrantClient and LangChain's QdrantVectorStore.
+"""
+
+import logging
+
 from langchain_core.documents import Document
+from langchain_qdrant import QdrantVectorStore, RetrievalMode
+from qdrant_client import QdrantClient, models
+from qdrant_client.http.models import (
+    Distance,
+    SparseVectorParams,
+    VectorParams,
+)
+
+from backend.core.embeddings import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
 
+# ── Distance metric mapping ──────────────────────────────
 
-class QdrantClient:
-    """Client for Qdrant vector store operations"""
+_DISTANCE_MAP: dict[str, Distance] = {
+    "Cosine similarity": Distance.COSINE,
+    "Dot product": Distance.DOT,
+    "Euclidean distance": Distance.EUCLID,
+    "Manhattan distance": Distance.MANHATTAN,
+}
 
-    def __init__(self, url: str = "http://qdrant:6333"):
-        self.client = QdrantBaseClient(url=url)
-        self.url = url
 
-    def get_embeddings(self, embedding_model: str):
-        """
-        Get embedding functions for dense and sparse embeddings.
-
-        Args:
-            embedding_model: Name of the embedding model
-
-        Returns:
-            Dict with dense_embeddings, sparse_embeddings, and embedding_dim
-        """
-
-        logger.info(f"get embedding model {embedding_model}")
-
-        if embedding_model == "jina/jina-embeddings-v2-base-de":
-            return {
-                "dense_embeddings": OllamaEmbeddings(
-                    model="jina/jina-embeddings-v2-base-de",
-                    base_url="http://host.docker.internal:11434",
-                ),
-                "sparse_embeddings": FastEmbedSparse(model_name="Qdrant/bm25"),
-                "embedding_dim": 768,
-            }
-        elif embedding_model == "text-embedding-3-small":
-            logger.info(f"Fetsching OpenAI Embedding Model '{embedding_model}' from Qdrant Client")
-            return {"dense_embeddings": OpenAIEmbeddings(model=embedding_model)}
-        else:
-            raise ValueError(f"Unsupported embedding model: {embedding_model}")
-
-    def chunk_markdown_documents(
-        self,
-        documents: List[Dict[str, Any]],
-        chunk_size: int = 1000,
-        chunk_overlap: int = 100,
-    ) -> List[Document]:
-        """
-        Chunk markdown documents into smaller pieces for embedding.
-
-        Args:
-            documents: List of documents with 'markdown', 'url', and 'title' keys
-            chunk_size: Maximum size of each chunk
-            chunk_overlap: Overlap between consecutive chunks
-
-        Returns:
-            List of LangChain Document objects with metadata
-        """
-        headers_to_split_on = [
-            ("#", "Header 1"),
-            ("##", "Header 2"),
-        ]
-
-        markdown_splitter = MarkdownHeaderTextSplitter(
-            headers_to_split_on=headers_to_split_on, strip_headers=True
+def parse_distance_metric(metric_name: str) -> Distance:
+    """Convert a human-readable distance metric name to Qdrant enum."""
+    if metric_name not in _DISTANCE_MAP:
+        raise ValueError(
+            f"Invalid distance metric: {metric_name}. "
+            f"Supported: {list(_DISTANCE_MAP.keys())}"
         )
+    return _DISTANCE_MAP[metric_name]
 
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=["\n\n", "\n", ".", ";", ",", " "],
-        )
 
-        all_chunks = []
+# ── Collection operations ─────────────────────────────────
 
-        for doc_data in documents:
-            try:
-                markdown_content = doc_data.get("markdown", "")
-                if not markdown_content:
-                    logger.warning(f"No markdown content for {doc_data.get('url')}")
-                    continue
 
-                # Split by markdown headers
-                md_header_splits = markdown_splitter.split_text(markdown_content)
+def create_collection(
+    client: QdrantClient,
+    collection_name: str,
+    embedding_dim: int,
+    distance: Distance,
+) -> None:
+    """Create a Qdrant collection with dense + sparse vector config."""
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config={
+            "dense": VectorParams(size=embedding_dim, distance=distance),
+        },
+        sparse_vectors_config={
+            "sparse": SparseVectorParams(
+                index=models.SparseIndexParams(on_disk=False),
+            ),
+        },
+    )
+    logger.info(f"Created Qdrant collection: {collection_name}")
 
-                # Further split into chunks
-                chunks = text_splitter.split_documents(md_header_splits)
 
-                # Add metadata to each chunk
-                for chunk in chunks:
-                    if not chunk.metadata:
-                        chunk.metadata = {}
+def delete_collection(client: QdrantClient, collection_name: str) -> None:
+    """Delete a Qdrant collection."""
+    client.delete_collection(collection_name=collection_name)
+    logger.info(f"Deleted Qdrant collection: {collection_name}")
 
-                    chunk.metadata["source_url"] = doc_data.get("url")
-                    chunk.metadata["title"] = doc_data.get("title", "Untitled")
 
-                    # Add custom payload if present
-                    if "custom_payload" in doc_data:
-                        chunk.metadata["custom_payload"] = doc_data["custom_payload"]
+def collection_exists(client: QdrantClient, collection_name: str) -> bool:
+    """Check if a collection exists."""
+    collections = client.get_collections()
+    return any(c.name == collection_name for c in collections.collections)
 
-                    all_chunks.append(chunk)
 
-                logger.info(f"Created {len(chunks)} chunks from {doc_data.get('url')}")
+def list_collection_names(client: QdrantClient) -> list[str]:
+    """List all collection names, sorted alphabetically."""
+    response = client.get_collections()
+    return sorted(c.name for c in response.collections)
 
-            except Exception as e:
-                logger.error(f"Error chunking document {doc_data.get('url')}: {str(e)}")
 
-        return all_chunks
+# ── Document operations ───────────────────────────────────
 
-    def store_embeddings(
-        self,
-        collection_name: str,
-        chunks: List[Document],
-        embedding_model: str,
-    ) -> int:
-        """
-        Create embeddings and store in Qdrant.
 
-        Args:
-            collection_name: Name of the Qdrant collection
-            chunks: List of LangChain Document objects to embed
-            embedding_model: Name of the embedding model to use
+def store_documents(
+    client: QdrantClient,
+    collection_name: str,
+    chunks: list[Document],
+    chunk_ids: list[str],
+    embedding_config: EmbeddingConfig,
+    batch_size: int = 10,
+) -> int:
+    """
+    Embed and store document chunks in Qdrant.
 
-        Returns:
-            Number of chunks stored
-        """
-        if not chunks:
-            logger.warning("No chunks to store")
-            return 0
+    Args:
+        client: Qdrant client instance.
+        collection_name: Target collection.
+        chunks: LangChain Document objects to embed and store.
+        chunk_ids: UUIDs for each chunk (must match len(chunks)).
+        embedding_config: Dense + sparse embedding models.
+        batch_size: Number of chunks per batch.
 
-        embedder_info = self.get_embeddings(embedding_model)
-        dense_embeddings = embedder_info["dense_embeddings"]
-        sparse_embeddings = embedder_info["sparse_embeddings"]
+    Returns:
+        Number of chunks stored.
+    """
+    if not chunks:
+        logger.warning("No chunks to store")
+        return 0
 
-        # Generate UUIDs for each chunk
-        uuids = [str(uuid4()) for _ in chunks]
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name=collection_name,
+        embedding=embedding_config.dense,
+        sparse_embedding=embedding_config.sparse,
+        retrieval_mode=RetrievalMode.HYBRID,
+        vector_name="dense",
+        sparse_vector_name="sparse",
+    )
 
-        # Create vector store instance
-        qdrant = QdrantVectorStore(
-            client=self.client,
+    for i in range(0, len(chunks), batch_size):
+        batch_chunks = chunks[i : i + batch_size]
+        batch_ids = chunk_ids[i : i + batch_size]
+        vector_store.add_documents(documents=batch_chunks, ids=batch_ids)
+
+    logger.info(f"Stored {len(chunks)} chunks in Qdrant collection '{collection_name}'")
+    return len(chunks)
+
+
+def delete_documents_by_urls(
+    client: QdrantClient,
+    collection_name: str,
+    urls: list[str],
+) -> None:
+    """Delete all points matching the given source URLs."""
+    for url in urls:
+        client.delete(
             collection_name=collection_name,
-            embedding=dense_embeddings,
-            sparse_embedding=sparse_embeddings,
-            retrieval_mode=RetrievalMode.HYBRID,
-            vector_name="dense",
-            sparse_vector_name="sparse",
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="metadata.source_url",
+                            match=models.MatchValue(value=url),
+                        ),
+                    ],
+                )
+            ),
         )
-
-        # Add documents with embeddings
-        qdrant.add_documents(documents=chunks, ids=uuids)
-
-        logger.info(f"Successfully stored {len(chunks)} chunks in Qdrant")
-        return len(chunks)
-
-    def collection_exists(self, collection_name: str) -> bool:
-        """Check if a collection exists in Qdrant."""
-        try:
-            collections = self.client.get_collections()
-            return any(col.name == collection_name for col in collections.collections)
-        except Exception as e:
-            logger.error(f"Error checking collection existence: {str(e)}")
-            return False
-
-    def delete_collection(self, collection_name: str) -> bool:
-        """Delete a collection from Qdrant."""
-        try:
-            self.client.delete_collection(collection_name=collection_name)
-            logger.info(f"Deleted Qdrant collection: {collection_name}")
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting collection {collection_name}: {str(e)}")
-            return False
-
-    def get_collection_info(self, collection_name: str) -> Optional[Dict[str, Any]]:
-        """Get information about a collection."""
-        try:
-            return self.client.get_collection(collection_name=collection_name)
-        except Exception as e:
-            logger.error(f"Error getting collection info: {str(e)}")
-            return None
+    logger.info(f"Deleted documents for {len(urls)} URLs from '{collection_name}'")

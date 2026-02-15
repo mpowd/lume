@@ -1,29 +1,46 @@
-import { useState, useEffect } from 'react'
-import { evaluationAPI } from '../services/api'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  useListDatasets,
+  useCreateDataset,
+  useUpdateDataset,
+  useDeleteDataset,
+  useGenerateRagasDataset,
+  getListDatasetsQueryKey,
+} from '../api/generated'
 
 export const useDatasets = () => {
-  const [datasets, setDatasets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListDatasetsQueryKey() })
 
-  const loadDatasets = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await evaluationAPI.getDatasets()
-      setDatasets(data.datasets || [])
-    } catch (err) {
-      console.error('Error loading datasets:', err)
-      setError('Failed to load datasets')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useListDatasets()
+
+  const { mutateAsync: createMutation } = useCreateDataset({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const { mutateAsync: updateMutation } = useUpdateDataset({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const { mutateAsync: deleteMutation } = useDeleteDataset({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const { mutateAsync: generateMutation } = useGenerateRagasDataset({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const datasets = data?.datasets || []
+  const error = queryError ? queryError.message || 'Failed to load datasets' : null
 
   const createDataset = async (datasetData) => {
     try {
-      await evaluationAPI.createDataset(datasetData)
-      await loadDatasets()
+      await createMutation({ data: datasetData })
       return { success: true }
     } catch (err) {
       console.error('Error creating dataset:', err)
@@ -31,10 +48,15 @@ export const useDatasets = () => {
     }
   }
 
-  const generateDataset = async (collection, name, size) => {
+  const generateDataset = async (collectionName, datasetName, testsetSize) => {
     try {
-      await evaluationAPI.generateDataset(collection, name, size)
-      await loadDatasets()
+      await generateMutation({
+        data: {
+          collection_name: collectionName,
+          dataset_name: datasetName,
+          testset_size: testsetSize,
+        },
+      })
       return { success: true }
     } catch (err) {
       console.error('Error generating dataset:', err)
@@ -44,8 +66,7 @@ export const useDatasets = () => {
 
   const updateDataset = async (id, data) => {
     try {
-      await evaluationAPI.updateDataset(id, data)
-      await loadDatasets()
+      await updateMutation({ datasetId: id, data })
       return { success: true }
     } catch (err) {
       console.error('Error updating dataset:', err)
@@ -55,18 +76,13 @@ export const useDatasets = () => {
 
   const deleteDataset = async (id) => {
     try {
-      await evaluationAPI.deleteDataset(id)
-      await loadDatasets()
+      await deleteMutation({ datasetId: id })
       return { success: true }
     } catch (err) {
       console.error('Error deleting dataset:', err)
       return { success: false, error: 'Failed to delete dataset' }
     }
   }
-
-  useEffect(() => {
-    loadDatasets()
-  }, [])
 
   return {
     datasets,
@@ -76,6 +92,6 @@ export const useDatasets = () => {
     generateDataset,
     updateDataset,
     deleteDataset,
-    reload: loadDatasets
+    reload: invalidate,
   }
 }

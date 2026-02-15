@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { BarChart3, Plus, Play, TrendingUp, Database } from 'lucide-react'
-import { evaluationAPI } from '../services/api'
+import { useListEvaluations, getListEvaluationsQueryKey } from '../api/generated'
 import { useCollections } from '../hooks/useCollections'
 import { useAssistants } from '../hooks/useAssistants'
+import { useDatasets } from '../hooks/useDatasets'
 import Button from '../components/shared/Button'
 import LoadingSpinner from '../components/shared/LoadingSpinner'
 import DatasetList from '../components/evaluation/DatasetList'
@@ -14,41 +15,23 @@ import DatasetManager from '../components/evaluation/DatasetManager'
 export default function EvaluationPage() {
   const { collections } = useCollections()
   const { assistants } = useAssistants()
-  const [view, setView] = useState('overview') // overview, create, edit, run, results, manage
-  const [datasets, setDatasets] = useState([])
-  const [evaluations, setEvaluations] = useState([])
+  const { datasets, reload: reloadDatasets } = useDatasets()
+  const { data: evaluationsData, isLoading: evalsLoading } = useListEvaluations()
+
+  const evaluations = evaluationsData?.evaluations || []
+
+  const [view, setView] = useState('overview')
   const [selectedDataset, setSelectedDataset] = useState(null)
   const [editingDataset, setEditingDataset] = useState(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [datasetsData, evaluationsData] = await Promise.all([
-        evaluationAPI.getDatasets(),
-        evaluationAPI.getEvaluations()
-      ])
-      setDatasets(datasetsData.datasets || [])
-      setEvaluations(evaluationsData.evaluations || [])
-    } catch (error) {
-      console.error('Error loading evaluation data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const loading = evalsLoading
 
   const handleDatasetCreated = async () => {
-    await loadData()
     setView('overview')
     setEditingDataset(null)
   }
 
   const handleDatasetDeleted = async () => {
-    await loadData()
     setSelectedDataset(null)
   }
 
@@ -58,7 +41,6 @@ export default function EvaluationPage() {
   }
 
   const handleEvaluationComplete = async () => {
-    await loadData()
     setView('results')
   }
 
@@ -72,7 +54,6 @@ export default function EvaluationPage() {
 
   return (
     <div className="min-h-full bg-background">
-      {/* Header */}
       <div className="border-b border-white/5 bg-background-elevated/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-[1600px] mx-auto px-8 py-6">
           <div className="flex items-center gap-4">
@@ -89,11 +70,9 @@ export default function EvaluationPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-[1600px] mx-auto p-8">
         {view === 'overview' && (
           <div className="space-y-8">
-            {/* Simple Action Buttons */}
             <div className="flex gap-4">
               <Button
                 variant="primary"
@@ -122,17 +101,12 @@ export default function EvaluationPage() {
                 Run Evaluation
               </Button>
               {evaluations.length > 0 && (
-                <Button
-                  variant="ghost"
-                  icon={TrendingUp}
-                  onClick={() => setView('results')}
-                >
+                <Button variant="ghost" icon={TrendingUp} onClick={() => setView('results')}>
                   View Results
                 </Button>
               )}
             </div>
 
-            {/* Datasets List */}
             <DatasetList
               datasets={datasets}
               onSelect={(dataset) => {
@@ -141,7 +115,7 @@ export default function EvaluationPage() {
               }}
               onEdit={handleDatasetEdit}
               onDelete={handleDatasetDeleted}
-              onRefresh={loadData}
+              onRefresh={reloadDatasets}
             />
           </div>
         )}

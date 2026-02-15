@@ -37,21 +37,11 @@ class AssistantResponse(BaseModel):
     is_active: bool
 
 
-class AssistantListResponse(BaseModel):
-    """Response with list of assistants"""
-
-    assistants: list[AssistantResponse]
-
-
 class ExecutionRequest(BaseModel):
-    """Request to execute an assistant"""
-
     input_data: dict[str, Any]
 
 
 class ExecutionResponse(BaseModel):
-    """Response from assistant execution"""
-
     execution_id: str | None = None
     status: str
     output: dict[str, Any]

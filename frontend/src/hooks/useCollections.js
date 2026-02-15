@@ -1,40 +1,46 @@
-import { useState, useEffect } from 'react'
-import { knowledgeBaseAPI } from '../services/api'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  useListCollections,
+  useCreateCollection,
+  useDeleteCollection,
+  getListCollectionsQueryKey,
+} from '../api/generated'
 
 export const useCollections = () => {
-  const [collections, setCollections] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListCollectionsQueryKey() })
 
-  const loadCollections = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await knowledgeBaseAPI.getAll()
-      setCollections(data.collection_names || [])
-    } catch (err) {
-      console.error('Error loading collections:', err)
-      setError('Failed to load collections')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useListCollections()
+
+  const { mutateAsync: createMutation } = useCreateCollection({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const { mutateAsync: deleteMutation } = useDeleteCollection({
+    mutation: { onSuccess: invalidate },
+  })
+
+  const collections = data?.collection_names || []
+  const error = queryError ? queryError.message || 'Failed to load collections' : null
 
   const createCollection = async (collectionData) => {
     try {
-      await knowledgeBaseAPI.create(collectionData)
-      await loadCollections()
+      await createMutation({ data: collectionData })
       return { success: true }
     } catch (err) {
       console.error('Error creating collection:', err)
-      return { success: false, error: 'Failed to create collection' }
+      return { success: false, error: err.response?.data?.detail || 'Failed to create collection' }
     }
   }
 
   const deleteCollection = async (collectionName) => {
     try {
-      await knowledgeBaseAPI.delete(collectionName)
-      await loadCollections()
+      await deleteMutation({ collectionName })
       return { success: true }
     } catch (err) {
       console.error('Error deleting collection:', err)
@@ -42,16 +48,12 @@ export const useCollections = () => {
     }
   }
 
-  useEffect(() => {
-    loadCollections()
-  }, [])
-
   return {
     collections,
     loading,
     error,
     createCollection,
     deleteCollection,
-    reload: loadCollections
+    reload: invalidate,
   }
 }

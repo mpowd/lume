@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { evaluationAPI, assistantsAPI } from '../services/api'
+import { listEvaluationsByDataset, getAssistant } from '../api/generated'
 
 export const useEvaluationComparison = (datasetName) => {
   const [evaluations, setEvaluations] = useState([])
@@ -11,19 +11,19 @@ export const useEvaluationComparison = (datasetName) => {
     try {
       setLoading(true)
       setError(null)
-      
-      const data = await evaluationAPI.getEvaluationsByDataset(datasetName)
-      
+
+      const data = await listEvaluationsByDataset(datasetName)
+
       if (data.evaluations) {
         setEvaluations(data.evaluations)
-        
-        // Fetch assistant details
+
+        // Fetch assistant names
         const assistantIds = [...new Set(data.evaluations.map(e => e.assistant_id))]
-        const assistantPromises = assistantIds.map(id => 
-          assistantsAPI.getById(id).catch(() => null)
+        const assistantPromises = assistantIds.map(id =>
+          getAssistant(id).catch(() => null)
         )
         const assistantData = await Promise.all(assistantPromises)
-        
+
         const assistantMap = {}
         assistantData.forEach(a => {
           if (a) {
