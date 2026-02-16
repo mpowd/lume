@@ -54,12 +54,9 @@ class AssistantService:
         self, assistant_id: str, request: AssistantUpdateRequest
     ) -> AssistantResponse:
         existing = self.get(assistant_id)
-
         if request.config is not None:
             self._validate_config(existing.type, request.config)
-
         self._clear_instance_cache(assistant_id)
-
         result = self.repo.update(assistant_id, request.model_dump(exclude_unset=True))
         if not result:
             raise AssistantNotFoundError(assistant_id)
@@ -73,55 +70,54 @@ class AssistantService:
 
     # ── Execution ─────────────────────────────────────────
 
+    def _prepare_execution(self, assistant_id: str, input_data: dict[str, Any]):
+        """Shared setup for execute and execute_stream."""
+        assistant = self.get(assistant_id)
+        if not assistant.is_active:
+            raise AssistantInactiveError(assistant_id)
+
+        instance = self._get_or_create_instance(assistant_id, assistant.type)
+        validated_input = self._validate_input(instance, input_data)
+
+        config_data = (
+            assistant.config
+            if isinstance(assistant.config, dict)
+            else assistant.config.model_dump()
+        )
+        config = instance.get_config_schema()(**config_data)
+
+        return instance, config, validated_input
+
     async def execute(
         self, assistant_id: str, input_data: dict[str, Any]
     ) -> dict[str, Any]:
         start_time = time.time()
 
-        assistant = self.get(assistant_id)
-
-        if not assistant.is_active:
-            raise AssistantInactiveError(assistant_id)
-
-        instance = self._get_or_create_instance(assistant_id, assistant.type)
-        validated_input = self._validate_input(instance, input_data)
-
-        config_data = (
-            assistant.config
-            if isinstance(assistant.config, dict)
-            else assistant.config.model_dump()
+        instance, config, validated_input = self._prepare_execution(
+            assistant_id, input_data
         )
-        config = instance.get_config_schema()(**config_data)
 
-        result = await instance.execute(config, validated_input)
+        # Non-streaming: collect the single yielded output
+        result = None
+        async for output in instance.execute(config, validated_input, stream=False):
+            result = output
+
         execution_time = time.time() - start_time
-
         logger.info(f"Assistant {assistant_id} executed in {execution_time:.2f}s")
 
         return {
             "status": "completed",
-            "output": result.model_dump(),
+            "output": result.model_dump() if result else {},
             "execution_time": execution_time,
             "error": None,
         }
 
     async def execute_stream(self, assistant_id: str, input_data: dict[str, Any]):
-        assistant = self.get(assistant_id)
-
-        if not assistant.is_active:
-            raise AssistantInactiveError(assistant_id)
-
-        instance = self._get_or_create_instance(assistant_id, assistant.type)
-        validated_input = self._validate_input(instance, input_data)
-
-        config_data = (
-            assistant.config
-            if isinstance(assistant.config, dict)
-            else assistant.config.model_dump()
+        instance, config, validated_input = self._prepare_execution(
+            assistant_id, input_data
         )
-        config = instance.get_config_schema()(**config_data)
 
-        async for chunk in instance.execute_stream(config, validated_input):
+        async for chunk in instance.execute(config, validated_input, stream=True):
             yield chunk
 
     # ── Schema / Type queries ─────────────────────────────

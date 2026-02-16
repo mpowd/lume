@@ -1,35 +1,42 @@
+"""
+API routes for Ollama integration
+"""
+
 import logging
 
 import httpx
 from fastapi import APIRouter, HTTPException
+
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get("/models")
-async def get_ollama_models():
-    """Fetch available Ollama models from the host machine"""
+@router.get("/models", operation_id="listOllamaModels")
+async def list_ollama_models():
+    """Fetch available models from the Ollama instance."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("http://host.docker.internal:11434/api/tags")
+            response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
             response.raise_for_status()
             return response.json()
-    except httpx.TimeoutException:
-        logger.error("Timeout connecting to Ollama")
+    except httpx.TimeoutException as e:
+        logger.error("Timeout connecting to Ollama at %s", settings.OLLAMA_BASE_URL)
         raise HTTPException(
             status_code=504,
-            detail="Ollama service timeout. Make sure Ollama is running on the host.",
-        )
-    except httpx.ConnectError:
-        logger.error("Cannot connect to Ollama")
+            detail="Ollama service timeout. Make sure Ollama is running.",
+        ) from e
+    except httpx.ConnectError as e:
+        logger.error("Cannot connect to Ollama at %s", settings.OLLAMA_BASE_URL)
         raise HTTPException(
             status_code=503,
-            detail="Cannot connect to Ollama. Make sure Ollama is running on the host.",
-        )
-    except Exception as e:
-        logger.error(f"Error fetching Ollama models: {str(e)}")
+            detail="Cannot connect to Ollama. Make sure Ollama is running.",
+        ) from e
+    except httpx.HTTPStatusError as e:
+        logger.error("Ollama returned %s: %s", e.response.status_code, e.response.text)
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch Ollama models: {str(e)}"
-        )
+            status_code=e.response.status_code,
+            detail=f"Ollama error: {e.response.text}",
+        ) from e

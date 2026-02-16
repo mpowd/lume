@@ -1,5 +1,7 @@
 """
-Question Answering Assistant.
+Question Answering Assistant with RAG.
+
+Orchestrates the retrieve → generate pipeline using core/ building blocks.
 """
 
 import logging
@@ -77,14 +79,22 @@ class QAAssistant(BaseAssistant):
         return QAAssistantInput
 
     async def execute(
-        self, config: QAAssistantConfig, input_data: QAAssistantInput
-    ) -> QAAssistantOutput:
-        """Execute QA pipeline: retrieve → generate"""
-        from ..generator import generate
+        self,
+        config: QAAssistantConfig,
+        input_data: QAAssistantInput,
+        stream: bool = False,
+    ):
+        """
+        Execute QA pipeline: retrieve → generate.
+
+        When stream=False: yields a single QAAssistantOutput.
+        When stream=True: yields str tokens, then a final metadata dict.
+        """
+        from ..generator import generate, generate_stream
         from ..retriever import retrieve
 
         try:
-            logger.info(f"Executing QA: {input_data.question}")
+            logger.info(f"Executing QA (stream={stream}): {input_data.question}")
 
             # Step 1: Retrieve
             retrieved_docs = []
@@ -96,65 +106,46 @@ class QAAssistant(BaseAssistant):
                 )
             logger.info(f"Retrieved {len(retrieved_docs)} documents")
 
-            # Step 2: Generate
-            result = await generate(
-                query=input_data.question,
-                documents=retrieved_docs,
-                config=config.model_dump(),
-            )
+            config_dict = config.model_dump()
 
-            return QAAssistantOutput(
-                result=result["answer"],
-                answer=result["answer"],
-                sources=result.get("sources", []),
-                contexts=result.get("contexts", []),
-                metadata={
-                    "retrieved_docs_count": len(retrieved_docs),
-                    "llm_model": config.llm_model,
-                },
-            )
+            if stream:
+                # Streaming mode: yield tokens then metadata
+                urls = [doc.metadata.get("source_url") for doc in retrieved_docs]
+                contexts = [doc.page_content for doc in retrieved_docs]
 
-        except Exception as e:
-            logger.error(f"Error executing QA Assistant: {e}", exc_info=True)
-            raise
-
-    async def execute_stream(
-        self, config: QAAssistantConfig, input_data: QAAssistantInput
-    ):
-        """Stream QA pipeline: retrieve → stream generate"""
-        from backend.core import generator, retriever
-
-        try:
-            logger.info(f"Streaming QA: {input_data.question}")
-
-            # Step 1: Retrieve
-            retrieved_docs = []
-            if config.knowledge_base_ids:
-                retrieved_docs = await retriever.retrieve(
+                async for chunk in generate_stream(
                     query=input_data.question,
-                    knowledge_base_ids=config.knowledge_base_ids,
-                    config=config.model_dump(),
+                    documents=retrieved_docs,
+                    config=config_dict,
+                ):
+                    if isinstance(chunk, str):
+                        yield chunk
+                    else:
+                        # Precise citation returns a dict
+                        urls = chunk.get("sources")
+                        contexts = chunk.get("contexts")
+                        yield chunk.get("answer")
+
+                yield {"source_urls": urls, "contexts": contexts}
+
+            else:
+                # Non-streaming mode: yield a single output
+                result = await generate(
+                    query=input_data.question,
+                    documents=retrieved_docs,
+                    config=config_dict,
                 )
-            logger.info(f"Retrieved {len(retrieved_docs)} documents")
 
-            urls = [doc.metadata.get("source_url") for doc in retrieved_docs]
-            contexts = [doc.page_content for doc in retrieved_docs]
-
-            # Step 2: Stream generation
-            async for chunk in generator.generate_stream(
-                query=input_data.question,
-                documents=retrieved_docs,
-                config=config.model_dump(),
-            ):
-                if isinstance(chunk, str):
-                    yield chunk
-                else:
-                    # Precise citation returns a dict
-                    urls = chunk.get("sources")
-                    contexts = chunk.get("contexts")
-                    yield chunk.get("answer")
-
-            yield {"source_urls": urls, "contexts": contexts}
+                yield QAAssistantOutput(
+                    result=result["answer"],
+                    answer=result["answer"],
+                    sources=result.get("sources", []),
+                    contexts=result.get("contexts", []),
+                    metadata={
+                        "retrieved_docs_count": len(retrieved_docs),
+                        "llm_model": config.llm_model,
+                    },
+                )
 
         except Exception as e:
             logger.error(f"Error executing QA Assistant: {e}", exc_info=True)

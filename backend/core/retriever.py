@@ -15,9 +15,10 @@ from backend.core.llm import get_chat_llm
 
 logger = logging.getLogger(__name__)
 
-# Module-level singletons — created once, reused across requests
+
 _qdrant_client: QdrantClient | None = None
 _embedding_config = None
+_sparse_embeddings = None
 
 
 def _get_qdrant_client() -> QdrantClient:
@@ -27,11 +28,28 @@ def _get_qdrant_client() -> QdrantClient:
     return _qdrant_client
 
 
-def _get_embedding_config():
+def _get_dense_embeddings():
     global _embedding_config
     if _embedding_config is None:
         _embedding_config = get_embedding_config("jina/jina-embeddings-v2-base-de")
-    return _embedding_config
+    return _embedding_config.dense
+
+
+def _get_sparse_embeddings():
+    """
+    Get sparse BM25 embeddings (only needed for hybrid search).
+
+    Lazy-loaded on first hybrid search request. The fastembed library
+    caches the model in ~/.cache/fastembed/ so it's only downloaded once.
+    """
+    global _sparse_embeddings
+    if _sparse_embeddings is None:
+        from langchain_qdrant import FastEmbedSparse
+
+        logger.info("Loading BM25 sparse model (first hybrid search request)...")
+        _sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+        logger.info("BM25 sparse model loaded and cached.")
+    return _sparse_embeddings
 
 
 def _generate_hypothetical_document(query: str, hyde_prompt: str, llm) -> str:
@@ -63,35 +81,36 @@ async def retrieve(
             - hyde_prompt (str): Prompt template for HyDE
             - llm_model (str): Model for HyDE generation
             - llm_provider (str): Provider for HyDE generation
-
-    Returns:
-        List of retrieved LangChain Documents.
     """
     if not knowledge_base_ids:
         logger.warning("No knowledge bases specified")
         return []
 
     collection_name = knowledge_base_ids[0]
-    logger.info(f"Retrieving from collection: {collection_name}")
-
-    # Determine search mode from config
     hybrid = config.get("hybrid_search", True)
     top_k = config.get("top_k", 10)
-    retrieval_mode = RetrievalMode.HYBRID if hybrid else RetrievalMode.DENSE
 
-    emb = _get_embedding_config()
-    client = _get_qdrant_client()
-
-    vector_store = QdrantVectorStore(
-        client=client,
-        collection_name=collection_name,
-        embedding=emb.dense,
-        sparse_embedding=emb.sparse,
-        retrieval_mode=retrieval_mode,
-        vector_name="dense",
-        sparse_vector_name="sparse",
+    logger.info(
+        f"Retrieving from '{collection_name}' "
+        f"(mode={'hybrid' if hybrid else 'dense'}, top_k={top_k})"
     )
 
+    # Build vector store with appropriate search mode
+    store_kwargs = {
+        "client": _get_qdrant_client(),
+        "collection_name": collection_name,
+        "embedding": _get_dense_embeddings(),
+        "vector_name": "dense",
+    }
+
+    if hybrid:
+        store_kwargs["sparse_embedding"] = _get_sparse_embeddings()
+        store_kwargs["sparse_vector_name"] = "sparse"
+        store_kwargs["retrieval_mode"] = RetrievalMode.HYBRID
+    else:
+        store_kwargs["retrieval_mode"] = RetrievalMode.DENSE
+
+    vector_store = QdrantVectorStore(**store_kwargs)
     retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
 
     # Apply HyDE if enabled

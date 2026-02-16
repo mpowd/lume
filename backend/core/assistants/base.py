@@ -34,30 +34,27 @@ class BaseAssistant(ABC):
     assistant_type: str = "base"
 
     @abstractmethod
-    def get_config_schema(self) -> type[BaseModel]:
-        """Return the Pydantic schema for configuration"""
+    def get_config_schema(self) -> type[BaseModel]: ...
+
+    @abstractmethod
+    def get_input_schema(self) -> type[BaseModel]: ...
+
+    @abstractmethod
+    def execute(
+        self, config: Any, input_data: Any, stream: bool = False
+    ) -> AsyncIterator[Any]:
+        """
+        Execute the assistant logic.
+
+        When stream=False: yields a single AssistantOutput.
+        When stream=True: yields str tokens, then a final metadata dict.
+        """
         ...
 
     @abstractmethod
-    def get_input_schema(self) -> type[BaseModel]:
-        """Return the Pydantic schema for runtime input"""
-        ...
-
-    @abstractmethod
-    async def execute(self, config: Any, input_data: Any) -> AssistantOutput:
-        """Execute the assistant logic"""
-        ...
-
-    @abstractmethod
-    def execute_stream(self, config: Any, input_data: Any) -> AsyncIterator[Any]: ...
-
-    @abstractmethod
-    def supports_evaluation(self) -> bool:
-        """Whether this assistant type can be evaluated"""
-        ...
+    def supports_evaluation(self) -> bool: ...
 
     def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate assistant configuration"""
         schema = self.get_config_schema()
         try:
             schema(**config)
