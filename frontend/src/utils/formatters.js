@@ -19,7 +19,7 @@ export const getSourceUrl = (source) => {
   if (typeof source === 'string') {
     return source
   }
-  
+
   return source.url || source.source || source
 }
 
@@ -36,21 +36,21 @@ export const getSourceStyle = (score) => {
       border: '2px solid'
     }
   }
-  
+
   const glowIntensity = score * 20
   const borderOpacity = 0.3 + (score * 0.4)
-  
+
   return {
     backgroundColor: 'rgb(30, 41, 59)',
     borderColor: `rgba(59, 130, 246, ${borderOpacity})`,
-    boxShadow: `0 0 ${glowIntensity}px rgba(59, 130, 246, ${score * 0.6}), inset 0 0 ${glowIntensity/2}px rgba(59, 130, 246, ${score * 0.2})`,
+    boxShadow: `0 0 ${glowIntensity}px rgba(59, 130, 246, ${score * 0.6}), inset 0 0 ${glowIntensity / 2}px rgba(59, 130, 246, ${score * 0.2})`,
     border: '2px solid'
   }
 }
 
 export const getDotColor = (score) => {
   if (score === null || score === undefined) return 'bg-slate-400'
-  
+
   if (score >= 0.8) return 'bg-emerald-400'
   if (score >= 0.6) return 'bg-blue-400'
   if (score >= 0.4) return 'bg-yellow-400'
@@ -62,10 +62,10 @@ export const getDotColor = (score) => {
 export const isFileUrl = (url) => {
   if (!url) return false
   const urlString = typeof url === 'string' ? url : url.url
-  
+
   const isNotHttpUrl = !urlString.startsWith('http://') && !urlString.startsWith('https://')
   const hasFileExtension = /\.(pdf|doc|docx|txt|md|xlsx?|csv)$/i.test(urlString)
-  
+
   return isNotHttpUrl && hasFileExtension
 }
 
@@ -81,8 +81,8 @@ export const getFileName = (url) => {
 
 export const getFileIcon = (filename) => {
   const ext = filename.split('.').pop()?.toLowerCase()
-  
-  switch(ext) {
+
+  switch (ext) {
     case 'pdf':
       return '📄'
     case 'doc':

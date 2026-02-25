@@ -2,6 +2,8 @@
 Application settings
 """
 
+from pathlib import Path
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,6 +30,9 @@ class Settings(BaseSettings):
     ENABLE_PHOENIX: bool = False
     ENABLE_OLLAMA: bool = False
     DEPLOYMENT_MODE: str = "dev"
+
+    # ── Storage ───────────────────────────────────────────
+    FILES_BASE_DIR: Path = Path("data/files")
 
     # ── Misc ──────────────────────────────────────────────
     TZ: str = "Europe/Berlin"

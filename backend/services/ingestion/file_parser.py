@@ -4,15 +4,17 @@ File parsing service — extracts content from uploaded files.
 
 import hashlib
 import logging
-import os
+import shutil
 from datetime import datetime
+from pathlib import Path
 
 from llama_parse import LlamaParse
 
+from backend.config import settings
+
 logger = logging.getLogger(__name__)
 
-# Base directory for stored files
-FILES_BASE_DIR = "/data/files"
+FILES_BASE_DIR: Path = settings.FILES_BASE_DIR
 
 
 def parse_file(
@@ -34,19 +36,13 @@ def parse_file(
     Raises:
         RuntimeError: If parsing fails.
     """
-    # Ensure collection directory exists
-    collection_dir = os.path.join(FILES_BASE_DIR, collection_name)
-    os.makedirs(collection_dir, exist_ok=True)
+    collection_dir = FILES_BASE_DIR / collection_name
+    collection_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = os.path.join(collection_dir, filename)
-
-    # Save file to disk
-    with open(file_path, "wb") as f:
-        f.write(content)
-
+    file_path = collection_dir / filename
+    file_path.write_bytes(content)
     logger.info(f"Saved file to {file_path}")
 
-    # Parse with LlamaParse
     try:
         parser = LlamaParse(
             result_type="markdown",
@@ -54,12 +50,11 @@ def parse_file(
             split_by_page=False,
         )
 
-        with open(file_path, "rb") as f:
-            documents = parser.load_data(f, extra_info={"file_name": file_path})
+        documents = parser.load_data(
+            str(file_path), extra_info={"file_name": str(file_path)}
+        )
 
-        parsed_content = ""
-        for doc in documents:
-            parsed_content += doc.text_resource.text
+        parsed_content = "".join(doc.text_resource.text for doc in documents)
 
         if not parsed_content:
             raise RuntimeError(f"LlamaParse returned empty content for {filename}")
@@ -70,7 +65,7 @@ def parse_file(
 
     return {
         "filename": filename,
-        "url": file_path,
+        "url": str(file_path),
         "content": parsed_content,
         "source_category": "file",
         "collection_name": collection_name,
@@ -82,9 +77,7 @@ def parse_file(
 
 def delete_collection_files(collection_name: str) -> None:
     """Remove the file directory for a collection."""
-    import shutil
-
-    collection_dir = os.path.join(FILES_BASE_DIR, collection_name)
-    if os.path.isdir(collection_dir):
+    collection_dir = FILES_BASE_DIR / collection_name
+    if collection_dir.is_dir():
         shutil.rmtree(collection_dir)
         logger.info(f"Deleted file directory: {collection_dir}")
