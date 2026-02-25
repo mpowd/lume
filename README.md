@@ -7,7 +7,7 @@ A modular platform for building AI assistants with RAG capabilities and integrat
 - Question-answering assistants with retrieval augmented generation
 - Knowledge base management with web crawling and file upload
 - Advanced retrieval (hybrid search, HyDE, reranking)
-- RAGAS-based evaluation framework
+- Evaluation module that supports built-in metrics and custom metrics
 - Support for OpenAI and Ollama models
 
 ## Architecture
@@ -21,7 +21,7 @@ A modular platform for building AI assistants with RAG capabilities and integrat
 │                  FastAPI Backend                            │
 │  • Assistant Registry & Execution Engine                    │
 │  • Knowledge Base Management                                │
-│  • Evaluation System (RAGAS)                                │
+│  • Evaluation System                                        │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌──────────────────┬──────────────────┬──────────────────────┐
@@ -53,21 +53,30 @@ cd lume
 
 2. **Create `.env` file**
 ```env
-QDRANT_HOST=qdrant
-QDRANT_PORT=6333
-MONGODB_URL=mongodb://mongodb:27017
-OPENAI_API_KEY=YOUR_KEY
-COHERE_API_KEY=YOUR_KEY
+OPENAI_API_KEY=YOUR_OPENAI_API_KEY
+COHERE_API_KEY=YOUR_COHERE_API_KEY
+LLAMA_CLOUD_API_KEY=YOUR_LLAMACLOUD_API_KEY
+TAVILY_API_KEY=YOUR_TAVILY_API_KEY
+
+# Config
 TZ=Europe/Berlin
-PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
-LLAMA_CLOUD_API_KEY=YOUR_KEY
-TAVILY_API_KEY=YOUR_KEY
-OLLAMA_BASE_URL=http://host.docker.internal:11434
+DEPLOYMENT_MODE=dev
+USE_GPU=true
+ENABLE_PHOENIX=true
+ENABLE_OLLAMA=true
+
+# Services
+PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
+OLLAMA_BASE_URL=http://localhost:11434
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_NAME=Lume
 ```
 
 3. **Start infrastructure services**
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.services.yml up -d
 ```
 
 4. **Start backend**
@@ -120,31 +129,28 @@ npm run preview      # Preview production build
 3. Create an assistant (Assistants → New Assistant)
 4. Configure retrieval settings and prompts
 5. Test in chat interface
-6. Evaluate with RAGAS metrics
+6. Evaluate the assistants performance
 
 ## API Documentation
 
 Interactive API docs available at: http://localhost:8000/docs
 
-### Key Endpoints
-- `POST /assistants/` - Create assistant
-- `POST /execute/qa` - Execute question-answering
-- `POST /knowledge_base/collections` - Create collection
-- `POST /website/upload-documents-stream` - Crawl and index website
-- `POST /evaluation/evaluate-assistant` - Run evaluation
 
 ## Project Structure
 ```
 lume/
-├── backend/                 # FastAPI backend
-│   ├── api/                # API routes
-│   ├── core/               # Core logic (assistants, etc.)
-│   ├── services/           # Business logic
-│   ├── schemas/            # Pydantic models
-│   └── cli.py              # CLI entry points
-├── frontend/               # React frontend
-├── docker-compose.dev.yml  # Development services
-└── pyproject.toml          # Python dependencies
+├── backend/                    # FastAPI backend
+│   ├── api/                      # API routes
+│   ├── core/                     # Core logic (assistants, etc.)
+│   ├── services/                 # Business logic
+│   ├── schemas/                  # Pydantic models
+│   └── cli.py                    # CLI entry points
+├── data/                         # data from mongodb, qdrant and phoenix
+├── frontend/                     # React frontend                 
+├── docker-compose.services.yml   # Docker services
+├── .env                          # .env file with your config
+├── .env.example                  # ecample .env file
+└── pyproject.toml                # Python dependencies
 ```
 
 ## License
