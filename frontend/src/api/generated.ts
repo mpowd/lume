@@ -10,9 +10,14 @@ import {
   useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
+  QueryClient,
   QueryFunction,
   QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
@@ -143,16 +148,25 @@ export interface DatasetUpdateRequest {
   qa_pairs?: DatasetUpdateRequestQaPairs;
 }
 
+/**
+ * ID of a saved evaluation dataset
+ */
+export type EvaluateAssistantRequestDatasetId = string | null;
+
+/**
+ * Ad-hoc questions when no saved dataset is used
+ */
+export type EvaluateAssistantRequestInlineQuestions = EvaluationQuestionInput[] | null;
+
 export interface EvaluateAssistantRequest {
-  /** Name of the evaluation dataset */
-  dataset_name: string;
-  /** ID of the assistant being evaluated */
+  /** ID of the assistant to evaluate */
   assistant_id: string;
-  questions: string[];
-  ground_truths: string[];
-  answers: string[];
-  /** Retrieved context chunks per question */
-  retrieved_contexts: string[][];
+  /** IDs of MetricDefinition documents to run */
+  metric_ids: string[];
+  /** ID of a saved evaluation dataset */
+  dataset_id?: EvaluateAssistantRequestDatasetId;
+  /** Ad-hoc questions when no saved dataset is used */
+  inline_questions?: EvaluateAssistantRequestInlineQuestions;
   eval_llm_model?: string;
   eval_llm_provider?: string;
 }
@@ -161,16 +175,33 @@ export interface EvaluationListResponse {
   evaluations: EvaluationResponse[];
 }
 
-export type EvaluationResponseDetailedResultsItem = { [key: string]: unknown };
+export type EvaluationQuestionInputGroundTruth = string | null;
+
+/**
+ * A single question supplied inline (without a saved dataset).
+ */
+export interface EvaluationQuestionInput {
+  question: string;
+  ground_truth?: EvaluationQuestionInputGroundTruth;
+}
+
+export type EvaluationResponseDatasetId = string | null;
+
+export type EvaluationResponseDatasetName = string | null;
+
+export type EvaluationResponseSummary = {[key: string]: number};
 
 export interface EvaluationResponse {
   id: string;
-  dataset_name: string;
   assistant_id: string;
+  assistant_name: string;
+  dataset_id: EvaluationResponseDatasetId;
+  dataset_name: EvaluationResponseDatasetName;
   eval_llm_model: string;
   eval_llm_provider: string;
-  metrics: MetricsSummary;
-  detailed_results: EvaluationResponseDetailedResultsItem[];
+  metric_ids: string[];
+  summary: EvaluationResponseSummary;
+  results: QuestionResult[];
   created_at: string;
 }
 
@@ -200,19 +231,94 @@ export interface HTTPValidationError {
   detail?: ValidationError[];
 }
 
-export type MetricsSummaryFaithfulness = number | null;
+/**
+ * Short description of what this metric measures
+ */
+export type MetricCreateRequestDescription = string | null;
 
-export type MetricsSummaryContextRecall = number | null;
+/**
+ * Prompt sent to the evaluator LLM. Use {question}, {answer}, {ground_truth}, {context} as placeholders. The model must return a single number.
+ */
+export type MetricCreateRequestPromptTemplate = string | null;
 
-export type MetricsSummaryAnswerRelevancy = number | null;
+export interface MetricCreateRequest {
+  /** Display name, e.g. 'Grammar' */
+  name: string;
+  /** Short description of what this metric measures */
+  description?: MetricCreateRequestDescription;
+  type?: MetricType;
+  /** Prompt sent to the evaluator LLM. Use {question}, {answer}, {ground_truth}, {context} as placeholders. The model must return a single number. */
+  prompt_template?: MetricCreateRequestPromptTemplate;
+  /** Minimum score value */
+  scale_min?: number;
+  /** Maximum score value */
+  scale_max?: number;
+  /** True for pre-defined metrics shipped with the platform */
+  is_builtin?: boolean;
+  /** If True, retrieval context must be available to use this metric */
+  requires_context?: boolean;
+  /** If True, ground truth must be provided in the dataset */
+  requires_ground_truth?: boolean;
+}
 
-export type MetricsSummaryContextPrecision = number | null;
+export interface MetricListResponse {
+  metrics: MetricResponse[];
+}
 
-export interface MetricsSummary {
-  faithfulness?: MetricsSummaryFaithfulness;
-  context_recall?: MetricsSummaryContextRecall;
-  answer_relevancy?: MetricsSummaryAnswerRelevancy;
-  context_precision?: MetricsSummaryContextPrecision;
+export type MetricResponseDescription = string | null;
+
+export type MetricResponsePromptTemplate = string | null;
+
+export interface MetricResponse {
+  id: string;
+  name: string;
+  description: MetricResponseDescription;
+  type: MetricType;
+  prompt_template: MetricResponsePromptTemplate;
+  scale_min: number;
+  scale_max: number;
+  is_builtin: boolean;
+  requires_context: boolean;
+  requires_ground_truth: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * llm_judge: LLM scores the answer using a custom prompt template.
+exact_match: Simple string equality check (case-insensitive).
+ */
+export type MetricType = typeof MetricType[keyof typeof MetricType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MetricType = {
+  llm_judge: 'llm_judge',
+  exact_match: 'exact_match',
+} as const;
+
+export type MetricUpdateRequestName = string | null;
+
+export type MetricUpdateRequestDescription = string | null;
+
+export type MetricUpdateRequestPromptTemplate = string | null;
+
+export type MetricUpdateRequestScaleMin = number | null;
+
+export type MetricUpdateRequestScaleMax = number | null;
+
+export type MetricUpdateRequestRequiresContext = boolean | null;
+
+export type MetricUpdateRequestRequiresGroundTruth = boolean | null;
+
+export interface MetricUpdateRequest {
+  name?: MetricUpdateRequestName;
+  description?: MetricUpdateRequestDescription;
+  prompt_template?: MetricUpdateRequestPromptTemplate;
+  scale_min?: MetricUpdateRequestScaleMin;
+  scale_max?: MetricUpdateRequestScaleMax;
+  requires_context?: MetricUpdateRequestRequiresContext;
+  requires_ground_truth?: MetricUpdateRequestRequiresGroundTruth;
 }
 
 export type ProgressStageResponseCurrentItem = string | null;
@@ -275,13 +381,20 @@ export interface QAAssistantConfig {
   agentic_system_prompt?: QAAssistantConfigAgenticSystemPrompt;
 }
 
-export interface RagasGenerationRequest {
-  collection_name: string;
-  dataset_name: string;
-  /** Number of test cases to generate */
-  testset_size?: number;
-  /** LLM model for generation */
-  model_name?: string;
+export type QuestionResultGroundTruth = string | null;
+
+/**
+ * Metric name → numeric score
+ */
+export type QuestionResultScores = {[key: string]: number};
+
+export interface QuestionResult {
+  question: string;
+  answer: string;
+  ground_truth: QuestionResultGroundTruth;
+  context: string[];
+  /** Metric name → numeric score */
+  scores: QuestionResultScores;
 }
 
 export interface ReindexRequest {
@@ -428,7 +541,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useCreateAssistant = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createAssistant>>,
         TError,
         {data: AssistantCreateRequest},
@@ -437,7 +550,7 @@ export const useCreateAssistant = <TError = HTTPValidationError,
 
       const mutationOptions = getCreateAssistantMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -467,7 +580,7 @@ export const getListAssistantsQueryKey = (params?: ListAssistantsParams,) => {
     }
 
     
-export const getListAssistantsQueryOptions = <TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(params?: ListAssistantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>, }
+export const getListAssistantsQueryOptions = <TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(params?: ListAssistantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -482,25 +595,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAssistantsQueryResult = NonNullable<Awaited<ReturnType<typeof listAssistants>>>
 export type ListAssistantsQueryError = HTTPValidationError
 
 
+export function useListAssistants<TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(
+ params: undefined |  ListAssistantsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistants>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistants>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistants<TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(
+ params?: ListAssistantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistants>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistants>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistants<TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(
+ params?: ListAssistantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Assistants
  */
 
 export function useListAssistants<TData = Awaited<ReturnType<typeof listAssistants>>, TError = HTTPValidationError>(
- params?: ListAssistantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ params?: ListAssistantsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistants>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAssistantsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -536,7 +673,7 @@ export const getGetAssistantQueryKey = (assistantId?: string,) => {
     }
 
     
-export const getGetAssistantQueryOptions = <TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(assistantId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>, }
+export const getGetAssistantQueryOptions = <TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -551,25 +688,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(assistantId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(assistantId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAssistantQueryResult = NonNullable<Awaited<ReturnType<typeof getAssistant>>>
 export type GetAssistantQueryError = HTTPValidationError
 
 
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistant>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistant>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistant>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistant>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Assistant
  */
 
 export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
- assistantId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAssistantQueryOptions(assistantId,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -633,7 +794,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useUpdateAssistant = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateAssistant>>,
         TError,
         {assistantId: string;data: AssistantUpdateRequest},
@@ -642,7 +803,7 @@ export const useUpdateAssistant = <TError = HTTPValidationError,
 
       const mutationOptions = getUpdateAssistantMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -696,7 +857,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useDeleteAssistant = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteAssistant>>,
         TError,
         {assistantId: string},
@@ -705,7 +866,7 @@ export const useDeleteAssistant = <TError = HTTPValidationError,
 
       const mutationOptions = getDeleteAssistantMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -734,7 +895,7 @@ export const getListAssistantTypesQueryKey = () => {
     }
 
     
-export const getListAssistantTypesQueryOptions = <TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>, }
+export const getListAssistantTypesQueryOptions = <TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -749,25 +910,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAssistantTypesQueryResult = NonNullable<Awaited<ReturnType<typeof listAssistantTypes>>>
 export type ListAssistantTypesQueryError = unknown
 
 
+export function useListAssistantTypes<TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistantTypes>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistantTypes>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistantTypes<TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistantTypes>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistantTypes>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistantTypes<TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Assistant Types
  */
 
 export function useListAssistantTypes<TData = Awaited<ReturnType<typeof listAssistantTypes>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantTypes>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAssistantTypesQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -803,7 +988,7 @@ export const getGetAssistantTypeSchemaQueryKey = (assistantType?: string,) => {
     }
 
     
-export const getGetAssistantTypeSchemaQueryOptions = <TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(assistantType: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>, }
+export const getGetAssistantTypeSchemaQueryOptions = <TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(assistantType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -818,25 +1003,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(assistantType), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(assistantType), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAssistantTypeSchemaQueryResult = NonNullable<Awaited<ReturnType<typeof getAssistantTypeSchema>>>
 export type GetAssistantTypeSchemaQueryError = HTTPValidationError
 
 
+export function useGetAssistantTypeSchema<TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(
+ assistantType: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistantTypeSchema>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistantTypeSchema>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistantTypeSchema<TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(
+ assistantType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistantTypeSchema>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistantTypeSchema>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistantTypeSchema<TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(
+ assistantType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Assistant Type Schema
  */
 
 export function useGetAssistantTypeSchema<TData = Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError = HTTPValidationError>(
- assistantType: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ assistantType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantTypeSchema>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAssistantTypeSchemaQueryOptions(assistantType,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -901,7 +1110,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useExecuteAssistant = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeAssistant>>, TError,{assistantId: string;data: ExecutionRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof executeAssistant>>,
         TError,
         {assistantId: string;data: ExecutionRequest},
@@ -910,7 +1119,7 @@ export const useExecuteAssistant = <TError = HTTPValidationError,
 
       const mutationOptions = getExecuteAssistantMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -968,7 +1177,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useExecuteAssistantStream = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeAssistantStream>>, TError,{assistantId: string;data: ExecutionRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof executeAssistantStream>>,
         TError,
         {assistantId: string;data: ExecutionRequest},
@@ -977,7 +1186,7 @@ export const useExecuteAssistantStream = <TError = HTTPValidationError,
 
       const mutationOptions = getExecuteAssistantStreamMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1006,7 +1215,7 @@ export const getListCollectionsQueryKey = () => {
     }
 
     
-export const getListCollectionsQueryOptions = <TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>, }
+export const getListCollectionsQueryOptions = <TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1021,25 +1230,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListCollectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCollections>>>
 export type ListCollectionsQueryError = unknown
 
 
+export function useListCollections<TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollections>>,
+          TError,
+          Awaited<ReturnType<typeof listCollections>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCollections<TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollections>>,
+          TError,
+          Awaited<ReturnType<typeof listCollections>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCollections<TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Collections
  */
 
 export function useListCollections<TData = Awaited<ReturnType<typeof listCollections>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListCollectionsQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1103,7 +1336,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useCreateCollection = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollection>>, TError,{data: CollectionCreateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createCollection>>,
         TError,
         {data: CollectionCreateRequest},
@@ -1112,7 +1345,7 @@ export const useCreateCollection = <TError = HTTPValidationError,
 
       const mutationOptions = getCreateCollectionMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1141,7 +1374,7 @@ export const getGetCollectionConfigQueryKey = (collectionName?: string,) => {
     }
 
     
-export const getGetCollectionConfigQueryOptions = <TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(collectionName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>, }
+export const getGetCollectionConfigQueryOptions = <TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1156,25 +1389,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(collectionName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(collectionName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetCollectionConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getCollectionConfig>>>
 export type GetCollectionConfigQueryError = HTTPValidationError
 
 
+export function useGetCollectionConfig<TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(
+ collectionName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionConfig>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCollectionConfig<TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionConfig>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCollectionConfig<TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Collection Config
  */
 
 export function useGetCollectionConfig<TData = Awaited<ReturnType<typeof getCollectionConfig>>, TError = HTTPValidationError>(
- collectionName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCollectionConfig>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCollectionConfigQueryOptions(collectionName,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1238,7 +1495,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useUpdateCollection = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCollection>>, TError,{collectionName: string;data: CollectionUpdateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateCollection>>,
         TError,
         {collectionName: string;data: CollectionUpdateRequest},
@@ -1247,7 +1504,7 @@ export const useUpdateCollection = <TError = HTTPValidationError,
 
       const mutationOptions = getUpdateCollectionMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1301,7 +1558,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useDeleteCollection = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCollection>>, TError,{collectionName: string}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteCollection>>,
         TError,
         {collectionName: string},
@@ -1310,7 +1567,7 @@ export const useDeleteCollection = <TError = HTTPValidationError,
 
       const mutationOptions = getDeleteCollectionMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1340,7 +1597,7 @@ export const getGetWebsiteLinksQueryKey = (params?: GetWebsiteLinksParams,) => {
     }
 
     
-export const getGetWebsiteLinksQueryOptions = <TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(params: GetWebsiteLinksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>, }
+export const getGetWebsiteLinksQueryOptions = <TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(params: GetWebsiteLinksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1355,25 +1612,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetWebsiteLinksQueryResult = NonNullable<Awaited<ReturnType<typeof getWebsiteLinks>>>
 export type GetWebsiteLinksQueryError = HTTPValidationError
 
 
+export function useGetWebsiteLinks<TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(
+ params: GetWebsiteLinksParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getWebsiteLinks>>,
+          TError,
+          Awaited<ReturnType<typeof getWebsiteLinks>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetWebsiteLinks<TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(
+ params: GetWebsiteLinksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getWebsiteLinks>>,
+          TError,
+          Awaited<ReturnType<typeof getWebsiteLinks>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetWebsiteLinks<TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(
+ params: GetWebsiteLinksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Links
  */
 
 export function useGetWebsiteLinks<TData = Awaited<ReturnType<typeof getWebsiteLinks>>, TError = HTTPValidationError>(
- params: GetWebsiteLinksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ params: GetWebsiteLinksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebsiteLinks>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetWebsiteLinksQueryOptions(params,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1437,7 +1718,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useUploadWebsites = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadWebsites>>, TError,{data: WebsiteUploadRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof uploadWebsites>>,
         TError,
         {data: WebsiteUploadRequest},
@@ -1446,7 +1727,7 @@ export const useUploadWebsites = <TError = HTTPValidationError,
 
       const mutationOptions = getUploadWebsitesMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1503,7 +1784,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useReindexUrls = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reindexUrls>>, TError,{data: ReindexRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof reindexUrls>>,
         TError,
         {data: ReindexRequest},
@@ -1512,7 +1793,7 @@ export const useReindexUrls = <TError = HTTPValidationError,
 
       const mutationOptions = getReindexUrlsMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1541,7 +1822,7 @@ export const getWatchUrlsQueryKey = (collectionName?: string,) => {
     }
 
     
-export const getWatchUrlsQueryOptions = <TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(collectionName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>, }
+export const getWatchUrlsQueryOptions = <TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1556,25 +1837,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(collectionName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(collectionName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type WatchUrlsQueryResult = NonNullable<Awaited<ReturnType<typeof watchUrls>>>
 export type WatchUrlsQueryError = HTTPValidationError
 
 
+export function useWatchUrls<TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(
+ collectionName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof watchUrls>>,
+          TError,
+          Awaited<ReturnType<typeof watchUrls>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useWatchUrls<TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof watchUrls>>,
+          TError,
+          Awaited<ReturnType<typeof watchUrls>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useWatchUrls<TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Watch Urls
  */
 
 export function useWatchUrls<TData = Awaited<ReturnType<typeof watchUrls>>, TError = HTTPValidationError>(
- collectionName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ collectionName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof watchUrls>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getWatchUrlsQueryOptions(collectionName,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1641,7 +1946,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useUploadFiles = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFiles>>, TError,{data: BodyUploadFiles}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof uploadFiles>>,
         TError,
         {data: BodyUploadFiles},
@@ -1650,7 +1955,7 @@ export const useUploadFiles = <TError = HTTPValidationError,
 
       const mutationOptions = getUploadFilesMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1682,7 +1987,7 @@ export const getGetFileQueryKey = (collectionName?: string,
 
     
 export const getGetFileQueryOptions = <TData = Awaited<ReturnType<typeof getFile>>, TError = HTTPValidationError>(collectionName: string,
-    filename: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>, }
+    filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1697,26 +2002,53 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(collectionName && filename), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(collectionName && filename), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetFileQueryResult = NonNullable<Awaited<ReturnType<typeof getFile>>>
 export type GetFileQueryError = HTTPValidationError
 
 
+export function useGetFile<TData = Awaited<ReturnType<typeof getFile>>, TError = HTTPValidationError>(
+ collectionName: string,
+    filename: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFile>>,
+          TError,
+          Awaited<ReturnType<typeof getFile>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFile<TData = Awaited<ReturnType<typeof getFile>>, TError = HTTPValidationError>(
+ collectionName: string,
+    filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFile>>,
+          TError,
+          Awaited<ReturnType<typeof getFile>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFile<TData = Awaited<ReturnType<typeof getFile>>, TError = HTTPValidationError>(
+ collectionName: string,
+    filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get File
  */
 
 export function useGetFile<TData = Awaited<ReturnType<typeof getFile>>, TError = HTTPValidationError>(
  collectionName: string,
-    filename: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+    filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFile>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetFileQueryOptions(collectionName,filename,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1752,7 +2084,7 @@ export const getGetUploadProgressQueryKey = (taskId?: string,) => {
     }
 
     
-export const getGetUploadProgressQueryOptions = <TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(taskId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>, }
+export const getGetUploadProgressQueryOptions = <TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1767,25 +2099,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(taskId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(taskId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetUploadProgressQueryResult = NonNullable<Awaited<ReturnType<typeof getUploadProgress>>>
 export type GetUploadProgressQueryError = HTTPValidationError
 
 
+export function useGetUploadProgress<TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(
+ taskId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUploadProgress>>,
+          TError,
+          Awaited<ReturnType<typeof getUploadProgress>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUploadProgress<TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUploadProgress>>,
+          TError,
+          Awaited<ReturnType<typeof getUploadProgress>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUploadProgress<TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Upload Progress
  */
 
 export function useGetUploadProgress<TData = Awaited<ReturnType<typeof getUploadProgress>>, TError = HTTPValidationError>(
- taskId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUploadProgress>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUploadProgressQueryOptions(taskId,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1795,6 +2151,294 @@ export function useGetUploadProgress<TData = Awaited<ReturnType<typeof getUpload
 
 
 
+/**
+ * Retrieve all metric definitions (built-in and custom).
+ * @summary List Metrics
+ */
+export const listMetrics = (
+    
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<MetricListResponse>(
+      {url: `/evaluation/metrics`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getListMetricsQueryKey = () => {
+    return [
+    `/evaluation/metrics`
+    ] as const;
+    }
+
+    
+export const getListMetricsQueryOptions = <TData = Awaited<ReturnType<typeof listMetrics>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMetricsQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMetrics>>> = ({ signal }) => listMetrics(signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof listMetrics>>>
+export type ListMetricsQueryError = unknown
+
+
+export function useListMetrics<TData = Awaited<ReturnType<typeof listMetrics>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof listMetrics>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMetrics<TData = Awaited<ReturnType<typeof listMetrics>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof listMetrics>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMetrics<TData = Awaited<ReturnType<typeof listMetrics>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Metrics
+ */
+
+export function useListMetrics<TData = Awaited<ReturnType<typeof listMetrics>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetrics>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * Create a custom metric definition.
+ * @summary Create Metric
+ */
+export const createMetric = (
+    metricCreateRequest: MetricCreateRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<MetricResponse>(
+      {url: `/evaluation/metrics`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: metricCreateRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getCreateMetricMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMetric>>, TError,{data: MetricCreateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createMetric>>, TError,{data: MetricCreateRequest}, TContext> => {
+
+const mutationKey = ['createMetric'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMetric>>, {data: MetricCreateRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMetric(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMetricMutationResult = NonNullable<Awaited<ReturnType<typeof createMetric>>>
+    export type CreateMetricMutationBody = MetricCreateRequest
+    export type CreateMetricMutationError = HTTPValidationError
+
+    /**
+ * @summary Create Metric
+ */
+export const useCreateMetric = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMetric>>, TError,{data: MetricCreateRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createMetric>>,
+        TError,
+        {data: MetricCreateRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getCreateMetricMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * Update a custom metric definition.
+ * @summary Update Metric
+ */
+export const updateMetric = (
+    metricId: string,
+    metricUpdateRequest: MetricUpdateRequest,
+ ) => {
+      
+      
+      return customInstance<MetricResponse>(
+      {url: `/evaluation/metrics/${metricId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: metricUpdateRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdateMetricMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMetric>>, TError,{metricId: string;data: MetricUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateMetric>>, TError,{metricId: string;data: MetricUpdateRequest}, TContext> => {
+
+const mutationKey = ['updateMetric'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMetric>>, {metricId: string;data: MetricUpdateRequest}> = (props) => {
+          const {metricId,data} = props ?? {};
+
+          return  updateMetric(metricId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMetricMutationResult = NonNullable<Awaited<ReturnType<typeof updateMetric>>>
+    export type UpdateMetricMutationBody = MetricUpdateRequest
+    export type UpdateMetricMutationError = HTTPValidationError
+
+    /**
+ * @summary Update Metric
+ */
+export const useUpdateMetric = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMetric>>, TError,{metricId: string;data: MetricUpdateRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateMetric>>,
+        TError,
+        {metricId: string;data: MetricUpdateRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateMetricMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * Delete a custom metric. Built-in metrics cannot be deleted.
+ * @summary Delete Metric
+ */
+export const deleteMetric = (
+    metricId: string,
+ ) => {
+      
+      
+      return customInstance<void>(
+      {url: `/evaluation/metrics/${metricId}`, method: 'DELETE'
+    },
+      );
+    }
+  
+
+
+export const getDeleteMetricMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMetric>>, TError,{metricId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMetric>>, TError,{metricId: string}, TContext> => {
+
+const mutationKey = ['deleteMetric'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMetric>>, {metricId: string}> = (props) => {
+          const {metricId} = props ?? {};
+
+          return  deleteMetric(metricId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMetricMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMetric>>>
+    
+    export type DeleteMetricMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete Metric
+ */
+export const useDeleteMetric = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMetric>>, TError,{metricId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMetric>>,
+        TError,
+        {metricId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteMetricMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
 /**
  * Retrieve all evaluation datasets.
  * @summary List Datasets
@@ -1821,7 +2465,7 @@ export const getListDatasetsQueryKey = () => {
     }
 
     
-export const getListDatasetsQueryOptions = <TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>, }
+export const getListDatasetsQueryOptions = <TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -1836,25 +2480,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListDatasetsQueryResult = NonNullable<Awaited<ReturnType<typeof listDatasets>>>
 export type ListDatasetsQueryError = unknown
 
 
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDatasets>>,
+          TError,
+          Awaited<ReturnType<typeof listDatasets>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDatasets>>,
+          TError,
+          Awaited<ReturnType<typeof listDatasets>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Datasets
  */
 
 export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListDatasetsQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1918,7 +2586,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useCreateDataset = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDataset>>, TError,{data: DatasetCreateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createDataset>>,
         TError,
         {data: DatasetCreateRequest},
@@ -1927,7 +2595,7 @@ export const useCreateDataset = <TError = HTTPValidationError,
 
       const mutationOptions = getCreateDatasetMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -1984,7 +2652,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useUpdateDataset = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDataset>>, TError,{datasetId: string;data: DatasetUpdateRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateDataset>>,
         TError,
         {datasetId: string;data: DatasetUpdateRequest},
@@ -1993,7 +2661,7 @@ export const useUpdateDataset = <TError = HTTPValidationError,
 
       const mutationOptions = getUpdateDatasetMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -2047,7 +2715,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useDeleteDataset = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDataset>>, TError,{datasetId: string}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteDataset>>,
         TError,
         {datasetId: string},
@@ -2056,77 +2724,15 @@ export const useDeleteDataset = <TError = HTTPValidationError,
 
       const mutationOptions = getDeleteDatasetMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
- * Generate a synthetic QA dataset using RAGAS.
- * @summary Generate Ragas Dataset
- */
-export const generateRagasDataset = (
-    ragasGenerationRequest: RagasGenerationRequest,
- signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<DatasetResponse>(
-      {url: `/evaluation/ragas`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: ragasGenerationRequest, signal
-    },
-      );
-    }
-  
+ * Evaluate an assistant using LLM-as-judge metrics.
 
-
-export const getGenerateRagasDatasetMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateRagasDataset>>, TError,{data: RagasGenerationRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof generateRagasDataset>>, TError,{data: RagasGenerationRequest}, TContext> => {
-
-const mutationKey = ['generateRagasDataset'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateRagasDataset>>, {data: RagasGenerationRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  generateRagasDataset(data,)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type GenerateRagasDatasetMutationResult = NonNullable<Awaited<ReturnType<typeof generateRagasDataset>>>
-    export type GenerateRagasDatasetMutationBody = RagasGenerationRequest
-    export type GenerateRagasDatasetMutationError = HTTPValidationError
-
-    /**
- * @summary Generate Ragas Dataset
- */
-export const useGenerateRagasDataset = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateRagasDataset>>, TError,{data: RagasGenerationRequest}, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof generateRagasDataset>>,
-        TError,
-        {data: RagasGenerationRequest},
-        TContext
-      > => {
-
-      const mutationOptions = getGenerateRagasDatasetMutationOptions(options);
-
-      return useMutation(mutationOptions);
-    }
-    
-/**
- * Evaluate an assistant's performance using RAGAS metrics.
+Requires at least one metric_id. Questions can come from a saved dataset
+(dataset_id) or be provided inline (inline_questions). At least one source
+must be supplied.
  * @summary Evaluate Assistant
  */
 export const evaluateAssistant = (
@@ -2179,7 +2785,7 @@ const {mutation: mutationOptions} = options ?
  */
 export const useEvaluateAssistant = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluateAssistant>>, TError,{data: EvaluateAssistantRequest}, TContext>, }
- ): UseMutationResult<
+ , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof evaluateAssistant>>,
         TError,
         {data: EvaluateAssistantRequest},
@@ -2188,7 +2794,7 @@ export const useEvaluateAssistant = <TError = HTTPValidationError,
 
       const mutationOptions = getEvaluateAssistantMutationOptions(options);
 
-      return useMutation(mutationOptions);
+      return useMutation(mutationOptions, queryClient);
     }
     
 /**
@@ -2217,7 +2823,7 @@ export const getListEvaluationsQueryKey = () => {
     }
 
     
-export const getListEvaluationsQueryOptions = <TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>, }
+export const getListEvaluationsQueryOptions = <TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -2232,25 +2838,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListEvaluationsQueryResult = NonNullable<Awaited<ReturnType<typeof listEvaluations>>>
 export type ListEvaluationsQueryError = unknown
 
 
+export function useListEvaluations<TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listEvaluations>>,
+          TError,
+          Awaited<ReturnType<typeof listEvaluations>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListEvaluations<TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listEvaluations>>,
+          TError,
+          Awaited<ReturnType<typeof listEvaluations>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListEvaluations<TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Evaluations
  */
 
 export function useListEvaluations<TData = Awaited<ReturnType<typeof listEvaluations>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listEvaluations>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListEvaluationsQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -2286,7 +2916,7 @@ export const getGetEvaluationQueryKey = (evaluationId?: string,) => {
     }
 
     
-export const getGetEvaluationQueryOptions = <TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(evaluationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>, }
+export const getGetEvaluationQueryOptions = <TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(evaluationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -2301,25 +2931,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(evaluationId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(evaluationId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetEvaluationQueryResult = NonNullable<Awaited<ReturnType<typeof getEvaluation>>>
 export type GetEvaluationQueryError = HTTPValidationError
 
 
+export function useGetEvaluation<TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(
+ evaluationId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEvaluation>>,
+          TError,
+          Awaited<ReturnType<typeof getEvaluation>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEvaluation<TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(
+ evaluationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEvaluation>>,
+          TError,
+          Awaited<ReturnType<typeof getEvaluation>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEvaluation<TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(
+ evaluationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Evaluation
  */
 
 export function useGetEvaluation<TData = Awaited<ReturnType<typeof getEvaluation>>, TError = HTTPValidationError>(
- evaluationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ evaluationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluation>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetEvaluationQueryOptions(evaluationId,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -2330,79 +2984,10 @@ export function useGetEvaluation<TData = Awaited<ReturnType<typeof getEvaluation
 
 
 /**
- * Get all evaluations for a specific dataset.
- * @summary List Evaluations By Dataset
+ * Fetch available models from the Ollama instance.
+ * @summary List Ollama Models
  */
-export const listEvaluationsByDataset = (
-    datasetName: string,
- signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<EvaluationListResponse>(
-      {url: `/evaluation/datasets/${datasetName}/evaluations`, method: 'GET', signal
-    },
-      );
-    }
-  
-
-
-
-export const getListEvaluationsByDatasetQueryKey = (datasetName?: string,) => {
-    return [
-    `/evaluation/datasets/${datasetName}/evaluations`
-    ] as const;
-    }
-
-    
-export const getListEvaluationsByDatasetQueryOptions = <TData = Awaited<ReturnType<typeof listEvaluationsByDataset>>, TError = HTTPValidationError>(datasetName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluationsByDataset>>, TError, TData>, }
-) => {
-
-const {query: queryOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListEvaluationsByDatasetQueryKey(datasetName);
-
-  
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEvaluationsByDataset>>> = ({ signal }) => listEvaluationsByDataset(datasetName, signal);
-
-      
-
-      
-
-   return  { queryKey, queryFn, enabled: !!(datasetName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEvaluationsByDataset>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListEvaluationsByDatasetQueryResult = NonNullable<Awaited<ReturnType<typeof listEvaluationsByDataset>>>
-export type ListEvaluationsByDatasetQueryError = HTTPValidationError
-
-
-/**
- * @summary List Evaluations By Dataset
- */
-
-export function useListEvaluationsByDataset<TData = Awaited<ReturnType<typeof listEvaluationsByDataset>>, TError = HTTPValidationError>(
- datasetName: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluationsByDataset>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListEvaluationsByDatasetQueryOptions(datasetName,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  query.queryKey = queryOptions.queryKey ;
-
-  return query;
-}
-
-
-
-
-/**
- * Fetch available Ollama models from the host machine
- * @summary Get Ollama Models
- */
-export const getOllamaModelsIntegrationsOllamaModelsGet = (
+export const listOllamaModels = (
     
  signal?: AbortSignal
 ) => {
@@ -2417,47 +3002,71 @@ export const getOllamaModelsIntegrationsOllamaModelsGet = (
 
 
 
-export const getGetOllamaModelsIntegrationsOllamaModelsGetQueryKey = () => {
+export const getListOllamaModelsQueryKey = () => {
     return [
     `/integrations/ollama/models`
     ] as const;
     }
 
     
-export const getGetOllamaModelsIntegrationsOllamaModelsGetQueryOptions = <TData = Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>, TError, TData>, }
+export const getListOllamaModelsQueryOptions = <TData = Awaited<ReturnType<typeof listOllamaModels>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetOllamaModelsIntegrationsOllamaModelsGetQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListOllamaModelsQueryKey();
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>> = ({ signal }) => getOllamaModelsIntegrationsOllamaModelsGet(signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOllamaModels>>> = ({ signal }) => listOllamaModels(signal);
 
       
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetOllamaModelsIntegrationsOllamaModelsGetQueryResult = NonNullable<Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>>
-export type GetOllamaModelsIntegrationsOllamaModelsGetQueryError = unknown
+export type ListOllamaModelsQueryResult = NonNullable<Awaited<ReturnType<typeof listOllamaModels>>>
+export type ListOllamaModelsQueryError = unknown
 
 
+export function useListOllamaModels<TData = Awaited<ReturnType<typeof listOllamaModels>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOllamaModels>>,
+          TError,
+          Awaited<ReturnType<typeof listOllamaModels>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOllamaModels<TData = Awaited<ReturnType<typeof listOllamaModels>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOllamaModels>>,
+          TError,
+          Awaited<ReturnType<typeof listOllamaModels>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOllamaModels<TData = Awaited<ReturnType<typeof listOllamaModels>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get Ollama Models
+ * @summary List Ollama Models
  */
 
-export function useGetOllamaModelsIntegrationsOllamaModelsGet<TData = Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOllamaModelsIntegrationsOllamaModelsGet>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+export function useListOllamaModels<TData = Awaited<ReturnType<typeof listOllamaModels>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOllamaModels>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetOllamaModelsIntegrationsOllamaModelsGetQueryOptions(options)
+  const queryOptions = getListOllamaModelsQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -2492,7 +3101,7 @@ export const getHealthCheckQueryKey = () => {
     }
 
     
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, }
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -2507,25 +3116,49 @@ const {query: queryOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
 export type HealthCheckQueryError = unknown
 
 
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof healthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof healthCheck>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof healthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof healthCheck>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Health Check
  */
 
 export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = unknown>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, }
-  
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

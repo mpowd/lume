@@ -91,6 +91,17 @@ const markdownComponents = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MessageBubble({ message, isStreaming = false }) {
+  // System notes (memory toggled, etc.) render as a centred pill
+  if (message.role === 'system') {
+    return (
+      <div className="flex justify-center message-enter">
+        <span className="text-[11px] text-text-quaternary border border-white/5 rounded-full px-3 py-1">
+          {message.content}
+        </span>
+      </div>
+    )
+  }
+
   const isUser = message.role === 'user'
 
   return (

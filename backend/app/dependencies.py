@@ -10,6 +10,7 @@ from qdrant_client import QdrantClient
 from backend.config import settings
 from backend.db.mongodb import MongoDBClient
 from backend.db.repositories.assistant_repo import AssistantRepository
+from backend.db.repositories.conversation_repo import ConversationRepository
 from backend.db.repositories.evaluation_repo import EvaluationRepository
 from backend.db.repositories.knowledge_base_repo import KnowledgeBaseRepository
 from backend.services.assistant_service import AssistantService
@@ -38,6 +39,12 @@ def get_assistant_repo(
     return AssistantRepository(db=db)
 
 
+def get_conversation_repo(  # ← new
+    db: MongoDBClient = Depends(get_mongodb),
+) -> ConversationRepository:
+    return ConversationRepository(db=db)
+
+
 def get_knowledge_base_repo(
     db: MongoDBClient = Depends(get_mongodb),
     qdrant: QdrantClient = Depends(get_qdrant_client),
@@ -56,8 +63,9 @@ def get_evaluation_repo(
 
 def get_assistant_service(
     repo: AssistantRepository = Depends(get_assistant_repo),
+    conversation_repo: ConversationRepository = Depends(get_conversation_repo),  # ← new
 ) -> AssistantService:
-    return AssistantService(repo=repo)
+    return AssistantService(repo=repo, conversation_repo=conversation_repo)
 
 
 def get_knowledge_base_service(

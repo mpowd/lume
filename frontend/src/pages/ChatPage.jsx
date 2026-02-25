@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { MessageSquare, Bot, RefreshCw, Database, Cpu } from 'lucide-react'
 import { useListAssistants } from '../api/generated'
 import { sendMessageStream } from '../api/streaming'
 import AssistantSelector from '../components/chat/AssistantSelector'
 import MessageList from '../components/chat/MessageList'
 import ChatInput from '../components/chat/ChatInput'
+import MemoryToggle from '../components/chat/MemoryToggle'
 import LoadingSpinner from '../components/shared/LoadingSpinner'
 import ErrorAlert from '../components/shared/ErrorAlert'
 import Button from '../components/shared/Button'
+
+// Stable session ID per assistant selection (resets on "New Chat")
+function makeSessionId(assistantId) {
+  return `${assistantId}:${Date.now()}`
+}
 
 export default function ChatPage() {
   const { data: assistants = [], isLoading, error } = useListAssistants({ type: 'qa' })
@@ -15,12 +21,17 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [streamingMessageIndex, setStreamingMessageIndex] = useState(null)
+  const [memoryEnabled, setMemoryEnabled] = useState(false)
+  const [sessionId, setSessionId] = useState(null)
 
   const getOpeningMessage = (bot) =>
     bot.config.opening_message || `Hi! I'm ${bot.name}. How can I help you today?`
 
   const handleSelectAssistant = (bot) => {
     setSelectedAssistant(bot)
+    setSessionId(makeSessionId(bot.id))
+    // Use the assistant's default memory setting as initial toggle state
+    setMemoryEnabled(bot.config.memory_enabled ?? false)
     setMessages([{ role: 'assistant', content: getOpeningMessage(bot) }])
   }
 
@@ -35,6 +46,10 @@ export default function ChatPage() {
     setStreamingMessageIndex(assistantMessageIndex)
 
     sendMessageStream(selectedAssistant.id, input, {
+      // Pass session_id and memory_enabled so the backend knows the context
+      session_id: sessionId,
+      memory_enabled: memoryEnabled,
+
       onToken: (token) => {
         setMessages(prev => {
           const next = [...prev]
@@ -89,9 +104,33 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     if (selectedAssistant) {
+      // New session ID = fresh memory context
+      setSessionId(makeSessionId(selectedAssistant.id))
       setMessages([{ role: 'assistant', content: getOpeningMessage(selectedAssistant) }])
     }
   }
+
+  const handleMemoryToggle = useCallback((enabled) => {
+    setMemoryEnabled(enabled)
+    // If turning memory off mid-conversation, optionally show a system note
+    if (!enabled) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'system',
+          content: 'Memory disabled — the assistant will no longer remember previous messages.',
+        },
+      ])
+    } else {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'system',
+          content: 'Memory enabled — the assistant will now remember this conversation.',
+        },
+      ])
+    }
+  }, [])
 
   if (isLoading) {
     return <LoadingSpinner fullScreen text="Loading assistants..." />
@@ -148,7 +187,8 @@ export default function ChatPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <MemoryToggle enabled={memoryEnabled} onToggle={handleMemoryToggle} />
                     <Button variant="secondary" onClick={() => setSelectedAssistant(null)}>
                       Change Assistant
                     </Button>

@@ -1,5 +1,5 @@
 """
-Service layer for assistant business logic
+Service layer for assistant business logic.
 """
 
 import logging
@@ -14,6 +14,7 @@ from backend.app.exceptions import (
 from backend.core.assistants.base import BaseAssistant
 from backend.core.assistants.registry import AssistantRegistry
 from backend.db.repositories.assistant_repo import AssistantRepository
+from backend.db.repositories.conversation_repo import ConversationRepository
 from backend.schemas.assistant import (
     AssistantCreateRequest,
     AssistantResponse,
@@ -24,10 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 class AssistantService:
-    """Service for managing and executing assistants"""
+    """Service for managing and executing assistants."""
 
-    def __init__(self, repo: AssistantRepository):
+    def __init__(
+        self, repo: AssistantRepository, conversation_repo: ConversationRepository
+    ):
         self.repo = repo
+        self.conversation_repo = conversation_repo
         self._instance_cache: dict[str, BaseAssistant] = {}
 
     # ── CRUD ──────────────────────────────────────────────
@@ -92,14 +96,17 @@ class AssistantService:
         self, assistant_id: str, input_data: dict[str, Any]
     ) -> dict[str, Any]:
         start_time = time.time()
-
         instance, config, validated_input = self._prepare_execution(
             assistant_id, input_data
         )
 
-        # Non-streaming: collect the single yielded output
         result = None
-        async for output in instance.execute(config, validated_input, stream=False):
+        async for output in instance.execute(
+            config,
+            validated_input,
+            stream=False,
+            conversation_repo=self.conversation_repo,
+        ):
             result = output
 
         execution_time = time.time() - start_time
@@ -117,7 +124,12 @@ class AssistantService:
             assistant_id, input_data
         )
 
-        async for chunk in instance.execute(config, validated_input, stream=True):
+        async for chunk in instance.execute(
+            config,
+            validated_input,
+            stream=True,
+            conversation_repo=self.conversation_repo,
+        ):
             yield chunk
 
     # ── Schema / Type queries ─────────────────────────────

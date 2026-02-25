@@ -1,5 +1,5 @@
 """
-LLM answer generator
+LLM answer generator with optional conversation memory.
 """
 
 import logging
@@ -7,8 +7,9 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import PydanticOutputParser, StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 
 from backend.core.llm import get_chat_llm
@@ -62,21 +63,6 @@ async def generate(
     documents: list[Document],
     config: dict[str, Any],
 ) -> dict[str, Any]:
-    """
-    Generate an answer from retrieved documents.
-
-    Args:
-        query: The user's question.
-        documents: Retrieved context documents.
-        config: Assistant config dict with keys:
-            - llm_model, llm_provider
-            - system_prompt, user_prompt
-            - precise_citation (bool)
-            - precise_citation_system_prompt, precise_citation_user_prompt
-
-    Returns:
-        Dict with 'answer', 'sources', and 'contexts'.
-    """
     llm = get_chat_llm(
         model=config.get("llm_model"),
         provider=config.get("llm_provider"),
@@ -88,28 +74,44 @@ async def generate(
         return _generate_standard(query, documents, config, llm)
 
 
+def _build_standard_prompt(
+    system_prompt: str, user_prompt: str, has_history: bool
+) -> ChatPromptTemplate:
+    """Build prompt with or without the chat history placeholder."""
+    messages = [("system", system_prompt)]
+    if has_history:
+        messages.append(MessagesPlaceholder("chat_history"))
+    messages.append(("user", user_prompt))
+    return ChatPromptTemplate.from_messages(messages)
+
+
 def _generate_standard(
     query: str, documents: list[Document], config: dict[str, Any], llm
 ) -> dict[str, Any]:
-    """Standard generation — stream-compatible chain."""
     system_prompt = config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
     user_prompt = config.get("user_prompt", DEFAULT_USER_PROMPT)
+    chat_history: list[BaseMessage] = config.get("chat_history", [])
 
-    prompt = ChatPromptTemplate.from_messages(
-        [("system", system_prompt), ("user", user_prompt)]
-    )
+    prompt = _build_standard_prompt(system_prompt, user_prompt, bool(chat_history))
 
     chain = (
         {
             "context": lambda x: format_context(x["documents"]),
             "question": lambda x: x["question"],
+            **({"chat_history": lambda x: x["chat_history"]} if chat_history else {}),
         }
         | prompt
         | llm
         | StrOutputParser()
     )
 
-    answer = chain.invoke({"documents": documents, "question": query})
+    answer = chain.invoke(
+        {
+            "documents": documents,
+            "question": query,
+            "chat_history": chat_history,
+        }
+    )
 
     include_all = not config.get("reranking", False)
     return {
@@ -122,7 +124,7 @@ def _generate_standard(
 def _generate_precise(
     query: str, documents: list[Document], config: dict[str, Any], llm
 ) -> dict[str, Any]:
-    """Precise citation mode — returns answer with chunk indices."""
+    """Precise citation mode — history not injected (structured output is incompatible)."""
     logger.info("Using precise citation mode")
     parser = PydanticOutputParser(pydantic_object=CitedAnswer)
 
@@ -171,35 +173,28 @@ async def generate_stream(
     documents: list[Document],
     config: dict[str, Any],
 ) -> AsyncIterator:
-    """
-    Stream answer tokens. Falls back to non-streaming for precise citation.
-
-    Yields:
-        str tokens for standard mode, or a dict result for precise citation.
-    """
     llm = get_chat_llm(
         model=config.get("llm_model"),
         provider=config.get("llm_provider"),
     )
 
     if config.get("precise_citation", False):
-        # Precise citation can't stream — yield the full result
         result = _generate_precise(query, documents, config, llm)
         yield result
     else:
         system_prompt = config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
         user_prompt = config.get("user_prompt", DEFAULT_USER_PROMPT)
+        chat_history: list[BaseMessage] = config.get("chat_history", [])
 
-        prompt = ChatPromptTemplate.from_messages(
-            [("system", system_prompt), ("user", user_prompt)]
-        )
+        prompt = _build_standard_prompt(system_prompt, user_prompt, bool(chat_history))
 
         chain_input = {
             "context": lambda x: format_context(x["documents"]),
             "question": lambda x: x["question"],
+            **({"chat_history": lambda x: x["chat_history"]} if chat_history else {}),
         }
 
-        # Inject reference text variables into the chain
+        # Inject reference text variables
         references = config.get("references", [])
         for ref in references:
             ref_name = ref.get("name")
@@ -209,5 +204,11 @@ async def generate_stream(
 
         chain = chain_input | prompt | llm | StrOutputParser()
 
-        for token in chain.stream({"documents": documents, "question": query}):
+        for token in chain.stream(
+            {
+                "documents": documents,
+                "question": query,
+                "chat_history": chat_history,
+            }
+        ):
             yield token
