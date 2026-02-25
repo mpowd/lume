@@ -1,14 +1,15 @@
 """
-API routes for assistant management and execution
+API routes for assistant management and execution.
 """
 
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from backend.app.dependencies import get_assistant_service
+from backend.app.dependencies import get_assistant_service, get_conversation_repo
+from backend.db.repositories.conversation_repo import ConversationRepository
 from backend.schemas.assistant import (
     AssistantCreateRequest,
     AssistantResponse,
@@ -16,6 +17,7 @@ from backend.schemas.assistant import (
     ExecutionRequest,
     ExecutionResponse,
 )
+from backend.schemas.conversation import ConversationDetail, ConversationListItem
 from backend.services.assistant_service import AssistantService
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ── CRUD ──────────────────────────────────────────────────
+@router.get("/", response_model=list[AssistantResponse], operation_id="listAssistants")
+async def list_assistants(
+    type: str | None = Query(None),
+    is_active: bool | None = Query(None),
+    service: AssistantService = Depends(get_assistant_service),
+):
+    return service.list_assistants(assistant_type=type, is_active=is_active)
 
 
 @router.post(
@@ -36,60 +44,13 @@ async def create_assistant(
     request: AssistantCreateRequest,
     service: AssistantService = Depends(get_assistant_service),
 ):
-    """Create a new assistant"""
     return service.create(request)
-
-
-@router.get("/", response_model=list[AssistantResponse], operation_id="listAssistants")
-async def list_assistants(
-    type: str | None = Query(None, description="Filter by assistant type"),
-    is_active: bool | None = Query(None, description="Filter by active status"),
-    service: AssistantService = Depends(get_assistant_service),
-):
-    """List all assistants"""
-    return service.list_assistants(assistant_type=type, is_active=is_active)
-
-
-@router.get(
-    "/{assistant_id}", response_model=AssistantResponse, operation_id="getAssistant"
-)
-async def get_assistant(
-    assistant_id: str,
-    service: AssistantService = Depends(get_assistant_service),
-):
-    """Get a specific assistant"""
-    return service.get(assistant_id)
-
-
-@router.put(
-    "/{assistant_id}", response_model=AssistantResponse, operation_id="updateAssistant"
-)
-async def update_assistant(
-    assistant_id: str,
-    request: AssistantUpdateRequest,
-    service: AssistantService = Depends(get_assistant_service),
-):
-    """Update an assistant"""
-    return service.update(assistant_id, request)
-
-
-@router.delete("/{assistant_id}", status_code=204, operation_id="deleteAssistant")
-async def delete_assistant(
-    assistant_id: str,
-    service: AssistantService = Depends(get_assistant_service),
-):
-    """Delete an assistant"""
-    service.delete(assistant_id)
-
-
-# ── Types & Schemas ───────────────────────────────────────
 
 
 @router.get("/types/list", operation_id="listAssistantTypes")
 async def list_assistant_types(
     service: AssistantService = Depends(get_assistant_service),
 ):
-    """List all available assistant types"""
     return {"types": service.list_types()}
 
 
@@ -98,11 +59,55 @@ async def get_assistant_type_schema(
     assistant_type: str,
     service: AssistantService = Depends(get_assistant_service),
 ):
-    """Get schemas for a specific assistant type"""
     return service.get_schemas(assistant_type)
 
 
-# ── Execution ─────────────────────────────────────────────
+@router.get(
+    "/{assistant_id}/conversations",
+    response_model=list[ConversationListItem],
+    operation_id="listConversations",
+)
+async def list_conversations(
+    assistant_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    repo: ConversationRepository = Depends(get_conversation_repo),
+):
+    return repo.list_by_assistant(assistant_id, limit=limit)
+
+
+@router.get(
+    "/{assistant_id}/conversations/{session_id}",
+    response_model=ConversationDetail,
+    operation_id="getConversation",
+)
+async def get_conversation(
+    assistant_id: str,
+    session_id: str,
+    repo: ConversationRepository = Depends(get_conversation_repo),
+):
+    doc = repo.get_session(session_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {
+        "session_id": doc["session_id"],
+        "title": doc.get("title"),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+        "messages": doc.get("messages", []),
+    }
+
+
+@router.delete(
+    "/{assistant_id}/conversations/{session_id}",
+    status_code=204,
+    operation_id="deleteConversation",
+)
+async def delete_conversation(
+    assistant_id: str,
+    session_id: str,
+    repo: ConversationRepository = Depends(get_conversation_repo),
+):
+    repo.clear(session_id)
 
 
 @router.post(
@@ -115,19 +120,19 @@ async def execute_assistant(
     request: ExecutionRequest,
     service: AssistantService = Depends(get_assistant_service),
 ):
-    """Execute an assistant"""
     result = await service.execute(assistant_id, request.input_data)
     return ExecutionResponse(**result)
 
 
-@router.post("/{assistant_id}/execute-stream", operation_id="executeAssistantStream")
+@router.post(
+    "/{assistant_id}/execute-stream",
+    operation_id="executeAssistantStream",
+)
 async def execute_assistant_stream(
     assistant_id: str,
     request: ExecutionRequest,
     service: AssistantService = Depends(get_assistant_service),
 ):
-    """Execute an assistant in streaming mode"""
-
     async def event_generator():
         async for chunk in service.execute_stream(assistant_id, request.input_data):
             if isinstance(chunk, str):
@@ -136,3 +141,43 @@ async def execute_assistant_stream(
                 yield f"data: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ── 3. /{assistant_id} — catch-all LAST ───────────────────────────────────────
+
+
+@router.get(
+    "/{assistant_id}",
+    response_model=AssistantResponse,
+    operation_id="getAssistant",
+)
+async def get_assistant(
+    assistant_id: str,
+    service: AssistantService = Depends(get_assistant_service),
+):
+    return service.get(assistant_id)
+
+
+@router.put(
+    "/{assistant_id}",
+    response_model=AssistantResponse,
+    operation_id="updateAssistant",
+)
+async def update_assistant(
+    assistant_id: str,
+    request: AssistantUpdateRequest,
+    service: AssistantService = Depends(get_assistant_service),
+):
+    return service.update(assistant_id, request)
+
+
+@router.delete(
+    "/{assistant_id}",
+    status_code=204,
+    operation_id="deleteAssistant",
+)
+async def delete_assistant(
+    assistant_id: str,
+    service: AssistantService = Depends(get_assistant_service),
+):
+    service.delete(assistant_id)

@@ -12,6 +12,15 @@ from .registry import AssistantRegistry
 
 logger = logging.getLogger(__name__)
 
+TITLE_PROMPT = """Based on this conversation, write a short title (max 6 words).
+Return ONLY the title text — no quotes, no punctuation at the end, no explanation.
+Use the same language as the conversation.
+
+User: {question}
+Assistant: {answer}
+
+Title:"""
+
 
 class QAAssistantConfig(AssistantConfig):
     knowledge_base_ids: list[str] = []
@@ -82,12 +91,35 @@ class QAAssistant(BaseAssistant):
             return input_data.memory_enabled
         return config.memory_enabled
 
+    def _extract_assistant_id(self, session_id: str) -> str | None:
+        """Extract assistant_id from session_id (format: '{assistantId}-{timestamp}')."""
+        parts = session_id.rsplit("-", 1)
+        return parts[0] if len(parts) == 2 else None
+
+    async def _generate_title(
+        self, config: QAAssistantConfig, question: str, answer: str
+    ) -> str:
+        """Ask the same LLM to produce a short conversation title."""
+        try:
+            from langchain_core.messages import HumanMessage
+
+            from backend.core.llm import get_chat_llm
+
+            llm = get_chat_llm(model=config.llm_model, provider=config.llm_provider)
+            prompt = TITLE_PROMPT.format(question=question, answer=answer[:500])
+            response = await llm.ainvoke([HumanMessage(content=prompt)])
+            title = response.content.strip().strip('"').strip("'")
+            return title or "New conversation"
+        except Exception as e:
+            logger.warning(f"Title generation failed: {e}")
+            return "New conversation"
+
     async def execute(
         self,
         config: QAAssistantConfig,
         input_data: QAAssistantInput,
         stream: bool = False,
-        conversation_repo=None,  # ConversationRepository injected by AssistantService
+        conversation_repo=None,
     ):
         from ..generator import generate, generate_stream
         from ..retriever import retrieve
@@ -97,16 +129,22 @@ class QAAssistant(BaseAssistant):
 
             use_memory = self._use_memory(config, input_data)
             session_id = input_data.session_id
+            assistant_id = (
+                self._extract_assistant_id(session_id) if session_id else None
+            )
 
-            # ── Load history ──────────────────────────────────────────────────
+            # ── Load history for LLM context (only when memory is on) ─────────
             chat_history = []
-            if use_memory and session_id and conversation_repo is not None:
+            is_first_exchange = True
+            if session_id and conversation_repo is not None:
                 raw = conversation_repo.get_messages(session_id)
-                raw = raw[-(config.memory_window_k * 2) :]  # sliding window
-                chat_history = _to_langchain_messages(raw)
-                logger.info(
-                    f"Loaded {len(chat_history)} history messages for session {session_id}"
-                )
+                is_first_exchange = len(raw) == 0
+                if use_memory:
+                    windowed = raw[-(config.memory_window_k * 2) :]
+                    chat_history = _to_langchain_messages(windowed)
+                    logger.info(
+                        f"Loaded {len(chat_history)} history messages for session {session_id}"
+                    )
 
             # ── Retrieve ──────────────────────────────────────────────────────
             retrieved_docs = []
@@ -139,14 +177,24 @@ class QAAssistant(BaseAssistant):
                         contexts = chunk.get("contexts")
                         yield chunk.get("answer")
 
-                if use_memory and session_id and conversation_repo is not None:
+                answer_text = "".join(full_response)
+
+                # Always persist — memory toggle only affects LLM context, not storage
+                if session_id and conversation_repo is not None:
                     conversation_repo.append_messages(
                         session_id,
+                        assistant_id,
                         [
                             {"role": "human", "content": input_data.question},
-                            {"role": "ai", "content": "".join(full_response)},
+                            {"role": "ai", "content": answer_text},
                         ],
                     )
+                    if is_first_exchange:
+                        title = await self._generate_title(
+                            config, input_data.question, answer_text
+                        )
+                        conversation_repo.set_title(session_id, title)
+                        yield {"conversation_title": title, "session_id": session_id}
 
                 yield {"source_urls": urls, "contexts": contexts}
 
@@ -158,14 +206,21 @@ class QAAssistant(BaseAssistant):
                     config=config_dict,
                 )
 
-                if use_memory and session_id and conversation_repo is not None:
+                # Always persist
+                if session_id and conversation_repo is not None:
                     conversation_repo.append_messages(
                         session_id,
+                        assistant_id,
                         [
                             {"role": "human", "content": input_data.question},
                             {"role": "ai", "content": result["answer"]},
                         ],
                     )
+                    if is_first_exchange:
+                        title = await self._generate_title(
+                            config, input_data.question, result["answer"]
+                        )
+                        conversation_repo.set_title(session_id, title)
 
                 yield QAAssistantOutput(
                     result=result["answer"],
@@ -190,7 +245,6 @@ class QAAssistant(BaseAssistant):
 
 
 def _to_langchain_messages(raw: list[dict]):
-    """Convert stored dicts to LangChain message objects."""
     from langchain_core.messages import AIMessage, HumanMessage
 
     mapping = {"human": HumanMessage, "ai": AIMessage}

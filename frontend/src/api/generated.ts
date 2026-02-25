@@ -108,6 +108,41 @@ export interface CompletionStatResponse {
   variant?: string;
 }
 
+export type ConversationDetailTitle = string | null;
+
+export type ConversationDetailCreatedAt = string | null;
+
+export type ConversationDetailUpdatedAt = string | null;
+
+export interface ConversationDetail {
+  session_id: string;
+  title: ConversationDetailTitle;
+  created_at: ConversationDetailCreatedAt;
+  updated_at: ConversationDetailUpdatedAt;
+  messages: ConversationMessage[];
+}
+
+export type ConversationListItemTitle = string | null;
+
+export type ConversationListItemCreatedAt = string | null;
+
+export type ConversationListItemUpdatedAt = string | null;
+
+export type ConversationListItemLastMessage = string | null;
+
+export interface ConversationListItem {
+  session_id: string;
+  title: ConversationListItemTitle;
+  created_at: ConversationListItemCreatedAt;
+  updated_at: ConversationListItemUpdatedAt;
+  last_message: ConversationListItemLastMessage;
+}
+
+export interface ConversationMessage {
+  role: string;
+  content: string;
+}
+
 export type DatasetCreateRequestQaPairsItem = { [key: string]: unknown };
 
 export interface DatasetCreateRequest {
@@ -352,9 +387,6 @@ export type QAAssistantConfigPreciseCitationUserPrompt = string | null;
 
 export type QAAssistantConfigAgenticSystemPrompt = string | null;
 
-/**
- * Configuration for QA Assistant
- */
 export interface QAAssistantConfig {
   knowledge_base_ids?: string[];
   opening_message?: string;
@@ -379,6 +411,8 @@ export interface QAAssistantConfig {
   max_steps?: number;
   workflow?: string;
   agentic_system_prompt?: QAAssistantConfigAgenticSystemPrompt;
+  memory_enabled?: boolean;
+  memory_window_k?: number;
 }
 
 export type QuestionResultGroundTruth = string | null;
@@ -455,14 +489,16 @@ export interface WebsiteUploadRequest {
 }
 
 export type ListAssistantsParams = {
-/**
- * Filter by assistant type
- */
 type?: string | null;
-/**
- * Filter by active status
- */
 is_active?: boolean | null;
+};
+
+export type ListConversationsParams = {
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };
 
 export type GetWebsiteLinksParams = {
@@ -488,73 +524,6 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 /**
- * Create a new assistant
- * @summary Create Assistant
- */
-export const createAssistant = (
-    assistantCreateRequest: AssistantCreateRequest,
- signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<AssistantResponse>(
-      {url: `/assistants/`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: assistantCreateRequest, signal
-    },
-      );
-    }
-  
-
-
-export const getCreateAssistantMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext> => {
-
-const mutationKey = ['createAssistant'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAssistant>>, {data: AssistantCreateRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createAssistant(data,)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof createAssistant>>>
-    export type CreateAssistantMutationBody = AssistantCreateRequest
-    export type CreateAssistantMutationError = HTTPValidationError
-
-    /**
- * @summary Create Assistant
- */
-export const useCreateAssistant = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext>, }
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof createAssistant>>,
-        TError,
-        {data: AssistantCreateRequest},
-        TContext
-      > => {
-
-      const mutationOptions = getCreateAssistantMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    
-/**
- * List all assistants
  * @summary List Assistants
  */
 export const listAssistants = (
@@ -648,123 +617,29 @@ export function useListAssistants<TData = Awaited<ReturnType<typeof listAssistan
 
 
 /**
- * Get a specific assistant
- * @summary Get Assistant
+ * @summary Create Assistant
  */
-export const getAssistant = (
-    assistantId: string,
+export const createAssistant = (
+    assistantCreateRequest: AssistantCreateRequest,
  signal?: AbortSignal
 ) => {
       
       
       return customInstance<AssistantResponse>(
-      {url: `/assistants/${assistantId}`, method: 'GET', signal
-    },
-      );
-    }
-  
-
-
-
-export const getGetAssistantQueryKey = (assistantId?: string,) => {
-    return [
-    `/assistants/${assistantId}`
-    ] as const;
-    }
-
-    
-export const getGetAssistantQueryOptions = <TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
-) => {
-
-const {query: queryOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetAssistantQueryKey(assistantId);
-
-  
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAssistant>>> = ({ signal }) => getAssistant(assistantId, signal);
-
-      
-
-      
-
-   return  { queryKey, queryFn, enabled: !!(assistantId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetAssistantQueryResult = NonNullable<Awaited<ReturnType<typeof getAssistant>>>
-export type GetAssistantQueryError = HTTPValidationError
-
-
-export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
- assistantId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAssistant>>,
-          TError,
-          Awaited<ReturnType<typeof getAssistant>>
-        > , 'initialData'
-      >, }
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
- assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAssistant>>,
-          TError,
-          Awaited<ReturnType<typeof getAssistant>>
-        > , 'initialData'
-      >, }
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
- assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get Assistant
- */
-
-export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
- assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetAssistantQueryOptions(assistantId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
-
-  return query;
-}
-
-
-
-
-/**
- * Update an assistant
- * @summary Update Assistant
- */
-export const updateAssistant = (
-    assistantId: string,
-    assistantUpdateRequest: AssistantUpdateRequest,
- ) => {
-      
-      
-      return customInstance<AssistantResponse>(
-      {url: `/assistants/${assistantId}`, method: 'PUT',
+      {url: `/assistants/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: assistantUpdateRequest
+      data: assistantCreateRequest, signal
     },
       );
     }
   
 
 
-export const getUpdateAssistantMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext> => {
+export const getCreateAssistantMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext> => {
 
-const mutationKey = ['updateAssistant'];
+const mutationKey = ['createAssistant'];
 const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -774,10 +649,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAssistant>>, {assistantId: string;data: AssistantUpdateRequest}> = (props) => {
-          const {assistantId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAssistant>>, {data: AssistantCreateRequest}> = (props) => {
+          const {data} = props ?? {};
 
-          return  updateAssistant(assistantId,data,)
+          return  createAssistant(data,)
         }
 
         
@@ -785,92 +660,28 @@ const {mutation: mutationOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof updateAssistant>>>
-    export type UpdateAssistantMutationBody = AssistantUpdateRequest
-    export type UpdateAssistantMutationError = HTTPValidationError
+    export type CreateAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof createAssistant>>>
+    export type CreateAssistantMutationBody = AssistantCreateRequest
+    export type CreateAssistantMutationError = HTTPValidationError
 
     /**
- * @summary Update Assistant
+ * @summary Create Assistant
  */
-export const useUpdateAssistant = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext>, }
+export const useCreateAssistant = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAssistant>>, TError,{data: AssistantCreateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof updateAssistant>>,
+        Awaited<ReturnType<typeof createAssistant>>,
         TError,
-        {assistantId: string;data: AssistantUpdateRequest},
+        {data: AssistantCreateRequest},
         TContext
       > => {
 
-      const mutationOptions = getUpdateAssistantMutationOptions(options);
+      const mutationOptions = getCreateAssistantMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
     
 /**
- * Delete an assistant
- * @summary Delete Assistant
- */
-export const deleteAssistant = (
-    assistantId: string,
- ) => {
-      
-      
-      return customInstance<void>(
-      {url: `/assistants/${assistantId}`, method: 'DELETE'
-    },
-      );
-    }
-  
-
-
-export const getDeleteAssistantMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext> => {
-
-const mutationKey = ['deleteAssistant'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAssistant>>, {assistantId: string}> = (props) => {
-          const {assistantId} = props ?? {};
-
-          return  deleteAssistant(assistantId,)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAssistant>>>
-    
-    export type DeleteAssistantMutationError = HTTPValidationError
-
-    /**
- * @summary Delete Assistant
- */
-export const useDeleteAssistant = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext>, }
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteAssistant>>,
-        TError,
-        {assistantId: string},
-        TContext
-      > => {
-
-      const mutationOptions = getDeleteAssistantMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    
-/**
- * List all available assistant types
  * @summary List Assistant Types
  */
 export const listAssistantTypes = (
@@ -963,7 +774,6 @@ export function useListAssistantTypes<TData = Awaited<ReturnType<typeof listAssi
 
 
 /**
- * Get schemas for a specific assistant type
  * @summary Get Assistant Type Schema
  */
 export const getAssistantTypeSchema = (
@@ -1056,7 +866,268 @@ export function useGetAssistantTypeSchema<TData = Awaited<ReturnType<typeof getA
 
 
 /**
- * Execute an assistant
+ * @summary List Conversations
+ */
+export const listConversations = (
+    assistantId: string,
+    params?: ListConversationsParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<ConversationListItem[]>(
+      {url: `/assistants/${assistantId}/conversations`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getListConversationsQueryKey = (assistantId?: string,
+    params?: ListConversationsParams,) => {
+    return [
+    `/assistants/${assistantId}/conversations`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListConversationsQueryOptions = <TData = Awaited<ReturnType<typeof listConversations>>, TError = HTTPValidationError>(assistantId: string,
+    params?: ListConversationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListConversationsQueryKey(assistantId,params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listConversations>>> = ({ signal }) => listConversations(assistantId,params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(assistantId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListConversationsQueryResult = NonNullable<Awaited<ReturnType<typeof listConversations>>>
+export type ListConversationsQueryError = HTTPValidationError
+
+
+export function useListConversations<TData = Awaited<ReturnType<typeof listConversations>>, TError = HTTPValidationError>(
+ assistantId: string,
+    params: undefined |  ListConversationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listConversations>>,
+          TError,
+          Awaited<ReturnType<typeof listConversations>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListConversations<TData = Awaited<ReturnType<typeof listConversations>>, TError = HTTPValidationError>(
+ assistantId: string,
+    params?: ListConversationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listConversations>>,
+          TError,
+          Awaited<ReturnType<typeof listConversations>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListConversations<TData = Awaited<ReturnType<typeof listConversations>>, TError = HTTPValidationError>(
+ assistantId: string,
+    params?: ListConversationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Conversations
+ */
+
+export function useListConversations<TData = Awaited<ReturnType<typeof listConversations>>, TError = HTTPValidationError>(
+ assistantId: string,
+    params?: ListConversationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConversations>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListConversationsQueryOptions(assistantId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Get Conversation
+ */
+export const getConversation = (
+    assistantId: string,
+    sessionId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<ConversationDetail>(
+      {url: `/assistants/${assistantId}/conversations/${sessionId}`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetConversationQueryKey = (assistantId?: string,
+    sessionId?: string,) => {
+    return [
+    `/assistants/${assistantId}/conversations/${sessionId}`
+    ] as const;
+    }
+
+    
+export const getGetConversationQueryOptions = <TData = Awaited<ReturnType<typeof getConversation>>, TError = HTTPValidationError>(assistantId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConversationQueryKey(assistantId,sessionId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConversation>>> = ({ signal }) => getConversation(assistantId,sessionId, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(assistantId && sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetConversationQueryResult = NonNullable<Awaited<ReturnType<typeof getConversation>>>
+export type GetConversationQueryError = HTTPValidationError
+
+
+export function useGetConversation<TData = Awaited<ReturnType<typeof getConversation>>, TError = HTTPValidationError>(
+ assistantId: string,
+    sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getConversation>>,
+          TError,
+          Awaited<ReturnType<typeof getConversation>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetConversation<TData = Awaited<ReturnType<typeof getConversation>>, TError = HTTPValidationError>(
+ assistantId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getConversation>>,
+          TError,
+          Awaited<ReturnType<typeof getConversation>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetConversation<TData = Awaited<ReturnType<typeof getConversation>>, TError = HTTPValidationError>(
+ assistantId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Conversation
+ */
+
+export function useGetConversation<TData = Awaited<ReturnType<typeof getConversation>>, TError = HTTPValidationError>(
+ assistantId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getConversation>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetConversationQueryOptions(assistantId,sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Delete Conversation
+ */
+export const deleteConversation = (
+    assistantId: string,
+    sessionId: string,
+ ) => {
+      
+      
+      return customInstance<void>(
+      {url: `/assistants/${assistantId}/conversations/${sessionId}`, method: 'DELETE'
+    },
+      );
+    }
+  
+
+
+export const getDeleteConversationMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConversation>>, TError,{assistantId: string;sessionId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteConversation>>, TError,{assistantId: string;sessionId: string}, TContext> => {
+
+const mutationKey = ['deleteConversation'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteConversation>>, {assistantId: string;sessionId: string}> = (props) => {
+          const {assistantId,sessionId} = props ?? {};
+
+          return  deleteConversation(assistantId,sessionId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteConversationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteConversation>>>
+    
+    export type DeleteConversationMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete Conversation
+ */
+export const useDeleteConversation = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConversation>>, TError,{assistantId: string;sessionId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteConversation>>,
+        TError,
+        {assistantId: string;sessionId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteConversationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
  * @summary Execute Assistant
  */
 export const executeAssistant = (
@@ -1123,7 +1194,6 @@ export const useExecuteAssistant = <TError = HTTPValidationError,
     }
     
 /**
- * Execute an assistant in streaming mode
  * @summary Execute Assistant Stream
  */
 export const executeAssistantStream = (
@@ -1185,6 +1255,225 @@ export const useExecuteAssistantStream = <TError = HTTPValidationError,
       > => {
 
       const mutationOptions = getExecuteAssistantStreamMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * @summary Get Assistant
+ */
+export const getAssistant = (
+    assistantId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AssistantResponse>(
+      {url: `/assistants/${assistantId}`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetAssistantQueryKey = (assistantId?: string,) => {
+    return [
+    `/assistants/${assistantId}`
+    ] as const;
+    }
+
+    
+export const getGetAssistantQueryOptions = <TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAssistantQueryKey(assistantId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAssistant>>> = ({ signal }) => getAssistant(assistantId, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(assistantId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAssistantQueryResult = NonNullable<Awaited<ReturnType<typeof getAssistant>>>
+export type GetAssistantQueryError = HTTPValidationError
+
+
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistant>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistant>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistant>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistant>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Assistant
+ */
+
+export function useGetAssistant<TData = Awaited<ReturnType<typeof getAssistant>>, TError = HTTPValidationError>(
+ assistantId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistant>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAssistantQueryOptions(assistantId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Update Assistant
+ */
+export const updateAssistant = (
+    assistantId: string,
+    assistantUpdateRequest: AssistantUpdateRequest,
+ ) => {
+      
+      
+      return customInstance<AssistantResponse>(
+      {url: `/assistants/${assistantId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: assistantUpdateRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdateAssistantMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext> => {
+
+const mutationKey = ['updateAssistant'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAssistant>>, {assistantId: string;data: AssistantUpdateRequest}> = (props) => {
+          const {assistantId,data} = props ?? {};
+
+          return  updateAssistant(assistantId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof updateAssistant>>>
+    export type UpdateAssistantMutationBody = AssistantUpdateRequest
+    export type UpdateAssistantMutationError = HTTPValidationError
+
+    /**
+ * @summary Update Assistant
+ */
+export const useUpdateAssistant = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAssistant>>, TError,{assistantId: string;data: AssistantUpdateRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateAssistant>>,
+        TError,
+        {assistantId: string;data: AssistantUpdateRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateAssistantMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * @summary Delete Assistant
+ */
+export const deleteAssistant = (
+    assistantId: string,
+ ) => {
+      
+      
+      return customInstance<void>(
+      {url: `/assistants/${assistantId}`, method: 'DELETE'
+    },
+      );
+    }
+  
+
+
+export const getDeleteAssistantMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext> => {
+
+const mutationKey = ['deleteAssistant'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAssistant>>, {assistantId: string}> = (props) => {
+          const {assistantId} = props ?? {};
+
+          return  deleteAssistant(assistantId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAssistant>>>
+    
+    export type DeleteAssistantMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete Assistant
+ */
+export const useDeleteAssistant = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAssistant>>, TError,{assistantId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAssistant>>,
+        TError,
+        {assistantId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteAssistantMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

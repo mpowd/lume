@@ -6,7 +6,7 @@ interface StreamCallbacks {
     onToken: (token: string) => void
     onComplete: (result: { response: string; contexts: string[]; source_urls: string[] }) => void
     onError: (error: Error) => void
-    // Memory fields — forwarded straight to the backend
+    onTitle?: (title: string, sessionId: string) => void  // ← new: fired after first exchange
     session_id?: string
     memory_enabled?: boolean
 }
@@ -16,7 +16,7 @@ export async function sendMessageStream(
     message: string,
     callbacks: StreamCallbacks
 ) {
-    const { onToken, onComplete, onError, session_id, memory_enabled } = callbacks
+    const { onToken, onComplete, onError, onTitle, session_id, memory_enabled } = callbacks
 
     try {
         const response = await fetch(
@@ -68,6 +68,9 @@ export async function sendMessageStream(
                         if (data.token) {
                             fullResponse += data.token
                             onToken(data.token)
+                        } else if (data.conversation_title && onTitle) {
+                            // Fired once after the first exchange — update sidebar
+                            onTitle(data.conversation_title, data.session_id)
                         } else if (data.contexts) {
                             contexts = data.contexts
                             sourceUrls = data.source_urls || []
