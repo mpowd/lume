@@ -76,6 +76,7 @@ MONGODB_NAME=Lume
 
 3. **Start infrastructure services**
 ```bash
+./scripts/setup.sh
 docker compose -f docker-compose.services.yml up -d
 ```
 
