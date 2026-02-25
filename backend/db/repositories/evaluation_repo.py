@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 DATASETS_COLLECTION = "evaluation_datasets"
 EVALUATIONS_COLLECTION = "evaluations"
+METRICS_COLLECTION = "evaluation_metrics"
 
 
 class EvaluationRepository:
@@ -20,6 +21,69 @@ class EvaluationRepository:
 
     def __init__(self, db: MongoDBClient):
         self.db = db
+
+    # ── Metric definition operations ──────────────────────
+
+    def find_all_metrics(self) -> list[dict]:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        return [self._serialize(doc) for doc in collection.find({})]
+
+    def find_metric_by_id(self, metric_id: str) -> dict | None:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        doc = collection.find_one({"_id": ObjectId(metric_id)})
+        return self._serialize(doc) if doc else None
+
+    def find_metric_by_name(self, name: str) -> dict | None:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        doc = collection.find_one({"name": name})
+        return self._serialize(doc) if doc else None
+
+    def find_metrics_by_ids(self, metric_ids: list[str]) -> list[dict]:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        object_ids = [ObjectId(mid) for mid in metric_ids]
+        docs = list(collection.find({"_id": {"$in": object_ids}}))
+        return [self._serialize(doc) for doc in docs]
+
+    def insert_metric(self, data: dict) -> str:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        result = collection.insert_one(data)
+        return str(result.inserted_id)
+
+    def upsert_builtin_metric(self, metric: dict, now: str) -> None:
+        """
+        Atomically insert-or-update a built-in metric keyed on its name.
+
+        Uses MongoDB's update_one with upsert=True so that concurrent calls
+        (e.g. multiple Uvicorn workers all starting at the same time) will
+        never produce duplicate documents — the first write wins the upsert
+        and subsequent ones simply update the existing document.
+
+        `created_at` is set only on insert ($setOnInsert) so it is never
+        overwritten on subsequent restarts.
+        """
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        collection.update_one(
+            {"name": metric["name"]},
+            {
+                "$set": {**metric, "updated_at": now},
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+
+    def update_metric(self, metric_id: str, update_data: dict) -> dict | None:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        result = collection.find_one_and_update(
+            {"_id": ObjectId(metric_id)},
+            {"$set": update_data},
+            return_document=True,
+        )
+        return self._serialize(result) if result else None
+
+    def delete_metric(self, metric_id: str) -> bool:
+        collection = self.db.get_collection(METRICS_COLLECTION)
+        result = collection.delete_one({"_id": ObjectId(metric_id)})
+        return result.deleted_count > 0
 
     # ── Dataset operations ────────────────────────────────
 
@@ -38,7 +102,6 @@ class EvaluationRepository:
         return [self._serialize(doc) for doc in collection.find({})]
 
     def insert_dataset(self, data: dict) -> str:
-        """Insert a dataset, return the inserted ID as string."""
         collection = self.db.get_collection(DATASETS_COLLECTION)
         result = collection.insert_one(data)
         return str(result.inserted_id)
@@ -60,7 +123,6 @@ class EvaluationRepository:
     # ── Evaluation result operations ──────────────────────
 
     def insert_evaluation(self, data: dict) -> str:
-        """Insert an evaluation result, return the inserted ID as string."""
         collection = self.db.get_collection(EVALUATIONS_COLLECTION)
         result = collection.insert_one(data)
         return str(result.inserted_id)
@@ -68,24 +130,21 @@ class EvaluationRepository:
     def find_evaluation_by_id(self, evaluation_id: str) -> dict | None:
         collection = self.db.get_collection(EVALUATIONS_COLLECTION)
         doc = collection.find_one({"_id": ObjectId(evaluation_id)})
-        if not doc:
-            return None
-        return self._sanitize_metrics(self._serialize(doc))
+        return self._sanitize_floats(self._serialize(doc)) if doc else None
 
     def find_all_evaluations(self) -> list[dict]:
         collection = self.db.get_collection(EVALUATIONS_COLLECTION)
         docs = list(collection.find({}))
-        return [self._sanitize_metrics(self._serialize(doc)) for doc in docs]
+        return [self._sanitize_floats(self._serialize(doc)) for doc in docs]
 
-    def find_evaluations_by_dataset(self, dataset_name: str) -> list[dict]:
+    def find_evaluations_by_assistant(self, assistant_id: str) -> list[dict]:
         collection = self.db.get_collection(EVALUATIONS_COLLECTION)
-        docs = list(collection.find({"dataset_name": dataset_name}))
-        return [self._sanitize_metrics(self._serialize(doc)) for doc in docs]
+        docs = list(collection.find({"assistant_id": assistant_id}))
+        return [self._sanitize_floats(self._serialize(doc)) for doc in docs]
 
-    # ── Source document access (for RAGAS generation) ─────
+    # ── Source document access (for dataset generation) ───
 
     def get_collection_documents(self, collection_name: str) -> list[dict]:
-        """Get all documents from a source collection (for test generation)."""
         collection = self.db.get_collection(collection_name)
         return list(collection.find({}))
 
@@ -99,39 +158,18 @@ class EvaluationRepository:
         return doc
 
     @staticmethod
-    def _sanitize_metrics(doc: dict) -> dict:
-        """
-        Replace NaN/Inf with None in metric values.
-
-        Applied once here instead of in every route handler.
-        Handles both flat metrics dicts and nested evaluation structures.
-        """
+    def _sanitize_floats(doc: dict) -> dict:
+        """Replace NaN/Inf float values with None throughout a document."""
         if not doc:
             return doc
 
-        def clean_value(v):
-            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        def clean(obj):
+            if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
                 return None
-            return v
+            if isinstance(obj, dict):
+                return {k: clean(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [clean(item) for item in obj]
+            return obj
 
-        def clean_dict(d: dict) -> dict:
-            for key, value in d.items():
-                if isinstance(value, float):
-                    d[key] = clean_value(value)
-                elif isinstance(value, dict):
-                    clean_dict(value)
-                elif isinstance(value, list):
-                    for item in value:
-                        if isinstance(item, dict):
-                            clean_dict(item)
-            return d
-
-        # Handle the flat format (evaluate-assistant)
-        if "metrics" in doc and isinstance(doc["metrics"], dict):
-            clean_dict(doc["metrics"])
-        if "detailed_results" in doc and isinstance(doc["detailed_results"], list):
-            for detail in doc["detailed_results"]:
-                if isinstance(detail, dict):
-                    clean_dict(detail)
-
-        return doc
+        return clean(doc)

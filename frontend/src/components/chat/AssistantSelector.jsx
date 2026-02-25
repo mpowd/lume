@@ -8,10 +8,10 @@ export default function AssistantSelector({ assistants, onSelect }) {
   const scrollCarousel = (direction) => {
     if (carouselRef.current) {
       const scrollAmount = 320
-      const newScroll = direction === 'left' 
+      const newScroll = direction === 'left'
         ? Math.max(0, carouselScroll - scrollAmount)
         : Math.min(carouselRef.current.scrollWidth - carouselRef.current.clientWidth, carouselScroll + scrollAmount)
-      
+
       carouselRef.current.scrollTo({ left: newScroll, behavior: 'smooth' })
       setCarouselScroll(newScroll)
     }
@@ -29,23 +29,23 @@ export default function AssistantSelector({ assistants, onSelect }) {
       `}</style>
 
       {carouselScroll > 0 && (
-        <button 
-          onClick={() => scrollCarousel('left')} 
+        <button
+          onClick={() => scrollCarousel('left')}
           className="absolute left-6 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-border-subtle border border-border-default rounded-2xl transition-all shadow-lg"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
       )}
 
-      <div 
-        ref={carouselRef} 
-        className="carousel-container flex gap-4 overflow-x-auto pb-2" 
+      <div
+        ref={carouselRef}
+        className="carousel-container flex gap-4 overflow-x-auto pb-2"
         onScroll={(e) => setCarouselScroll(e.target.scrollLeft)}
       >
         {assistants.map((bot) => (
-          <div 
-            key={bot.id} 
-            onClick={() => onSelect(bot)} 
+          <div
+            key={bot.id}
+            onClick={() => onSelect(bot)}
             className="assistant-card flex-shrink-0 w-80 p-5 rounded-2xl border cursor-pointer bg-transparent border-border-default hover:border-border-brand hover:bg-background-elevated shadow-sm hover:shadow-brand"
           >
             <div className="flex items-start justify-between mb-3">
@@ -58,9 +58,9 @@ export default function AssistantSelector({ assistants, onSelect }) {
             </div>
 
             <p className="text-sm text-text-tertiary mb-4 line-clamp-2">
-              {bot.workflow === 'agentic' 
-                ? 'Agentic workflow with tools' 
-                : `Assistant with ${bot.collections?.length || 0} knowledge source${bot.collections?.length !== 1 ? 's' : ''}`
+              {bot.workflow === 'agentic'
+                ? 'Agentic workflow with tools'
+                : `Assistant connected to ${bot.config.knowledge_base_ids?.length || 0} collection${bot.config.knowledge_base_ids?.length !== 1 ? 's' : ''}`
               }
             </p>
 
@@ -71,10 +71,10 @@ export default function AssistantSelector({ assistants, onSelect }) {
                 </div>
                 <span className="text-text-tertiary">Knowledge:</span>
                 <span className="text-text-secondary font-medium">
-                  {bot.collections && bot.collections.length > 0 
-                    ? bot.collections.length === 1 
-                      ? bot.collections[0] 
-                      : `${bot.collections.length} sources` 
+                  {bot.config.knowledge_base_ids && bot.config.knowledge_base_ids.length > 0
+                    ? bot.config.knowledge_base_ids.length === 1
+                      ? bot.config.knowledge_base_ids[0]
+                      : `${bot.config.knowledge_base_ids.length} sources`
                     : 'None'}
                 </span>
               </div>
@@ -84,7 +84,7 @@ export default function AssistantSelector({ assistants, onSelect }) {
                   <Cpu className="w-3.5 h-3.5 text-brand-teal" />
                 </div>
                 <span className="text-text-tertiary">Model:</span>
-                <span className="text-text-secondary font-medium">{bot.llm || 'Not set'}</span>
+                <span className="text-text-secondary font-medium">{(bot.config.llm_provider + ": " + bot.config.llm_model) || 'Not set'}</span>
               </div>
             </div>
           </div>
@@ -92,8 +92,8 @@ export default function AssistantSelector({ assistants, onSelect }) {
       </div>
 
       {carouselRef.current && carouselScroll < (carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10) && (
-        <button 
-          onClick={() => scrollCarousel('right')} 
+        <button
+          onClick={() => scrollCarousel('right')}
           className="absolute right-6 top-1/2 -translate-y-1/2 z-10 p-2 bg-background-elevated/90 hover:bg-border-subtle border border-border-default rounded-2xl transition-all shadow-lg"
         >
           <ChevronRight className="w-5 h-5 text-white" />

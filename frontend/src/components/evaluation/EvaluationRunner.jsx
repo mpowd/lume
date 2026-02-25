@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Play, Check, Loader2, AlertCircle, ArrowLeft, Sparkles, Cpu } from 'lucide-react'
-import { evaluateAssistant, executeAssistant, getOllamaModelsIntegrationsOllamaModelsGet } from '../../api/generated'
+import { Play, Check, Loader2, AlertCircle, ArrowLeft, Sparkles } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  useEvaluateAssistant,
+  getListEvaluationsQueryKey,
+  executeAssistant,
+  getOllamaModelsIntegrationsOllamaModelsGet,
+} from '../../api/generated'
 import { OPENAI_MODELS } from '../../constants/models'
 import Card from '../shared/Card'
 import Button from '../shared/Button'
@@ -20,6 +26,14 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
   const [evalLLMModel, setEvalLLMModel] = useState('gpt-4o-mini')
   const [ollamaModels, setOllamaModels] = useState([])
   const [loadingOllamaModels, setLoadingOllamaModels] = useState(false)
+
+  const queryClient = useQueryClient()
+  const invalidateEvaluations = () =>
+    queryClient.invalidateQueries({ queryKey: getListEvaluationsQueryKey() })
+
+  const { mutateAsync: evaluateMutation } = useEvaluateAssistant({
+    mutation: { onSuccess: invalidateEvaluations },
+  })
 
   useEffect(() => { loadOllamaModelsList() }, [])
 
@@ -47,7 +61,6 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
     }
   }
 
-  // Support both Orval format (assistant.config.*) and legacy flattened format
   const qaAssistants = assistants?.filter(a => {
     const isQA = a.type === 'qa'
     const isActive = a.is_active !== false
@@ -102,15 +115,18 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
           }
         }
 
-        const evalResult = await evaluateAssistant({
-          dataset_name: dataset.name || dataset.dataset_name,
-          assistant_id: assistantId,
-          questions: qaArrays.questions,
-          ground_truths: qaArrays.ground_truths,
-          answers: qaArrays.answers,
-          retrieved_contexts: qaArrays.contexts,
-          eval_llm_model: evalLLMModel,
-          eval_llm_provider: evalLLMProvider,
+        // Use the mutation hook so the cache is automatically invalidated on success
+        const evalResult = await evaluateMutation({
+          data: {
+            dataset_name: dataset.name || dataset.dataset_name,
+            assistant_id: assistantId,
+            questions: qaArrays.questions,
+            ground_truths: qaArrays.ground_truths,
+            answers: qaArrays.answers,
+            retrieved_contexts: qaArrays.contexts,
+            eval_llm_model: evalLLMModel,
+            eval_llm_provider: evalLLMProvider,
+          },
         })
 
         setResults(prev => ({ ...prev, [assistantId]: evalResult }))
@@ -246,11 +262,13 @@ export default function EvaluationRunner({ datasets, assistants, selectedDataset
 
         {running && (
           <div className="mb-6 p-6 rounded-xl bg-brand-teal/10 border border-brand-teal/20">
-            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-            <p className="text-brand-teal font-medium">Running Evaluation...</p>
-            {progress.assistant && <p className="text-sm text-brand-teal/80">Testing {progress.assistant}: {progress.current} / {progress.total} questions</p>}
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="w-5 h-5 text-brand-teal animate-spin" />
+              <p className="text-brand-teal font-medium">Running Evaluation...</p>
+            </div>
+            {progress.assistant && <p className="text-sm text-brand-teal/80 mb-3">Testing {progress.assistant}: {progress.current} / {progress.total} questions</p>}
             <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
-              <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${(progress.current / progress.total) * 100}%` }} />
+              <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%` }} />
             </div>
           </div>
         )}

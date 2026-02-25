@@ -1,193 +1,248 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, FileText, ArrowLeft } from 'lucide-react'
-import { createDataset, updateDataset } from '../../api/generated'
+import {
+  ArrowLeft, Plus, Trash2, Database, Hash, FileText, AlertCircle
+} from 'lucide-react'
+import { useCreateDataset, useUpdateDataset } from '../../api/generated'
 import Button from '../shared/Button'
 import Card from '../shared/Card'
-import FormInput from '../shared/FormInput'
-import FormTextarea from '../shared/FormTextarea'
 
-const USE_CASE_TYPES = [
-  { id: 'qa', name: 'Question Answering', description: 'Evaluate answer quality and relevance', enabled: true, icon: '💬', fields: ['question', 'ground_truth'] },
-  { id: 'retrieval', name: 'Document Retrieval', description: 'Test document relevance and ranking', enabled: false, icon: '📄', fields: ['query', 'relevant_docs'] },
-  { id: 'summarization', name: 'Summarization', description: 'Evaluate summary quality', enabled: false, icon: '📝', fields: ['document', 'reference_summary'] }
-]
+// ── Empty QA pair factory ─────────────────────────────────
+const emptyPair = () => ({ question: '', ground_truth: '' })
 
-export default function DatasetCreator({ collections, dataset, onSuccess, onCancel }) {
-  const isEditMode = !!dataset
-  const [step, setStep] = useState(isEditMode ? 2 : 1)
-  const [selectedUseCase, setSelectedUseCase] = useState(null)
-  const [loading, setLoading] = useState(false)
+// ── Sub-component: single QA row ──────────────────────────
 
-  const [config, setConfig] = useState({ name: '', description: '' })
-  const [qaData, setQaData] = useState([{ question: '', ground_truth: '' }])
+function QAPairRow({ pair, index, onChange, onRemove, canRemove }) {
+  return (
+    <div className="group relative p-4 rounded-xl border border-white/8 bg-background-elevated hover:border-white/14 transition-all duration-200">
+      {/* Row header */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-mono text-text-quaternary">
+          #{String(index + 1).padStart(2, '0')}
+        </span>
+        {canRemove && (
+          <button
+            onClick={() => onRemove(index)}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 text-text-quaternary hover:text-red-400 transition-all duration-200"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
+      <div className="space-y-2.5">
+        {/* Question */}
+        <div>
+          <label className="block text-xs font-medium text-text-quaternary uppercase tracking-wide mb-1.5">
+            Question <span className="text-red-400">*</span>
+          </label>
+          <textarea
+            value={pair.question}
+            onChange={(e) => onChange(index, 'question', e.target.value)}
+            placeholder="Enter your question…"
+            rows={2}
+            className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-lg text-white text-sm placeholder:text-text-quaternary focus:outline-none focus:border-brand-teal/50 hover:border-white/20 transition-all resize-none leading-relaxed"
+          />
+        </div>
+
+        {/* Ground truth */}
+        <div>
+          <label className="block text-xs font-medium text-text-quaternary uppercase tracking-wide mb-1.5">
+            Expected Answer <span className="text-text-quaternary font-normal normal-case">(optional)</span>
+          </label>
+          <textarea
+            value={pair.ground_truth}
+            onChange={(e) => onChange(index, 'ground_truth', e.target.value)}
+            placeholder="Expected answer for correctness scoring…"
+            rows={2}
+            className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-lg text-text-secondary text-sm placeholder:text-text-quaternary focus:outline-none focus:border-brand-teal/50 hover:border-white/20 transition-all resize-none leading-relaxed"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────
+
+export default function DatasetCreator({ dataset, onSuccess, onCancel }) {
+  const isEdit = !!dataset
+
+  const [name, setName] = useState('')
+  const [pairs, setPairs] = useState([emptyPair()])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const { mutateAsync: createDataset } = useCreateDataset()
+  const { mutateAsync: updateDataset } = useUpdateDataset()
+
+  // Populate when editing
   useEffect(() => {
     if (dataset) {
-      setConfig({
-        name: dataset.name || dataset.dataset_name || '',
-        description: dataset.description || ''
-      })
-      if (dataset.qa_pairs && dataset.qa_pairs.length > 0) {
-        setQaData(dataset.qa_pairs.map(pair => ({
-          question: pair.question || '',
-          ground_truth: pair.ground_truth || pair.answer || ''
-        })))
-      }
-      if (dataset.use_case) {
-        const useCase = USE_CASE_TYPES.find(uc => uc.id === dataset.use_case)
-        setSelectedUseCase(useCase || USE_CASE_TYPES[0])
-      } else {
-        setSelectedUseCase(USE_CASE_TYPES[0])
-      }
+      setName(dataset.name || dataset.dataset_name || '')
+      const existingPairs = dataset.qa_pairs || []
+      setPairs(existingPairs.length ? existingPairs.map((p) => ({
+        question: p.question || '',
+        ground_truth: p.ground_truth || '',
+      })) : [emptyPair()])
     }
   }, [dataset])
 
-  const handleUseCaseSelect = (useCase) => {
-    if (!useCase.enabled) return
-    setSelectedUseCase(useCase)
-    setConfig({ name: '', description: '' })
-    setStep(2)
+  // ── Pair manipulation ─────────────────────────────────
+
+  const handlePairChange = (idx, field, value) => {
+    setPairs((prev) => {
+      const next = [...prev]
+      next[idx] = { ...next[idx], [field]: value }
+      return next
+    })
   }
 
-  const addQAPair = () => setQaData([...qaData, { question: '', ground_truth: '' }])
+  const addPair = () => setPairs((prev) => [...prev, emptyPair()])
 
-  const removeQAPair = (index) => {
-    if (qaData.length === 1) return
-    setQaData(qaData.filter((_, i) => i !== index))
-  }
+  const removePair = (idx) =>
+    setPairs((prev) => prev.filter((_, i) => i !== idx))
 
-  const updateQAPair = (index, field, value) => {
-    const updated = [...qaData]
-    updated[index][field] = value
-    setQaData(updated)
-  }
+  // ── Validation ────────────────────────────────────────
+
+  const validPairs = pairs.filter((p) => p.question.trim())
+  const isValid = name.trim() && validPairs.length > 0
+
+  // ── Submit ────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (!config.name.trim()) {
-      alert('Please provide a dataset name')
-      return
-    }
-
-    const validPairs = qaData.filter(pair => pair.question.trim() && pair.ground_truth.trim())
-    if (validPairs.length === 0) {
-      alert('Please add at least one complete Q&A pair')
-      return
-    }
-
-    setLoading(true)
+    if (!isValid) return
+    setError(null)
+    setSaving(true)
     try {
-      if (isEditMode) {
-        // Use Orval-generated function
-        await updateDataset(dataset._id || dataset.id, {
-          name: config.name,
-          qa_pairs: validPairs,
+      const payload = validPairs.map((p) => ({
+        question: p.question.trim(),
+        ground_truth: p.ground_truth.trim() || null,
+      }))
+
+      if (isEdit) {
+        const id = dataset._id || dataset.id
+        await updateDataset({
+          datasetId: id,
+          data: { name: name.trim(), qa_pairs: payload },
         })
       } else {
-        // Use Orval-generated function
         await createDataset({
-          dataset_name: config.name,
-          qa_pairs: validPairs,
+          data: { dataset_name: name.trim(), qa_pairs: payload },
         })
       }
       onSuccess()
-    } catch (error) {
-      alert(`Error ${isEditMode ? 'updating' : 'creating'} dataset: ` + (error.response?.data?.detail || error.message))
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Failed to save dataset')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
+  // ── Render ─────────────────────────────────────────────
+
   return (
-    <div className="max-w-5xl mx-auto">
-      {!isEditMode && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {['Select Use Case', 'Add Data'].map((label, idx) => (
-              <div key={idx} className="flex items-center flex-1">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 font-semibold transition-all ${step > idx + 1 ? 'bg-brand-teal border-brand-teal text-white' : step === idx + 1 ? 'bg-white border-white text-black' : 'bg-transparent border-white/20 text-slate-500'
-                  }`}>
-                  {step > idx + 1 ? '✓' : idx + 1}
-                </div>
-                <div className="ml-3 flex-1">
-                  <p className={`text-sm font-medium ${step >= idx + 1 ? 'text-white' : 'text-slate-500'}`}>{label}</p>
-                </div>
-                {idx < 1 && <div className={`h-0.5 flex-1 mx-4 ${step > idx + 1 ? 'bg-brand-teal' : 'bg-white/20'}`} />}
-              </div>
-            ))}
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Back + title */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 text-sm text-text-tertiary hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-brand-teal/10 border border-brand-teal/20">
+            <Database className="w-4 h-4 text-brand-teal" />
           </div>
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              {isEdit ? 'Edit Dataset' : 'New QA Dataset'}
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              Question–answer pairs used for evaluation runs
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Dataset name */}
+      <Card className="p-6">
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Dataset Name <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Product FAQ — v1"
+          className="w-full px-4 py-2.5 bg-transparent border border-white/10 rounded-xl text-white text-sm placeholder:text-text-quaternary focus:outline-none focus:border-brand-teal/50 hover:border-white/20 transition-all"
+        />
+      </Card>
+
+      {/* QA pairs */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-text-tertiary" />
+              <span className="text-sm font-medium text-text-secondary">Q&amp;A Pairs</span>
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-xs bg-background-elevated text-text-quaternary border border-white/8">
+              {validPairs.length} valid
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-text-quaternary">
+            <Hash className="w-3.5 h-3.5" />
+            {pairs.length} total
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {pairs.map((pair, i) => (
+            <QAPairRow
+              key={i}
+              pair={pair}
+              index={i}
+              onChange={handlePairChange}
+              onRemove={removePair}
+              canRemove={pairs.length > 1}
+            />
+          ))}
+        </div>
+
+        {/* Add pair button */}
+        <button
+          onClick={addPair}
+          className="mt-4 w-full py-3 flex items-center justify-center gap-2 text-sm text-text-tertiary hover:text-brand-teal border border-dashed border-white/10 hover:border-brand-teal/30 rounded-xl transition-all duration-200"
+        >
+          <Plus className="w-4 h-4" />
+          Add Q&amp;A pair
+        </button>
+      </Card>
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/20">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
-      {!isEditMode && step === 1 && (
-        <Card className="p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">Select Evaluation Use Case</h2>
-            <p className="text-slate-400">Choose what you want to evaluate</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {USE_CASE_TYPES.map((useCase) => (
-              <button key={useCase.id} onClick={() => handleUseCaseSelect(useCase)} disabled={!useCase.enabled}
-                className={`p-6 rounded-xl border-2 transition-all text-left ${useCase.enabled ? 'border-white/10 hover:border-brand-teal hover:bg-slate-900/50 cursor-pointer' : 'border-white/5 opacity-40 cursor-not-allowed'}`}>
-                <div className="text-4xl mb-4">{useCase.icon}</div>
-                <h3 className="text-lg font-semibold text-white mb-2">{useCase.name}</h3>
-                <p className="text-sm text-slate-400 mb-3">{useCase.description}</p>
-                {!useCase.enabled && <span className="inline-block px-2 py-1 text-xs rounded-full bg-slate-800 text-slate-500">Coming Soon</span>}
-              </button>
-            ))}
-          </div>
-          <div className="flex justify-end gap-3 mt-8">
-            <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-          </div>
-        </Card>
-      )}
-
-      {step === 2 && (
-        <Card className="p-8">
-          <div className="mb-6">
-            {!isEditMode && (
-              <button onClick={() => setStep(1)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-            )}
-            <h2 className="text-2xl font-bold text-white mb-2">{isEditMode ? `Edit Dataset: ${config.name}` : 'Create Dataset'}</h2>
-            <p className="text-slate-400">{isEditMode ? 'Update questions and ground truth answers' : 'Add dataset details and Q&A pairs'}</p>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            <FormInput label="Dataset Name" value={config.name} onChange={(e) => setConfig({ ...config, name: e.target.value })} placeholder="e.g., Product Support Q&A v1" required />
-            <FormTextarea label="Description (Optional)" value={config.description} onChange={(e) => setConfig({ ...config, description: e.target.value })} placeholder="Describe the purpose of this evaluation dataset..." rows={3} />
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Q&A Pairs</h3>
-            <div className="space-y-4">
-              {qaData.map((pair, index) => (
-                <div key={index} className="p-6 rounded-xl bg-brand-teal/5 border border-brand-teal/20 space-y-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-medium text-slate-400">Pair {index + 1}</span>
-                    {qaData.length > 1 && (
-                      <button onClick={() => removeQAPair(index)} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors text-red-400">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <FormTextarea label="Question" value={pair.question} onChange={(e) => updateQAPair(index, 'question', e.target.value)} placeholder="What is the refund policy?" rows={2} />
-                  <FormTextarea label="Ground Truth Answer" value={pair.ground_truth} onChange={(e) => updateQAPair(index, 'ground_truth', e.target.value)} placeholder="Our refund policy allows returns within 30 days..." rows={3} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Button variant="ghost" onClick={addQAPair} icon={Plus} fullWidth className="mb-6">Add Another Q&A Pair</Button>
-
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-            <Button variant="primary" onClick={handleSubmit} loading={loading} icon={FileText}>
-              {isEditMode ? 'Update Dataset' : 'Create Dataset'}
-            </Button>
-          </div>
-        </Card>
-      )}
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-3 pt-2">
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSubmit}
+          loading={saving}
+          disabled={!isValid}
+        >
+          {isEdit ? 'Save Changes' : 'Create Dataset'}
+        </Button>
+      </div>
     </div>
   )
 }

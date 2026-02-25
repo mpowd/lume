@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Sparkles, Database, Check, Lock, Plus, ScrollText, X, Edit2, MessageSquare } from 'lucide-react'
 import { useCollections } from '../../hooks/useCollections'
-import { getOllamaModelsIntegrationsOllamaModelsGet } from '../../api/generated'
+import { listOllamaModels } from '../../api/generated'
 import FormInput from '../shared/FormInput'
 import FormTextarea from '../shared/FormTextarea'
 import Button from '../shared/Button'
@@ -180,7 +180,7 @@ Question: {question}`
   const loadOllamaModels = async () => {
     setLoadingModels(true)
     try {
-      const response = await getOllamaModelsIntegrationsOllamaModelsGet()
+      const response = await listOllamaModels()
       const chatModels = (response.models || [])
         .filter(m => !m.name.includes('embed') && !m.name.includes('jina'))
         .map(m => ({ name: m.name, fullName: m.name, size: m.size }))

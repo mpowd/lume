@@ -935,6 +935,155 @@
         }
       }
     },
+    "/evaluation/metrics": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "List Metrics",
+        "description": "Retrieve all metric definitions (built-in and custom).",
+        "operationId": "listMetrics",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Create Metric",
+        "description": "Create a custom metric definition.",
+        "operationId": "createMetric",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluation/metrics/{metric_id}": {
+      "put": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Update Metric",
+        "description": "Update a custom metric definition.",
+        "operationId": "updateMetric",
+        "parameters": [
+          {
+            "name": "metric_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Delete Metric",
+        "description": "Delete a custom metric. Built-in metrics cannot be deleted.",
+        "operationId": "deleteMetric",
+        "parameters": [
+          {
+            "name": "metric_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/evaluation/datasets": {
       "get": {
         "tags": [
@@ -1084,55 +1233,13 @@
         }
       }
     },
-    "/evaluation/ragas": {
-      "post": {
-        "tags": [
-          "evaluation"
-        ],
-        "summary": "Generate Ragas Dataset",
-        "description": "Generate a synthetic QA dataset using RAGAS.",
-        "operationId": "generateRagasDataset",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RagasGenerationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DatasetResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/evaluation/evaluate-assistant": {
       "post": {
         "tags": [
           "evaluation"
         ],
         "summary": "Evaluate Assistant",
-        "description": "Evaluate an assistant's performance using RAGAS metrics.",
+        "description": "Evaluate an assistant using LLM-as-judge metrics.\n\nRequires at least one metric_id. Questions can come from a saved dataset\n(dataset_id) or be provided inline (inline_questions). At least one source\nmust be supplied.",
         "operationId": "evaluateAssistant",
         "requestBody": {
           "content": {
@@ -1233,57 +1340,14 @@
         }
       }
     },
-    "/evaluation/datasets/{dataset_name}/evaluations": {
-      "get": {
-        "tags": [
-          "evaluation"
-        ],
-        "summary": "List Evaluations By Dataset",
-        "description": "Get all evaluations for a specific dataset.",
-        "operationId": "listEvaluationsByDataset",
-        "parameters": [
-          {
-            "name": "dataset_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Dataset Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EvaluationListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/integrations/ollama/models": {
       "get": {
         "tags": [
           "integrations"
         ],
-        "summary": "Get Ollama Models",
-        "description": "Fetch available Ollama models from the host machine",
-        "operationId": "get_ollama_models_integrations_ollama_models_get",
+        "summary": "List Ollama Models",
+        "description": "Fetch available models from the Ollama instance.",
+        "operationId": "listOllamaModels",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1759,47 +1823,45 @@
       },
       "EvaluateAssistantRequest": {
         "properties": {
-          "dataset_name": {
-            "type": "string",
-            "title": "Dataset Name",
-            "description": "Name of the evaluation dataset"
-          },
           "assistant_id": {
             "type": "string",
             "title": "Assistant Id",
-            "description": "ID of the assistant being evaluated"
+            "description": "ID of the assistant to evaluate"
           },
-          "questions": {
+          "metric_ids": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Questions"
+            "title": "Metric Ids",
+            "description": "IDs of MetricDefinition documents to run"
           },
-          "ground_truths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Ground Truths"
-          },
-          "answers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Answers"
-          },
-          "retrieved_contexts": {
-            "items": {
-              "items": {
+          "dataset_id": {
+            "anyOf": [
+              {
                 "type": "string"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Retrieved Contexts",
-            "description": "Retrieved context chunks per question"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id",
+            "description": "ID of a saved evaluation dataset"
+          },
+          "inline_questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EvaluationQuestionInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inline Questions",
+            "description": "Ad-hoc questions when no saved dataset is used"
           },
           "eval_llm_model": {
             "type": "string",
@@ -1814,12 +1876,8 @@
         },
         "type": "object",
         "required": [
-          "dataset_name",
           "assistant_id",
-          "questions",
-          "ground_truths",
-          "answers",
-          "retrieved_contexts"
+          "metric_ids"
         ],
         "title": "EvaluateAssistantRequest"
       },
@@ -1839,19 +1897,66 @@
         ],
         "title": "EvaluationListResponse"
       },
+      "EvaluationQuestionInput": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "ground_truth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground Truth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "EvaluationQuestionInput",
+        "description": "A single question supplied inline (without a saved dataset)."
+      },
       "EvaluationResponse": {
         "properties": {
           "id": {
             "type": "string",
             "title": "Id"
           },
-          "dataset_name": {
-            "type": "string",
-            "title": "Dataset Name"
-          },
           "assistant_id": {
             "type": "string",
             "title": "Assistant Id"
+          },
+          "assistant_name": {
+            "type": "string",
+            "title": "Assistant Name"
+          },
+          "dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
           },
           "eval_llm_model": {
             "type": "string",
@@ -1861,16 +1966,26 @@
             "type": "string",
             "title": "Eval Llm Provider"
           },
-          "metrics": {
-            "$ref": "#/components/schemas/MetricsSummary"
-          },
-          "detailed_results": {
+          "metric_ids": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "type": "string"
             },
             "type": "array",
-            "title": "Detailed Results"
+            "title": "Metric Ids"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Summary"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionResult"
+            },
+            "type": "array",
+            "title": "Results"
           },
           "created_at": {
             "type": "string",
@@ -1880,12 +1995,15 @@
         "type": "object",
         "required": [
           "id",
-          "dataset_name",
           "assistant_id",
+          "assistant_name",
+          "dataset_id",
+          "dataset_name",
           "eval_llm_model",
           "eval_llm_provider",
-          "metrics",
-          "detailed_results",
+          "metric_ids",
+          "summary",
+          "results",
           "created_at"
         ],
         "title": "EvaluationResponse"
@@ -1969,55 +2087,266 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "MetricsSummary": {
+      "MetricCreateRequest": {
         "properties": {
-          "faithfulness": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Faithfulness"
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name, e.g. 'Grammar'"
           },
-          "context_recall": {
+          "description": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Context Recall"
+            "title": "Description",
+            "description": "Short description of what this metric measures"
           },
-          "answer_relevancy": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Answer Relevancy"
+          "type": {
+            "$ref": "#/components/schemas/MetricType",
+            "default": "llm_judge"
           },
-          "context_precision": {
+          "prompt_template": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Context Precision"
+            "title": "Prompt Template",
+            "description": "Prompt sent to the evaluator LLM. Use {question}, {answer}, {ground_truth}, {context} as placeholders. The model must return a single number."
+          },
+          "scale_min": {
+            "type": "number",
+            "title": "Scale Min",
+            "description": "Minimum score value",
+            "default": 0.0
+          },
+          "scale_max": {
+            "type": "number",
+            "title": "Scale Max",
+            "description": "Maximum score value",
+            "default": 1.0
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin",
+            "description": "True for pre-defined metrics shipped with the platform",
+            "default": false
+          },
+          "requires_context": {
+            "type": "boolean",
+            "title": "Requires Context",
+            "description": "If True, retrieval context must be available to use this metric",
+            "default": false
+          },
+          "requires_ground_truth": {
+            "type": "boolean",
+            "title": "Requires Ground Truth",
+            "description": "If True, ground truth must be provided in the dataset",
+            "default": false
           }
         },
         "type": "object",
-        "title": "MetricsSummary"
+        "required": [
+          "name"
+        ],
+        "title": "MetricCreateRequest"
+      },
+      "MetricListResponse": {
+        "properties": {
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricResponse"
+            },
+            "type": "array",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metrics"
+        ],
+        "title": "MetricListResponse"
+      },
+      "MetricResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "type": {
+            "$ref": "#/components/schemas/MetricType"
+          },
+          "prompt_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Template"
+          },
+          "scale_min": {
+            "type": "number",
+            "title": "Scale Min"
+          },
+          "scale_max": {
+            "type": "number",
+            "title": "Scale Max"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
+          },
+          "requires_context": {
+            "type": "boolean",
+            "title": "Requires Context"
+          },
+          "requires_ground_truth": {
+            "type": "boolean",
+            "title": "Requires Ground Truth"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "type",
+          "prompt_template",
+          "scale_min",
+          "scale_max",
+          "is_builtin",
+          "requires_context",
+          "requires_ground_truth",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MetricResponse"
+      },
+      "MetricType": {
+        "type": "string",
+        "enum": [
+          "llm_judge",
+          "exact_match"
+        ],
+        "title": "MetricType",
+        "description": "llm_judge: LLM scores the answer using a custom prompt template.\nexact_match: Simple string equality check (case-insensitive)."
+      },
+      "MetricUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "prompt_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Template"
+          },
+          "scale_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Min"
+          },
+          "scale_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Max"
+          },
+          "requires_context": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Context"
+          },
+          "requires_ground_truth": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Ground Truth"
+          }
+        },
+        "type": "object",
+        "title": "MetricUpdateRequest"
       },
       "ProgressStageResponse": {
         "properties": {
@@ -2249,35 +2578,52 @@
         "title": "QAAssistantConfig",
         "description": "Configuration for QA Assistant"
       },
-      "RagasGenerationRequest": {
+      "QuestionResult": {
         "properties": {
-          "collection_name": {
+          "question": {
             "type": "string",
-            "title": "Collection Name"
+            "title": "Question"
           },
-          "dataset_name": {
+          "answer": {
             "type": "string",
-            "title": "Dataset Name"
+            "title": "Answer"
           },
-          "testset_size": {
-            "type": "integer",
-            "title": "Testset Size",
-            "description": "Number of test cases to generate",
-            "default": 1
+          "ground_truth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground Truth"
           },
-          "model_name": {
-            "type": "string",
-            "title": "Model Name",
-            "description": "LLM model for generation",
-            "default": "gpt-4o-mini"
+          "context": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Scores",
+            "description": "Metric name \u2192 numeric score"
           }
         },
         "type": "object",
         "required": [
-          "collection_name",
-          "dataset_name"
+          "question",
+          "answer",
+          "ground_truth",
+          "context",
+          "scores"
         ],
-        "title": "RagasGenerationRequest"
+        "title": "QuestionResult"
       },
       "ReindexRequest": {
         "properties": {
