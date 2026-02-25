@@ -1,7 +1,5 @@
 """
-Question Answering Assistant with RAG.
-
-Orchestrates the retrieve → generate pipeline using core/ building blocks.
+Question Answering Assistant with RAG + optional conversation memory.
 """
 
 import logging
@@ -16,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class QAAssistantConfig(AssistantConfig):
-    """Configuration for QA Assistant"""
-
     knowledge_base_ids: list[str] = []
     opening_message: str = ""
     references: list[dict] = []
@@ -50,17 +46,19 @@ class QAAssistantConfig(AssistantConfig):
     workflow: str = "linear"
     agentic_system_prompt: str | None = None
 
+    # Memory
+    memory_enabled: bool = False
+    memory_window_k: int = 10
+
 
 class QAAssistantInput(AssistantInput):
-    """Input for QA Assistant"""
-
     question: str
     context: dict[str, Any] | None = Field(default_factory=dict)
+    session_id: str | None = None
+    memory_enabled: bool | None = None  # per-request override
 
 
 class QAAssistantOutput(AssistantOutput):
-    """Output from QA Assistant"""
-
     answer: str
     sources: list[dict[str, Any]] = Field(default_factory=list)
     contexts: list[str] = Field(default_factory=list)
@@ -68,8 +66,6 @@ class QAAssistantOutput(AssistantOutput):
 
 @AssistantRegistry.register("qa")
 class QAAssistant(BaseAssistant):
-    """Question Answering Assistant with RAG"""
-
     assistant_type = "qa"
 
     def get_config_schema(self) -> type[BaseModel]:
@@ -78,25 +74,41 @@ class QAAssistant(BaseAssistant):
     def get_input_schema(self) -> type[BaseModel]:
         return QAAssistantInput
 
+    def _use_memory(
+        self, config: QAAssistantConfig, input_data: QAAssistantInput
+    ) -> bool:
+        """Per-request flag wins; falls back to assistant config default."""
+        if input_data.memory_enabled is not None:
+            return input_data.memory_enabled
+        return config.memory_enabled
+
     async def execute(
         self,
         config: QAAssistantConfig,
         input_data: QAAssistantInput,
         stream: bool = False,
+        conversation_repo=None,  # ConversationRepository injected by AssistantService
     ):
-        """
-        Execute QA pipeline: retrieve → generate.
-
-        When stream=False: yields a single QAAssistantOutput.
-        When stream=True: yields str tokens, then a final metadata dict.
-        """
         from ..generator import generate, generate_stream
         from ..retriever import retrieve
 
         try:
             logger.info(f"Executing QA (stream={stream}): {input_data.question}")
 
-            # Step 1: Retrieve
+            use_memory = self._use_memory(config, input_data)
+            session_id = input_data.session_id
+
+            # ── Load history ──────────────────────────────────────────────────
+            chat_history = []
+            if use_memory and session_id and conversation_repo is not None:
+                raw = conversation_repo.get_messages(session_id)
+                raw = raw[-(config.memory_window_k * 2) :]  # sliding window
+                chat_history = _to_langchain_messages(raw)
+                logger.info(
+                    f"Loaded {len(chat_history)} history messages for session {session_id}"
+                )
+
+            # ── Retrieve ──────────────────────────────────────────────────────
             retrieved_docs = []
             if config.knowledge_base_ids:
                 retrieved_docs = await retrieve(
@@ -106,12 +118,13 @@ class QAAssistant(BaseAssistant):
                 )
             logger.info(f"Retrieved {len(retrieved_docs)} documents")
 
-            config_dict = config.model_dump()
+            config_dict = {**config.model_dump(), "chat_history": chat_history}
 
+            # ── Stream ────────────────────────────────────────────────────────
             if stream:
-                # Streaming mode: yield tokens then metadata
                 urls = [doc.metadata.get("source_url") for doc in retrieved_docs]
                 contexts = [doc.page_content for doc in retrieved_docs]
+                full_response: list[str] = []
 
                 async for chunk in generate_stream(
                     query=input_data.question,
@@ -119,22 +132,40 @@ class QAAssistant(BaseAssistant):
                     config=config_dict,
                 ):
                     if isinstance(chunk, str):
+                        full_response.append(chunk)
                         yield chunk
                     else:
-                        # Precise citation returns a dict
                         urls = chunk.get("sources")
                         contexts = chunk.get("contexts")
                         yield chunk.get("answer")
 
+                if use_memory and session_id and conversation_repo is not None:
+                    conversation_repo.append_messages(
+                        session_id,
+                        [
+                            {"role": "human", "content": input_data.question},
+                            {"role": "ai", "content": "".join(full_response)},
+                        ],
+                    )
+
                 yield {"source_urls": urls, "contexts": contexts}
 
+            # ── Non-stream ────────────────────────────────────────────────────
             else:
-                # Non-streaming mode: yield a single output
                 result = await generate(
                     query=input_data.question,
                     documents=retrieved_docs,
                     config=config_dict,
                 )
+
+                if use_memory and session_id and conversation_repo is not None:
+                    conversation_repo.append_messages(
+                        session_id,
+                        [
+                            {"role": "human", "content": input_data.question},
+                            {"role": "ai", "content": result["answer"]},
+                        ],
+                    )
 
                 yield QAAssistantOutput(
                     result=result["answer"],
@@ -153,3 +184,18 @@ class QAAssistant(BaseAssistant):
 
     def supports_evaluation(self) -> bool:
         return True
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _to_langchain_messages(raw: list[dict]):
+    """Convert stored dicts to LangChain message objects."""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    mapping = {"human": HumanMessage, "ai": AIMessage}
+    return [
+        mapping[msg["role"]](content=msg["content"])
+        for msg in raw
+        if msg.get("role") in mapping
+    ]
