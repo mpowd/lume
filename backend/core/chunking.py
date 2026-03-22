@@ -25,6 +25,7 @@ def chunk_documents(
     documents: list[dict],
     chunk_size: int = 1000,
     chunk_overlap: int = 100,
+    on_progress=None,
 ) -> tuple[list[Document], list[str]]:
     """
     Chunk a list of documents into smaller pieces for embedding.
@@ -58,10 +59,12 @@ def chunk_documents(
     all_chunks: list[Document] = []
     all_ids: list[str] = []
 
-    for doc_data in documents:
+    for idx, doc_data in enumerate(documents, 1):
         content = doc_data.get("markdown") or doc_data.get("content", "")
         if not content:
             logger.warning(f"Skipping document with no content: {doc_data.get('url')}")
+            if on_progress:
+                on_progress(idx, len(documents), doc_data.get("url", ""))
             continue
 
         try:
@@ -82,6 +85,9 @@ def chunk_documents(
 
         except Exception as e:
             logger.error(f"Error chunking {doc_data.get('url', 'unknown')}: {e}")
+
+        if on_progress:
+            on_progress(idx, len(documents), doc_data.get("url", ""))
 
     logger.info(
         f"Chunking complete: {len(all_chunks)} total chunks from {len(documents)} documents"

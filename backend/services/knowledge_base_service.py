@@ -234,10 +234,15 @@ class KnowledgeBaseService:
             self.progress.advance_to_stage(task_id, 1)
             self.progress.update_stage(task_id, 1, total=len(scraped_docs))
 
+            def on_chunk_progress(idx, total, url):
+                self.progress.update_stage(task_id, 1, current=idx, current_item=url)
+                self.progress.update_message(task_id, f"Chunking {idx}/{total}...")
+
             chunks, chunk_ids = chunk_documents(
                 scraped_docs,
                 chunk_size=collection_config.get("chunk_size", 1000),
                 chunk_overlap=collection_config.get("chunk_overlap", 100),
+                on_progress=on_chunk_progress,
             )
 
             # Stage 3: Embed and store
@@ -369,10 +374,15 @@ class KnowledgeBaseService:
             self.progress.advance_to_stage(task_id, 1)
             self.progress.update_stage(task_id, 1, total=len(parsed_docs))
 
+            def on_chunk_progress(idx, total, url):
+                self.progress.update_stage(task_id, 1, current=idx, current_item=url)
+                self.progress.update_message(task_id, f"Chunking {idx}/{total}...")
+
             chunks, chunk_ids = chunk_documents(
                 parsed_docs,
                 chunk_size=collection_config.get("chunk_size", 1000),
                 chunk_overlap=collection_config.get("chunk_overlap", 100),
+                on_progress=on_chunk_progress,
             )
 
             # Stage 3: Embed and store
@@ -545,7 +555,32 @@ class KnowledgeBaseService:
         for i in range(0, len(chunks), batch_size):
             batch_chunks = chunks[i : i + batch_size]
             batch_ids = chunk_ids[i : i + batch_size]
-            vector_store.add_documents(documents=batch_chunks, ids=batch_ids)
+            # Filter out empty/whitespace-only chunks that cause NaN embeddings
+            filtered = [
+                (chunk, cid)
+                for chunk, cid in zip(batch_chunks, batch_ids)
+                if chunk.page_content and chunk.page_content.strip()
+            ]
+            if not filtered:
+                continue
+            batch_chunks, batch_ids = zip(*filtered)
+            try:
+                vector_store.add_documents(
+                    documents=list(batch_chunks), ids=list(batch_ids)
+                )
+            except Exception as batch_err:
+                # A single bad chunk can fail the whole batch — retry one by one
+                logger.warning(
+                    f"Batch embedding failed ({batch_err}), retrying individually..."
+                )
+                for chunk, cid in zip(batch_chunks, batch_ids):
+                    try:
+                        vector_store.add_documents(documents=[chunk], ids=[cid])
+                    except Exception as chunk_err:
+                        logger.warning(
+                            f"Skipping chunk that failed embedding: {chunk_err!r} "
+                            f"| content preview: {chunk.page_content[:80]!r}"
+                        )
 
             current = min(i + batch_size, len(chunks))
             self.progress.update_stage(task_id, stage_index, current=current)
